@@ -105,8 +105,6 @@ class LineTask:
                 return return_results
 
             else:
-                # Normal triggering
-                return_results = None
                 return return_results
 
     def scheduler(self) -> None:

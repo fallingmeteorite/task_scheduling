@@ -20,7 +20,8 @@ timeout
 
 5.Automatically hibernate when there are no tasks
 
-!!! WARNING: If the task is running in a series of blocked tasks such as `time.sleep`, the task cannot be forcibly terminated, 
+!!! WARNING: If the task is running in a series of blocked tasks such as `time.sleep`, the task cannot be forcibly
+terminated,
 so use `await asyncio.sleep` for asynchronous tasks
 
 ## Installation
@@ -227,6 +228,8 @@ print(get_all_queue_info("line"))
 # Both asyntask and linetask contain this function, and the usage method is the same
 
 ```
+
+配置文件文件存放于`common/config.yaml`
 
 # Reference libraries:
 
