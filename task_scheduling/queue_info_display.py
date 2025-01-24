@@ -1,6 +1,7 @@
 import time
 from typing import Dict
 
+from .common.config import config
 from .scheduler.asyn_task_assignment import asyntask
 from .scheduler.line_task_assignment import linetask
 
@@ -16,18 +17,16 @@ def format_task_info(task_id: str, details: Dict) -> str:
     start_time = details.get("start_time", 0)
     end_time = details.get("end_time", 0)
     status = details.get("status", "unknown")
-    continue_timing = details.get("continue_timing", True)
 
-    if continue_timing:
-        if end_time == "NaN":
-            elapsed_time_display = end_time
-        else:
-            # Display elapsed time
-            elapsed_time = time.time() - start_time if time.time() - start_time >= 0 else 0
-            elapsed_time_display = f"{elapsed_time:.2f}"
-
+    # Calculate elapsed time
+    if status == "running":
+        elapsed_time = time.time() - start_time if time.time() - start_time >= 0  else 0
+        elapsed_time_display = f"{elapsed_time:.2f}"
+    elif end_time == "NaN":
+        elapsed_time_display = "NaN"
     else:
-        elapsed_time_display = "NAN"
+        elapsed_time = end_time - start_time if end_time - start_time >= 0 else 0
+        elapsed_time_display = f"{elapsed_time:.2f}"
 
     # Add special hints based on status
     status_hint = ""
@@ -46,7 +45,7 @@ def get_queue_info_string(task_queue, queue_type: str) -> str:
     Get the string of queue information.
 
     :param task_queue: Task queue object.
-    :param queue_type: Queue type (e.g., "线性" or "异步").
+    :param queue_type: Queue type (e.g., "line" or "asyncio").
     :return: String of queue information.
     """
     try:
@@ -78,10 +77,12 @@ def get_all_queue_info(queue_type: str) -> str:
     """
     Get the string of all queue information.
 
-    :param queue_type: Queue type (e.g., "线性" or "异步").
+    :param queue_type: Queue type (e.g., "line" or "asyncio").
     :return: String of all queue information.
     """
     if queue_type == "line":
         return get_queue_info_string(linetask, queue_type="line")
-    else:
+    elif queue_type == "asyncio":
         return get_queue_info_string(asyntask, queue_type="asyncio")
+    else:
+        return f"Unknown queue type: {queue_type}"

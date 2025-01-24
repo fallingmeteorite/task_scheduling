@@ -3,10 +3,11 @@ from typing import Dict
 
 import yaml
 
-from ..common.logging import logger
+from ..common.log_config import logger
 
 # Global configuration dictionary to store loaded configurations
 config: Dict = {}
+
 
 def get_package_directory() -> str:
     """
@@ -17,6 +18,7 @@ def get_package_directory() -> str:
     """
     import os
     return os.path.dirname(__file__)
+
 
 def load_config(file_path=f'{get_package_directory()}/config.yaml') -> bool:
     """
@@ -32,7 +34,7 @@ def load_config(file_path=f'{get_package_directory()}/config.yaml') -> bool:
         with open(file_path, 'r', encoding='utf-8') as f:
             # Safely load the YAML file using yaml.safe_load
             config.update(yaml.safe_load(f))
-            logger.debug("Configuration file loaded successfully")
+            logger.info("Configuration file loaded successfully")
             return True  # Return True indicating successful loading
     except Exception as error:
         logger.error(f"Unknown error occurred while loading configuration file: {error}")

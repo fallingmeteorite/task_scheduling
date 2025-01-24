@@ -7,7 +7,7 @@ from typing import Callable, Dict, List, Tuple, Optional, Any
 from weakref import WeakValueDictionary
 
 from ..common.config import config
-from ..common.logging import logger
+from ..common.log_config import logger
 from ..scheduler.memory_release import memory_release_decorator
 from ..stopit.task_destruction import task_manager
 from ..stopit.threadstop import ThreadingTimeout, TimeoutException
@@ -35,7 +35,7 @@ class LineTask:
         self.scheduler_thread: Optional[threading.Thread] = None  # Scheduler thread
         self.banned_task_ids: List[str] = []  # List of banned task IDs
         self.idle_timer: Optional[threading.Timer] = None  # Idle timer
-        self.idle_timeout = config["scheduler_check_interval"]  # Idle timeout, default is 60 seconds
+        self.idle_timeout = config["max_idle_time"]  # Idle timeout, default is 60 seconds
         self.idle_timer_lock = threading.Lock()  # Idle timer lock
         self.task_results: Dict[str, List[Any]] = {}  # Store task return results, keep up to 2 results for each task ID
 
@@ -65,45 +65,49 @@ class LineTask:
 
         :param task: Task tuple, including timeout processing flag, task ID, task function, positional arguments, and keyword arguments.
         """
-        thread_local_data = threading.local()
-        thread_local_data.timeout_processing, thread_local_data.task_id, thread_local_data.func, thread_local_data.args, thread_local_data.kwargs = task
-        logger.debug(f"Start running linear task, task name: {thread_local_data.task_id}")
-
+        timeout_processing, task_id, func, args, kwargs = task
         try:
-            if thread_local_data.task_id in self.banned_task_ids:
-                logger.warning(f"Task {thread_local_data.task_id} is banned and will be deleted")
+            if task_id in self.banned_task_ids:
+                logger.warning(f"Task {task_id} is banned and will be deleted")
                 return
 
             with self.lock:
-                self.task_details[thread_local_data.task_id] = {
+                self.task_details[task_id] = {
                     "start_time": time.time(),
-                    "status": "running"
+                    "status": "running",
+                    "timeout_processing": timeout_processing  # Add this line to record timeout_processing flag
                 }
 
-            if thread_local_data.timeout_processing:
+            logger.info(f"Start running linear task, task name: {task_id}")
+            if timeout_processing:
                 with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False) as task_control:
-                    task_manager.add(task_control, thread_local_data.task_id)
-                    return_results = thread_local_data.func(*thread_local_data.args, **thread_local_data.kwargs)
-                    task_manager.remove(thread_local_data.task_id)
+                    task_manager.add(task_control, task_id)
+                    return_results = func(*args, **kwargs)
+                    task_manager.remove(task_id)
             else:
                 with ThreadingTimeout(seconds=None, swallow_exc=True) as task_control:
-                    task_manager.add(task_control, thread_local_data.task_id)
-                    return_results = thread_local_data.func(*thread_local_data.args, **thread_local_data.kwargs)
-                    task_manager.remove(thread_local_data.task_id)
+                    task_manager.add(task_control, task_id)
+                    return_results = func(*args, **kwargs)
+                    task_manager.remove(task_id)
         except TimeoutException:
-            logger.warning(f"Linear queue task | {thread_local_data.task_id} | timed out, forced termination")
-            task_manager.remove(thread_local_data.task_id)
+            logger.warning(f"Linear queue task | {task_id} | timed out, forced termination")
+            self.update_task_status(task_id, "timeout")
             raise  # Re-raise the exception to be handled by the task_done callback
         except Exception as e:
-            logger.error(f"Linear task {thread_local_data.task_id} execution failed: {e}")
-            task_manager.remove(thread_local_data.task_id)
-            self.log_error(thread_local_data.task_id, e)
+            logger.error(f"Linear task {task_id} execution failed: {e}")
+            self.log_error(task_id, e)
             raise  # Re-raise the exception to be handled by the task_done callback
         finally:
-            # Explicitly delete no longer used variables
-            del thread_local_data.timeout_processing, thread_local_data.task_id, thread_local_data.func, thread_local_data.args, thread_local_data.kwargs
+            if task_manager.check(task_id):
+                task_manager.remove(task_id)
+                # Define variables when they are not defined
+                return_results = "error happen"
+                return return_results
 
-        return return_results
+            else:
+                # Normal triggering
+                return_results = None
+                return return_results
 
     def scheduler(self) -> None:
         """
@@ -161,11 +165,13 @@ class LineTask:
                 self.task_results[task_id].append(result)
                 if len(self.task_results[task_id]) > 2:
                     self.task_results[task_id].pop(0)  # Remove the oldest result
+            if not result == "error happen":
+                self.update_task_status(task_id, "completed")
 
-            self.update_task_status(task_id, "completed")
-        except TimeoutException:
-            logger.warning(f"Linear queue task | {task_id} | timed out, forced termination")
+        except TimeoutException as e:
+            logger.error(f"Linear task {task_id} timed out: {e}")
             self.update_task_status(task_id, "timeout")
+            self.log_error(task_id, e)
         except Exception as e:
             logger.error(f"Linear task {task_id} execution failed: {e}")
             self.update_task_status(task_id, "failed")
@@ -175,8 +181,6 @@ class LineTask:
             with self.lock:
                 if task_id in self.running_tasks:
                     del self.running_tasks[task_id]
-                if task_id in self.task_results and not self.task_results[task_id]:
-                    del self.task_results[task_id]
 
             # Check if all tasks are completed
             with self.lock:
@@ -195,8 +199,12 @@ class LineTask:
                 del self.running_tasks[task_id]
             if task_id in self.task_details:
                 self.task_details[task_id]["status"] = status
-                self.task_details[task_id]["end_time"] = time.time()
-                del self.task_details[task_id]
+                # Set end_time to NaN if the task failed because of timeout and timeout_processing was False
+                print(status)
+                if status == "timeout":
+                    self.task_details[task_id]["end_time"] = "NaN"
+                else:
+                    self.task_details[task_id]["end_time"] = time.time()
 
     def log_error(self, task_id: str, exception: Exception) -> None:
         """
@@ -215,7 +223,7 @@ class LineTask:
             if len(self.error_logs) > 10:
                 self.error_logs.pop(0)
 
-    def add_task(self, timeout_processing: bool, task_id: str, func: Callable, *args, **kwargs) -> None:
+    def add_task(self, timeout_processing: bool, task_id: str, func: Callable, *args, **kwargs) -> bool:
         """
         Add a task to the task queue.
 
@@ -224,10 +232,11 @@ class LineTask:
         :param func: Task function.
         :param args: Positional arguments for the task function.
         :param kwargs: Keyword arguments for the task function.
+        :return: True if the task was successfully added, False otherwise.
         """
         if task_id in self.banned_task_ids:
             logger.warning(f"Task {task_id} is banned and will be deleted")
-            return
+            return False
 
         if self.task_queue.qsize() <= config["maximum_queue_line"]:
             self.task_queue.put((timeout_processing, task_id, func, args, kwargs))
@@ -240,8 +249,10 @@ class LineTask:
 
             # Cancel the idle timer
             self.cancel_idle_timer()
+            return True
         else:
             logger.warning(f"Task {task_id} not added, queue is full")
+            return False
 
     def start_scheduler(self) -> None:
         """
@@ -309,29 +320,12 @@ class LineTask:
             Dict: Dictionary containing queue size, number of running tasks, task details, and error logs.
         """
         with self.lock:
-            current_time = time.time()
             queue_info = {
                 "queue_size": self.task_queue.qsize(),
                 "running_tasks_count": len(self.running_tasks),
-                "task_details": {},
+                "task_details": self.task_details.copy(),
                 "error_logs": self.error_logs.copy()
             }
-
-            for task_id, details in self.task_details.items():
-                status = details.get("status")
-                if status == "running":
-                    start_time = details.get("start_time")
-                    if current_time - start_time > config["watch_dog_time"]:
-                        queue_info["task_details"][task_id] = {
-                            "start_time": start_time,
-                            "status": status,
-                            "end_time": "NaN"
-                        }
-                    else:
-                        queue_info["task_details"][task_id] = details
-                else:
-                    queue_info["task_details"][task_id] = details
-
             return queue_info
 
     def force_stop_task(self, task_id: str) -> None:
@@ -381,6 +375,10 @@ class LineTask:
 
             # Cancel all queued tasks with the banned task ID
             self.cancel_all_queued_tasks(task_id)
+
+            # Cancel any running tasks with the banned task ID
+            if task_id in self.running_tasks:
+                self.force_stop_task(task_id)
 
     def cancel_all_queued_tasks(self, task_id: str) -> None:
         """

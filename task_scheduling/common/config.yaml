@@ -10,8 +10,5 @@ line_task_max: 4
 # How many seconds after the task is executed (seconds)
 watch_dog_time: 60
 
-# Controls the time interval at which the scheduled thread checks the task (seconds)
-scheduler_check_interval: 18
-
 #When the scheduler throttles how long it stops (seconds)
 max_idle_time: 60

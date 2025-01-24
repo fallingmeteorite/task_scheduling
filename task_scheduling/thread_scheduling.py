@@ -4,7 +4,7 @@ from typing import Callable
 
 from .scheduler.asyn_task_assignment import asyntask
 from .scheduler.line_task_assignment import linetask
-from .common.logging import logger
+from .common.log_config import logger
 
 
 def is_async_function(func: Callable) -> bool:
