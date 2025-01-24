@@ -229,7 +229,16 @@ print(get_all_queue_info("line"))
 
 ```
 
-配置文件文件存放于`common/config.yaml`
+## shutdown() -> None:
+
+```
+from task_scheduling import shutdown
+
+# When you want to close the software, call this function to close the task scheduling
+shutdown()
+```
+
+The configuration file is stored at:`common/config.yaml`
 
 # Reference libraries:
 

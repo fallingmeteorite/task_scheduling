@@ -1,0 +1,28 @@
+[project]
+name = "task_scheduling"
+version = "0.0.1"
+description = "It is mainly used for task scheduling"
+authors = [
+    { name = "fallingmeteorite", email = "2327667836@qq.com" }
+]
+dependencies = [
+    "loguru",
+    "pyyaml"
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/fallingmeteorite/task_scheduling"
+"Bug Tracker" = "https://github.com/fallingmeteorite/task_scheduling/issues"
+
+[project.readme]
+file = "README.md"
+content-type = "text/markdown"
+
+[tool.setuptools.packages]
+find = {}
+
