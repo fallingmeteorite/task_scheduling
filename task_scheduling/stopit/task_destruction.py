@@ -9,60 +9,60 @@ class TaskManager:
 
     def add(self, instance: Any, key: str) -> None:
         """
-        添加一个实例及其键值对到字典中。
+        Add an instance and its key-value pair to the dictionary.
 
-        :param instance: 实例化的类。
-        :param key: 用作字典中键的字符串。
+        :param instance: The instantiated object.
+        :param key: A string to be used as the key in the dictionary.
         """
         self.data[key] = instance
 
     def force_stop(self, key: str) -> None:
         """
-        使用键调用字典中相应实例的 stop 方法。
+        Call the stop method of the corresponding instance in the dictionary using the key.
 
-        :param key: 用作字典中键的字符串。
+        :param key: A string to be used as the key in the dictionary.
         """
         if key in self.data:
             instance = self.data[key]
             try:
                 instance.stop()
-                logger.warning(f"'{key}' 停止成功")
+                logger.warning(f" A stop command has been issued to the task '{key}'")
             except Exception as error:
                 logger.error(error)
         else:
-            logger.warning(f"没有找到键为 '{key}' 的任务，操作无效")
+            logger.warning(f"No task found with key '{key}', operation invalid")
 
     def force_stop_all(self) -> None:
         """
-        调用字典中所有实例的 stop 方法。
+        Call the stop method of all instances in the dictionary.
         """
         for key, instance in self.data.items():
             try:
                 instance.stop()
-                logger.warning(f"'{key}' 停止成功")
+                logger.warning(f"'{key}' stopped successfully")
             except Exception as error:
                 logger.error(error)
 
     def remove(self, key: str) -> None:
         """
-        从字典中移除指定的键值对。
+        Remove the specified key-value pair from the dictionary.
 
-        :param key: 用作字典中键的字符串。
+        :param key: A string to be used as the key in the dictionary.
         """
         if key in self.data:
             del self.data[key]
         else:
-            logger.warning(f"没有找到键为 '{key}' 的任务，操作无效")
+            logger.warning(f"No task found with key '{key}', operation invalid")
 
     def check(self, key: str) -> bool:
         """
-        检查给定的键是否在字典中。
+        Check if the given key exists in the dictionary.
 
-        :param key: 用作字典中键的字符串。
-        :return: 如果键存在则返回 True，否则返回 False。
+        :param key: A string to be used as the key in the dictionary.
+        :return: True if the key exists, otherwise False.
         """
         return key in self.data
 
 
-# 创建 Manager 实例
+# Create Manager instance
 task_manager = TaskManager()

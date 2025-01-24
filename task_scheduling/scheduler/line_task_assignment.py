@@ -147,6 +147,23 @@ class LineTask:
                     }
 
                 future.add_done_callback(partial(self.task_done, task_id))
+                # Start a thread to monitor the state of the future
+                threading.Thread(target=self.monitor_future_timeout, args=(task_id, timeout_processing,)).start()
+
+    def monitor_future_timeout(self, task_id: str, timeout_processing: bool) -> None:
+        if not timeout_processing:
+            return None
+        seconds = config["watch_dog_time"] + 5
+        while seconds > 0:
+            time.sleep(1)
+            seconds -= 1
+            with self.lock:
+                if not self.task_details[task_id]["status"] == "running":
+                    return None
+        # If the timeout cannot be processed, the task is forcibly terminated
+        # !!! dangerous
+        task_manager.force_stop(task_id)
+        return None
 
     def task_done(self, task_id: str, future: Future) -> None:
         """
@@ -200,7 +217,6 @@ class LineTask:
             if task_id in self.task_details:
                 self.task_details[task_id]["status"] = status
                 # Set end_time to NaN if the task failed because of timeout and timeout_processing was False
-                print(status)
                 if status == "timeout":
                     self.task_details[task_id]["end_time"] = "NaN"
                 else:
@@ -398,6 +414,19 @@ class LineTask:
             # Put uncancelled tasks back into the queue
             while not temp_queue.empty():
                 self.task_queue.put(temp_queue.get())
+
+    def allow_task_id(self, task_id: str) -> None:
+        """
+        Allow a banned task ID to be executed again.
+
+        :param task_id: Task ID.
+        """
+        with self.lock:
+            if task_id in self.banned_task_ids:
+                self.banned_task_ids.remove(task_id)
+                logger.info(f"Task ID {task_id} has been allowed for execution")
+            else:
+                logger.warning(f"Task ID {task_id} is not banned, no action taken")
 
     def get_task_result(self, task_id: str) -> Optional[Any]:
         """

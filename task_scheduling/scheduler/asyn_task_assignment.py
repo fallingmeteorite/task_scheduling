@@ -83,7 +83,8 @@ class AsynTask:
 
             # If the task needs timeout processing, set the timeout time
             if self.thread_local_data.timeout_processing:
-                with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
+                # Prevent simultaneous triggering
+                with ThreadingTimeout(seconds=config["watch_dog_time"] + 5, swallow_exc=False):
                     result = await asyncio.wait_for(
                         self.thread_local_data.func(*self.thread_local_data.args, **self.thread_local_data.kwargs),
                         timeout=config["watch_dog_time"]
@@ -135,6 +136,7 @@ class AsynTask:
             self.log_error(self.thread_local_data.task_id, e)
 
         finally:
+
             if not self.task_details[self.thread_local_data.task_id].get("end_time") == "NaN":
                 self.task_details[self.thread_local_data.task_id]["end_time"] = time.time()
             # Remove the task from running tasks dictionary
@@ -454,6 +456,19 @@ class AsynTask:
             # Put uncancelled tasks back into the queue
             while not temp_queue.empty():
                 self.task_queue.put(temp_queue.get())
+
+    def allow_task_id(self, task_id: str) -> None:
+        """
+        Allow a banned task ID to be executed again.
+
+        :param task_id: Task ID.
+        """
+        with self.condition:
+            if task_id in self.banned_task_ids:
+                self.banned_task_ids.remove(task_id)
+                logger.info(f"Task ID {task_id} has been allowed for execution")
+            else:
+                logger.warning(f"Task ID {task_id} is not banned, no action taken")
 
 
 # Instantiate object
