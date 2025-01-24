@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import queue
 import threading
 import time
@@ -31,7 +32,7 @@ class LineTask:
         self.condition = threading.Condition()  # Condition variable for thread synchronization
         self.scheduler_started = False  # Whether the scheduler thread has started
         self.scheduler_stop_event = threading.Event()  # Scheduler thread stop event
-        self.error_logs: List[Dict] = []  # Error logs, keep up to 10
+        self.error_logs: List[Dict] = []  # Logs, keep up to 10
         self.scheduler_thread: Optional[threading.Thread] = None  # Scheduler thread
         self.banned_task_ids: List[str] = []  # List of banned task IDs
         self.idle_timer: Optional[threading.Timer] = None  # Idle timer
@@ -85,7 +86,7 @@ class LineTask:
                     return_results = func(*args, **kwargs)
                     task_manager.remove(task_id)
             else:
-                with ThreadingTimeout(seconds=None, swallow_exc=True) as task_control:
+                with ThreadingTimeout(seconds=None, swallow_exc=False) as task_control:
                     task_manager.add(task_control, task_id)
                     return_results = func(*args, **kwargs)
                     task_manager.remove(task_id)
@@ -281,16 +282,24 @@ class LineTask:
         Stop the scheduler thread and forcibly kill all tasks.
         """
         logger.warning("Exit cleanup")
+
+        # 1. Force stop all running tasks
         task_manager.force_stop_all()
+
+        # 2. Set the stop event to notify the scheduler thread to stop
         self.scheduler_stop_event.set()
+
+        # 3. Notify all waiting threads
         with self.condition:
             self.condition.notify_all()
 
-        self.cancel_all_running_tasks()
+        # 5. Clear the task queue
         self.clear_task_queue()
+
+        # 6. Wait for the scheduler thread to finish
         self.join_scheduler_thread()
 
-        # Reset parameters for scheduler restart
+        # 7. Reset all state variables
         self.scheduler_started = False
         self.scheduler_stop_event.clear()
         self.error_logs = []
@@ -300,17 +309,6 @@ class LineTask:
         self.task_results = {}
 
         logger.info("Scheduler thread has stopped, all resources have been released and parameters reset")
-
-    def cancel_all_running_tasks(self) -> None:
-        """
-        Forcibly cancel all running tasks.
-        """
-        with self.lock:
-            for task_id, future in self.running_tasks.items():
-                task_manager.force_stop(task_id)
-                future.cancel()
-                logger.warning(f"Task {task_id} has been forcibly cancelled")
-                self.update_task_status(task_id, "cancelled")
 
     def clear_task_queue(self) -> None:
         """
@@ -364,6 +362,7 @@ class LineTask:
 
         :param task_name: Task name.
         """
+
         with self.condition:
             temp_queue = queue.Queue()
             while not self.task_queue.empty():

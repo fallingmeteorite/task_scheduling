@@ -1,10 +1,10 @@
+# -*- coding: utf-8 -*-
 import inspect
-import atexit
 from typing import Callable
 
+from .common.log_config import logger
 from .scheduler.asyn_task_assignment import asyntask
 from .scheduler.line_task_assignment import linetask
-from .common.log_config import logger
 
 
 def is_async_function(func: Callable) -> bool:
@@ -57,6 +57,3 @@ def shutdown() -> None:
         linetask.stop_scheduler()
 
     logger.info("All schedulers have been shut down, resources have been released.")
-
-# Register the opt-out function
-atexit.register(shutdown)

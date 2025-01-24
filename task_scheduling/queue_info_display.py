@@ -1,7 +1,7 @@
+# -*- coding: utf-8 -*-
 import time
 from typing import Dict
 
-from .common.config import config
 from .scheduler.asyn_task_assignment import asyntask
 from .scheduler.line_task_assignment import linetask
 
@@ -20,7 +20,7 @@ def format_task_info(task_id: str, details: Dict) -> str:
 
     # Calculate elapsed time
     if status == "running":
-        elapsed_time = time.time() - start_time if time.time() - start_time >= 0  else 0
+        elapsed_time = time.time() - start_time if time.time() - start_time >= 0 else 0
         elapsed_time_display = f"{elapsed_time:.2f}"
     elif end_time == "NaN":
         elapsed_time_display = "NaN"

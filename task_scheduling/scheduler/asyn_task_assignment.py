@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import asyncio
 import queue
 import threading
@@ -325,7 +326,7 @@ class AsynTask:
                 self.loop.call_soon_threadsafe(self.loop.stop)
                 # Wait for the event loop thread to finish
                 if self.event_loop_thread and self.event_loop_thread.is_alive():
-                    self.event_loop_thread.join(timeout=5)  # Wait up to 5 seconds
+                    self.event_loop_thread.join(timeout=1)  # Wait up to 1 seconds
             except Exception as e:
                 logger.error(f"Error occurred while stopping the event loop: {e}")
 
@@ -334,7 +335,7 @@ class AsynTask:
         Wait for the scheduler thread to finish.
         """
         if self.scheduler_thread and self.scheduler_thread.is_alive():
-            self.scheduler_thread.join(timeout=5)  # Wait up to 5 seconds
+            self.scheduler_thread.join(timeout=1)  # Wait up to 1 seconds
 
     def get_queue_info(self) -> Dict:
         """
