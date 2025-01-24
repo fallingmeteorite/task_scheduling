@@ -229,7 +229,7 @@ print(get_all_queue_info("line"))
 
 ```
 
-## shutdown() -> None:
+### shutdown() -> None:
 
 ```
 from task_scheduling import shutdown
