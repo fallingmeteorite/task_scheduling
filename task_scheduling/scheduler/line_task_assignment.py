@@ -6,9 +6,9 @@ from functools import partial
 from typing import Callable, Dict, List, Tuple, Optional, Any
 from weakref import WeakValueDictionary
 
+from ..common.config import config
 from ..common.logging import logger
 from ..scheduler.memory_release import memory_release_decorator
-from ..common.config import config
 from ..stopit.task_destruction import task_manager
 from ..stopit.threadstop import ThreadingTimeout, TimeoutException
 
@@ -24,9 +24,6 @@ class LineTask:
     ]
 
     def __init__(self) -> None:
-        """
-        Initialize the linear task manager.
-        """
         self.task_queue = queue.Queue()  # Task queue
         self.running_tasks: WeakValueDictionary[str, Future] = WeakValueDictionary()  # Running tasks
         self.task_details: Dict[str, Dict] = {}  # Task details
@@ -68,39 +65,43 @@ class LineTask:
 
         :param task: Task tuple, including timeout processing flag, task ID, task function, positional arguments, and keyword arguments.
         """
-        timeout_processing, task_id, func, args, kwargs = task
-        logger.debug(f"Start running linear task, task name: {task_id}")
+        thread_local_data = threading.local()
+        thread_local_data.timeout_processing, thread_local_data.task_id, thread_local_data.func, thread_local_data.args, thread_local_data.kwargs = task
+        logger.debug(f"Start running linear task, task name: {thread_local_data.task_id}")
 
         try:
-            if task_id in self.banned_task_ids:
-                logger.warning(f"Task {task_id} is banned and will be deleted")
+            if thread_local_data.task_id in self.banned_task_ids:
+                logger.warning(f"Task {thread_local_data.task_id} is banned and will be deleted")
                 return
 
-            self.task_details[task_id] = {
-                "start_time": time.time(),
-                "status": "running"
-            }
+            with self.lock:
+                self.task_details[thread_local_data.task_id] = {
+                    "start_time": time.time(),
+                    "status": "running"
+                }
 
-            if timeout_processing:
+            if thread_local_data.timeout_processing:
                 with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False) as task_control:
-                    task_manager.add(task_control, task_id)
-                    return_results = func(*args, **kwargs)
-                    task_manager.remove(task_id)
+                    task_manager.add(task_control, thread_local_data.task_id)
+                    return_results = thread_local_data.func(*thread_local_data.args, **thread_local_data.kwargs)
+                    task_manager.remove(thread_local_data.task_id)
             else:
                 with ThreadingTimeout(seconds=None, swallow_exc=True) as task_control:
-                    task_manager.add(task_control, task_id)
-                    return_results = func(*args, **kwargs)
-                    task_manager.remove(task_id)
+                    task_manager.add(task_control, thread_local_data.task_id)
+                    return_results = thread_local_data.func(*thread_local_data.args, **thread_local_data.kwargs)
+                    task_manager.remove(thread_local_data.task_id)
         except TimeoutException:
-            logger.warning(f"Linear queue task | {task_id} | timed out, forced termination")
-            task_manager.remove(task_id)
+            logger.warning(f"Linear queue task | {thread_local_data.task_id} | timed out, forced termination")
+            task_manager.remove(thread_local_data.task_id)
+            raise  # Re-raise the exception to be handled by the task_done callback
         except Exception as e:
-            logger.error(f"Linear task {task_id} execution failed: {e}")
-            task_manager.remove(task_id)
-            self.log_error(task_id, e)
+            logger.error(f"Linear task {thread_local_data.task_id} execution failed: {e}")
+            task_manager.remove(thread_local_data.task_id)
+            self.log_error(thread_local_data.task_id, e)
+            raise  # Re-raise the exception to be handled by the task_done callback
         finally:
             # Explicitly delete no longer used variables
-            del timeout_processing, task_id, func, args, kwargs
+            del thread_local_data.timeout_processing, thread_local_data.task_id, thread_local_data.func, thread_local_data.args, thread_local_data.kwargs
 
         return return_results
 
@@ -169,11 +170,18 @@ class LineTask:
             logger.error(f"Linear task {task_id} execution failed: {e}")
             self.update_task_status(task_id, "failed")
             self.log_error(task_id, e)
+        finally:
+            # Ensure the Future object is deleted
+            with self.lock:
+                if task_id in self.running_tasks:
+                    del self.running_tasks[task_id]
+                if task_id in self.task_results and not self.task_results[task_id]:
+                    del self.task_results[task_id]
 
-        # Check if all tasks are completed
-        with self.lock:
-            if self.task_queue.empty() and len(self.running_tasks) == 0:
-                self.reset_idle_timer()
+            # Check if all tasks are completed
+            with self.lock:
+                if self.task_queue.empty() and len(self.running_tasks) == 0:
+                    self.reset_idle_timer()
 
     def update_task_status(self, task_id: str, status: str) -> None:
         """
@@ -185,8 +193,10 @@ class LineTask:
         with self.lock:
             if task_id in self.running_tasks:
                 del self.running_tasks[task_id]
+            if task_id in self.task_details:
                 self.task_details[task_id]["status"] = status
                 self.task_details[task_id]["end_time"] = time.time()
+                del self.task_details[task_id]
 
     def log_error(self, task_id: str, exception: Exception) -> None:
         """
@@ -255,7 +265,16 @@ class LineTask:
         self.clear_task_queue()
         self.join_scheduler_thread()
 
-        logger.info("Scheduler thread has stopped, all resources have been released")
+        # Reset parameters for scheduler restart
+        self.scheduler_started = False
+        self.scheduler_stop_event.clear()
+        self.error_logs = []
+        self.scheduler_thread = None
+        self.banned_task_ids = []
+        self.idle_timer = None
+        self.task_results = {}
+
+        logger.info("Scheduler thread has stopped, all resources have been released and parameters reset")
 
     def cancel_all_running_tasks(self) -> None:
         """
@@ -324,6 +343,8 @@ class LineTask:
         with self.lock:
             if task_id in self.running_tasks:
                 task_manager.force_stop(task_id)
+                future = self.running_tasks[task_id]
+                future.cancel()
                 logger.warning(f"Task {task_id} has been forcibly cancelled")
                 self.update_task_status(task_id, "cancelled")
             else:
@@ -389,7 +410,10 @@ class LineTask:
         """
         with self.lock:
             if task_id in self.task_results and self.task_results[task_id]:
-                return self.task_results[task_id].pop(0)  # Return and delete the oldest result
+                result = self.task_results[task_id].pop(0)  # Return and delete the oldest result
+                if not self.task_results[task_id]:
+                    del self.task_results[task_id]
+                return result
             return None
 
 
