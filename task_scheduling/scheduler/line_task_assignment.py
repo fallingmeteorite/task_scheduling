@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
+import itertools
 import queue
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, Future
 from functools import partial
 from typing import Callable, Dict, List, Tuple, Optional, Any
-from weakref import WeakValueDictionary
 
 from ..common.config import config
 from ..common.log_config import logger
@@ -21,12 +21,12 @@ class LineTask:
     __slots__ = [
         'task_queue', 'running_tasks', 'task_details', 'lock', 'condition',
         'scheduler_started', 'scheduler_stop_event', 'error_logs', 'scheduler_thread',
-        'banned_task_ids', 'idle_timer', 'idle_timeout', 'idle_timer_lock', 'task_results'
+        'banned_task_names', 'idle_timer', 'idle_timeout', 'idle_timer_lock', 'task_results'
     ]
 
     def __init__(self) -> None:
         self.task_queue = queue.Queue()  # Task queue
-        self.running_tasks: WeakValueDictionary[str, Future] = WeakValueDictionary()  # Running tasks
+        self.running_tasks: [str, Future, str] = {}  # Running tasks
         self.task_details: Dict[str, Dict] = {}  # Task details
         self.lock = threading.Lock()  # Lock to protect access to shared resources
         self.condition = threading.Condition()  # Condition variable for thread synchronization
@@ -34,50 +34,163 @@ class LineTask:
         self.scheduler_stop_event = threading.Event()  # Scheduler thread stop event
         self.error_logs: List[Dict] = []  # Logs, keep up to 10
         self.scheduler_thread: Optional[threading.Thread] = None  # Scheduler thread
-        self.banned_task_ids: List[str] = []  # List of banned task IDs
+        self.banned_task_names: List[str] = []  # List of banned task IDs
         self.idle_timer: Optional[threading.Timer] = None  # Idle timer
         self.idle_timeout = config["max_idle_time"]  # Idle timeout, default is 60 seconds
         self.idle_timer_lock = threading.Lock()  # Idle timer lock
         self.task_results: Dict[str, List[Any]] = {}  # Store task return results, keep up to 2 results for each task ID
 
-    def reset_idle_timer(self) -> None:
+    # Add the task to the scheduler
+    def add_task(self, timeout_processing: bool, task_name: str, task_id: str, func: Callable, *args, **kwargs) -> bool:
         """
-        Reset the idle timer.
-        """
-        with self.idle_timer_lock:
-            if self.idle_timer is not None:
-                self.idle_timer.cancel()
-            self.idle_timer = threading.Timer(self.idle_timeout, self.stop_scheduler)
-            self.idle_timer.start()
+        Add a task to the task queue.
 
-    def cancel_idle_timer(self) -> None:
+        :param timeout_processing: Whether to enable timeout processing.
+        :param task_name: Task name (can be repeated).
+        :param task_id: Task ID (must be unique).
+        :param func: Task function.
+        :param args: Positional arguments for the task function.
+        :param kwargs: Keyword arguments for the task function.
+        :return: True if the task was successfully added, False otherwise.
         """
-        Cancel the idle timer.
-        """
-        with self.idle_timer_lock:
-            if self.idle_timer is not None:
-                self.idle_timer.cancel()
-                self.idle_timer = None
 
+        # Determine whether a task is prohibited from running
+        if task_name in self.banned_task_names:
+            logger.warning(f"Task {task_id} is banned and will be deleted")
+            return False
+
+        if self.task_queue.qsize() <= config["maximum_queue_line"]:
+            # Store task name in task_details
+            with self.lock:
+                self.task_details[task_id] = {
+                    "task_name": task_name,
+                    "start_time": None,
+                    "status": "pending"
+                }
+            self.task_queue.put((timeout_processing, task_name, task_id, func, args, kwargs))
+
+            if not self.scheduler_started:
+                self.start_scheduler()
+
+            with self.condition:
+                self.condition.notify()
+
+            # Cancel the idle timer
+            self.cancel_idle_timer()
+            return True
+
+        else:
+            logger.warning(f"Task {task_id} not added, queue is full")
+            logger.warning(f"Task queue is full!!!")
+            return False
+
+    # Start the scheduler
+    def start_scheduler(self) -> None:
+        """
+        Start the scheduler thread.
+        """
+        self.scheduler_started = True
+        self.scheduler_thread = threading.Thread(target=self.scheduler, daemon=True)
+        self.scheduler_thread.start()
+
+    # Stop the scheduler
+    def stop_scheduler(self, force_cleanup: bool) -> None:
+        """
+        :param force_cleanup: Force the end of a running task
+        Stop the scheduler thread and forcibly kill all tasks if force_cleanup is True.
+        """
+        logger.warning("Exit cleanup")
+
+        if force_cleanup:
+            # 1. Force stop all running tasks
+            task_manager.force_stop_all()
+
+            # 2. Set the stop event to notify the scheduler thread to stop
+            self.scheduler_stop_event.set()
+
+            # 3. Notify all waiting threads
+            with self.condition:
+                self.condition.notify_all()
+
+            # 5. Clear the task queue
+            self.clear_task_queue()
+
+            # 6. Wait for the scheduler thread to finish
+            self.join_scheduler_thread()
+
+            # 7. Reset all state variables
+            self.scheduler_started = False
+            self.scheduler_stop_event.clear()
+            self.error_logs = []
+            self.scheduler_thread = None
+            self.banned_task_names = []
+            self.idle_timer = None
+            self.task_results = {}
+
+            logger.info("Scheduler thread has stopped, all resources have been released and parameters reset")
+        else:
+            logger.info("Notification has been given to turn off task scheduling")
+            # 2. Set the stop event to notify the scheduler thread to stop
+            self.scheduler_stop_event.set()
+
+            # 3. Notify all waiting threads
+            with self.condition:
+                self.condition.notify_all()
+
+            # 5. Clear the task queue
+            self.clear_task_queue()
+
+            # 6. Wait for the scheduler thread to finish
+            self.join_scheduler_thread()
+
+    # Task scheduler
+    def scheduler(self) -> None:
+        """
+        Scheduler function, fetch tasks from the task queue and submit them to the thread pool for execution.
+        """
+        with ThreadPoolExecutor(max_workers=int(config["line_task_max"])) as executor:
+            while not self.scheduler_stop_event.is_set():
+                with self.condition:
+                    while self.task_queue.empty() and not self.scheduler_stop_event.is_set():
+                        self.condition.wait()
+
+                    if self.scheduler_stop_event.is_set():
+                        break
+
+                    if self.task_queue.qsize() == 0:
+                        continue
+
+                    task = self.task_queue.get()
+
+                timeout_processing, task_name, task_id, func, args, kwargs = task
+
+                with self.lock:
+                    if task_name in list(itertools.chain.from_iterable(self.running_tasks.values())):
+                        self.task_queue.put(task)
+                        continue
+
+                    future = executor.submit(self.execute_task, task)
+                    self.running_tasks[task_id] = [future, task_name]
+
+                future.add_done_callback(partial(self.task_done, task_id))
+
+    # A function that executes a task
     @memory_release_decorator
-    def execute_task(self, task: Tuple[bool, str, Callable, Tuple, Dict]) -> Any:
+    def execute_task(self, task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
         """
         Execute a linear task.
 
         :param task: Task tuple, including timeout processing flag, task ID, task function, positional arguments, and keyword arguments.
         """
-        timeout_processing, task_id, func, args, kwargs = task
+        timeout_processing, task_name, task_id, func, args, kwargs = task
         try:
-            if task_id in self.banned_task_ids:
-                logger.warning(f"Task {task_id} is banned and will be deleted")
-                return
 
             with self.lock:
-                self.task_details[task_id] = {
-                    "start_time": time.time(),
-                    "status": "running",
-                    "timeout_processing": timeout_processing  # Add this line to record timeout_processing flag
-                }
+
+                # Modify the task status
+                self.task_details[task_id]["start_time"] = time.time()
+
+                self.task_details[task_id]["status"] = "running"
 
             logger.info(f"Start running linear task, task name: {task_id}")
             if timeout_processing:
@@ -104,65 +217,8 @@ class LineTask:
                 # Define variables when they are not defined
                 return_results = "error happen"
                 return return_results
-
             else:
                 return return_results
-
-    def scheduler(self) -> None:
-        """
-        Scheduler function, fetch tasks from the task queue and submit them to the thread pool for execution.
-        """
-        with ThreadPoolExecutor(max_workers=int(config["line_task_max"])) as executor:
-            while not self.scheduler_stop_event.is_set():
-                with self.condition:
-                    while self.task_queue.empty() and not self.scheduler_stop_event.is_set():
-                        self.condition.wait()
-
-                    if self.scheduler_stop_event.is_set():
-                        break
-
-                    if self.task_queue.qsize() == 0:
-                        continue
-
-                    task = self.task_queue.get()
-
-                timeout_processing, task_id, func, args, kwargs = task
-
-                with self.lock:
-                    if task_id in self.banned_task_ids:
-                        logger.warning(f"Task {task_id} is banned and will be deleted")
-                        self.task_queue.task_done()
-                        continue
-
-                    if task_id in self.running_tasks:
-                        self.task_queue.put(task)
-                        continue
-
-                    future = executor.submit(self.execute_task, task)
-                    self.running_tasks[task_id] = future
-                    self.task_details[task_id] = {
-                        "start_time": time.time(),
-                        "status": "running"
-                    }
-
-                future.add_done_callback(partial(self.task_done, task_id))
-                # Start a thread to monitor the state of the future
-                threading.Thread(target=self.monitor_future_timeout, args=(task_id, timeout_processing,)).start()
-
-    def monitor_future_timeout(self, task_id: str, timeout_processing: bool) -> None:
-        if not timeout_processing:
-            return None
-        seconds = config["watch_dog_time"] + 5
-        while seconds > 0:
-            time.sleep(1)
-            seconds -= 1
-            with self.lock:
-                if not self.task_details[task_id]["status"] == "running":
-                    return None
-        # If the timeout cannot be processed, the task is forcibly terminated
-        # !!! dangerous
-        task_manager.force_stop(task_id)
-        return None
 
     def task_done(self, task_id: str, future: Future) -> None:
         """
@@ -197,12 +253,15 @@ class LineTask:
             with self.lock:
                 if task_id in self.running_tasks:
                     del self.running_tasks[task_id]
+                if task_id in self.task_results:
+                    del self.task_results[task_id]
 
             # Check if all tasks are completed
             with self.lock:
                 if self.task_queue.empty() and len(self.running_tasks) == 0:
                     self.reset_idle_timer()
 
+    # Update the task status
     def update_task_status(self, task_id: str, status: str) -> None:
         """
         Update task status.
@@ -238,77 +297,25 @@ class LineTask:
             if len(self.error_logs) > 10:
                 self.error_logs.pop(0)
 
-    def add_task(self, timeout_processing: bool, task_id: str, func: Callable, *args, **kwargs) -> bool:
+    # The task scheduler closes the countdown
+    def reset_idle_timer(self) -> None:
         """
-        Add a task to the task queue.
-
-        :param timeout_processing: Whether to enable timeout processing.
-        :param task_id: Task ID.
-        :param func: Task function.
-        :param args: Positional arguments for the task function.
-        :param kwargs: Keyword arguments for the task function.
-        :return: True if the task was successfully added, False otherwise.
+        Reset the idle timer.
         """
-        if task_id in self.banned_task_ids:
-            logger.warning(f"Task {task_id} is banned and will be deleted")
-            return False
+        with self.idle_timer_lock:
+            if self.idle_timer is not None:
+                self.idle_timer.cancel()
+            self.idle_timer = threading.Timer(self.idle_timeout, self.stop_scheduler, args=(True,))
+            self.idle_timer.start()
 
-        if self.task_queue.qsize() <= config["maximum_queue_line"]:
-            self.task_queue.put((timeout_processing, task_id, func, args, kwargs))
-
-            if not self.scheduler_started:
-                self.start_scheduler()
-
-            with self.condition:
-                self.condition.notify()
-
-            # Cancel the idle timer
-            self.cancel_idle_timer()
-            return True
-        else:
-            logger.warning(f"Task {task_id} not added, queue is full")
-            return False
-
-    def start_scheduler(self) -> None:
+    def cancel_idle_timer(self) -> None:
         """
-        Start the scheduler thread.
+        Cancel the idle timer.
         """
-        self.scheduler_started = True
-        self.scheduler_thread = threading.Thread(target=self.scheduler, daemon=True)
-        self.scheduler_thread.start()
-
-    def stop_scheduler(self) -> None:
-        """
-        Stop the scheduler thread and forcibly kill all tasks.
-        """
-        logger.warning("Exit cleanup")
-
-        # 1. Force stop all running tasks
-        task_manager.force_stop_all()
-
-        # 2. Set the stop event to notify the scheduler thread to stop
-        self.scheduler_stop_event.set()
-
-        # 3. Notify all waiting threads
-        with self.condition:
-            self.condition.notify_all()
-
-        # 5. Clear the task queue
-        self.clear_task_queue()
-
-        # 6. Wait for the scheduler thread to finish
-        self.join_scheduler_thread()
-
-        # 7. Reset all state variables
-        self.scheduler_started = False
-        self.scheduler_stop_event.clear()
-        self.error_logs = []
-        self.scheduler_thread = None
-        self.banned_task_ids = []
-        self.idle_timer = None
-        self.task_results = {}
-
-        logger.info("Scheduler thread has stopped, all resources have been released and parameters reset")
+        with self.idle_timer_lock:
+            if self.idle_timer is not None:
+                self.idle_timer.cancel()
+                self.idle_timer = None
 
     def clear_task_queue(self) -> None:
         """
@@ -335,9 +342,20 @@ class LineTask:
             queue_info = {
                 "queue_size": self.task_queue.qsize(),
                 "running_tasks_count": len(self.running_tasks),
-                "task_details": self.task_details.copy(),
+                "task_details": {},
                 "error_logs": self.error_logs.copy()
             }
+
+            for task_id, details in self.task_details.items():
+                task_name = details.get("task_name", "Unknown")
+                status = details.get("status")
+                queue_info["task_details"][task_id] = {
+                    "task_name": task_name,
+                    "start_time": details.get("start_time"),
+                    "status": status,
+                    "end_time": details.get("end_time")
+                }
+
             return queue_info
 
     def force_stop_task(self, task_id: str) -> None:
@@ -349,10 +367,13 @@ class LineTask:
         with self.lock:
             if task_id in self.running_tasks:
                 task_manager.force_stop(task_id)
-                future = self.running_tasks[task_id]
-                future.cancel()
                 logger.warning(f"Task {task_id} has been forcibly cancelled")
                 self.update_task_status(task_id, "cancelled")
+                # Clean up task details and results
+                if task_id in self.task_details:
+                    del self.task_details[task_id]
+                if task_id in self.task_results:
+                    del self.task_results[task_id]
             else:
                 logger.warning(f"Task {task_id} does not exist or is already completed")
 
@@ -362,13 +383,32 @@ class LineTask:
 
         :param task_name: Task name.
         """
+        with self.condition:
+            temp_queue = queue.Queue()
+            while not self.task_queue.empty():
+                task = self.task_queue.get()
+                if task[1] == task_name:  # Use function name to match task name
+                    logger.warning(f"Task Name {task_name} is waiting to be executed in the queue, has been deleted")
+                else:
+                    temp_queue.put(task)
 
+            # Put uncancelled tasks back into the queue
+            while not temp_queue.empty():
+                self.task_queue.put(temp_queue.get())
+
+    def cancel_all_queued_tasks(self, task_name: str) -> None:
+        """
+        Cancel all queued tasks with the banned task ID.
+
+        :param task_name: Task ID.
+        """
         with self.condition:
             temp_queue = queue.Queue()
             while not self.task_queue.empty():
                 task = self.task_queue.get()
                 if task[1] == task_name:
-                    logger.warning(f"Task {task_name} is waiting to be executed in the queue, has been deleted")
+                    logger.warning(f"Task Name {task_name} is waiting to be executed in the queue, has been deleted")
+
                 else:
                     temp_queue.put(task)
 
@@ -376,55 +416,33 @@ class LineTask:
             while not temp_queue.empty():
                 self.task_queue.put(temp_queue.get())
 
-    def ban_task_id(self, task_id: str) -> None:
+    def ban_task_id(self, task_name: str) -> None:
         """
         Ban a task ID from execution, delete tasks directly if detected and print information.
 
-        :param task_id: Task ID.
+        :param task_name: Task Name.
         """
         with self.lock:
-            self.banned_task_ids.append(task_id)
-            logger.warning(f"Task ID {task_id} has been banned from execution")
+            self.banned_task_names.append(task_name)
+            logger.warning(f"Task Name {task_name} has been banned from execution")
 
             # Cancel all queued tasks with the banned task ID
-            self.cancel_all_queued_tasks(task_id)
+            self.cancel_all_queued_tasks(task_name)
 
-            # Cancel any running tasks with the banned task ID
-            if task_id in self.running_tasks:
-                self.force_stop_task(task_id)
-
-    def cancel_all_queued_tasks(self, task_id: str) -> None:
-        """
-        Cancel all queued tasks with the banned task ID.
-
-        :param task_id: Task ID.
-        """
-        with self.condition:
-            temp_queue = queue.Queue()
-            while not self.task_queue.empty():
-                task = self.task_queue.get()
-                if task[1] == task_id:
-                    logger.warning(f"Task ID {task_id} is waiting to be executed in the queue, has been deleted")
-                else:
-                    temp_queue.put(task)
-
-            # Put uncancelled tasks back into the queue
-            while not temp_queue.empty():
-                self.task_queue.put(temp_queue.get())
-
-    def allow_task_id(self, task_id: str) -> None:
+    def allow_task_id(self, task_name: str) -> None:
         """
         Allow a banned task ID to be executed again.
 
-        :param task_id: Task ID.
+        :param task_name: Task Name.
         """
         with self.lock:
-            if task_id in self.banned_task_ids:
-                self.banned_task_ids.remove(task_id)
-                logger.info(f"Task ID {task_id} has been allowed for execution")
+            if task_name in self.banned_task_names:
+                self.banned_task_names.remove(task_name)
+                logger.info(f"Task Name {task_name} has been allowed for execution")
             else:
-                logger.warning(f"Task ID {task_id} is not banned, no action taken")
+                logger.warning(f"Task Name {task_name} is not banned, no action taken")
 
+    # Obtain the information returned by the corresponding task
     def get_task_result(self, task_id: str) -> Optional[Any]:
         """
         Get the result of a task. If there is a result, return and delete the oldest result; if no result, return None.

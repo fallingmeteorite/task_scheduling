@@ -1,14 +1,5 @@
-# Linear function maximum queue queue
-maximum_queue_line: 12
-
-# The asynchronous feature has a maximum queue of queues
-maximum_queue_async: 12
-
-# Linear tasks run the maximum task limit at the same time
 line_task_max: 4
-
-# How many seconds after the task is executed (seconds)
-watch_dog_time: 200
-
-#When the scheduler throttles how long it stops (seconds)
-max_idle_time: 60
+max_idle_time: 20
+maximum_queue_async: 12
+maximum_queue_line: 12
+watch_dog_time: 16
