@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from typing import Dict
+from typing import Dict, Any
 
 import yaml
 
@@ -41,7 +41,7 @@ def load_config(file_path=f'{get_package_directory()}/config.yaml') -> bool:
     return False  # Return False indicating loading failure
 
 
-def update_config(key: str, value, file_path=f'{get_package_directory()}/config.yaml') -> bool:
+def update_config(key: str, value: Any, file_path=f'{get_package_directory()}/config.yaml') -> bool:
     """
     Update a specific key-value pair in the configuration file, save the changes,
     and reload the configuration to ensure the global `config` is up-to-date.

@@ -54,7 +54,7 @@ class AsynTask:
         :param kwargs: Keyword arguments for the task function.
         """
         with self.condition:
-            if task_id in self.banned_task_ids:
+            if task_name in self.banned_task_ids:
                 logger.warning(f"Task {task_id} is banned and will be deleted")
                 return False
 
@@ -110,11 +110,11 @@ class AsynTask:
             self.condition.notify_all()
 
         if force_cleanup:
-            # Forcibly cancel all running tasks
-            self.cancel_all_running_tasks()
-
             # Clear the task queue
             self.clear_task_queue()
+
+            # Forcibly cancel all running tasks
+            self.cancel_all_running_tasks()
 
             # Stop the event loop
             self.stop_event_loop()
@@ -258,11 +258,6 @@ class AsynTask:
             if task_id in self.running_tasks:
                 del self.running_tasks[task_id]
 
-            # Clean up task details and results
-            with self.condition:
-                if task_id in self.task_results:
-                    del self.task_results[task_id]
-
             # Check if all tasks are completed
             if self.task_queue.empty() and len(self.running_tasks) == 0:
                 self.reset_idle_timer()
@@ -375,6 +370,7 @@ class AsynTask:
             else:
                 logger.warning(f"Task {task_id} does not exist or is already completed")
 
+
     def cancel_all_queued_tasks_by_name(self, task_name: str) -> None:
         """
         Cancel all queued tasks with the same name.
@@ -385,7 +381,7 @@ class AsynTask:
             temp_queue = queue.Queue()
             while not self.task_queue.empty():
                 task = self.task_queue.get()
-                if task[2].__name__ == task_name:  # Use function name to match task name
+                if task[2] == task_name:  # Use function name to match task name
                     logger.warning(f"Task {task_name} is waiting to be executed in the queue, has been deleted")
                     # Clean up task details and results
                     if task[1] in self.task_details:  # Use task ID to delete task details and results

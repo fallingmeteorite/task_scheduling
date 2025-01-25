@@ -102,23 +102,23 @@ class LineTask:
         logger.warning("Exit cleanup")
 
         if force_cleanup:
-            # 1. Force stop all running tasks
-            task_manager.force_stop_all()
-
-            # 2. Set the stop event to notify the scheduler thread to stop
+            # Set the stop event to notify the scheduler thread to stop
             self.scheduler_stop_event.set()
 
-            # 3. Notify all waiting threads
+            # Notify all waiting threads
             with self.condition:
                 self.condition.notify_all()
 
-            # 5. Clear the task queue
+            # Clear the task queue
             self.clear_task_queue()
 
-            # 6. Wait for the scheduler thread to finish
+            # Force stop all running tasks
+            task_manager.force_stop_all()
+
+            # Wait for the scheduler thread to finish
             self.join_scheduler_thread()
 
-            # 7. Reset all state variables
+            # Reset all state variables
             self.scheduler_started = False
             self.scheduler_stop_event.clear()
             self.error_logs = []
@@ -130,17 +130,17 @@ class LineTask:
             logger.info("Scheduler thread has stopped, all resources have been released and parameters reset")
         else:
             logger.info("Notification has been given to turn off task scheduling")
-            # 2. Set the stop event to notify the scheduler thread to stop
+            # Set the stop event to notify the scheduler thread to stop
             self.scheduler_stop_event.set()
 
-            # 3. Notify all waiting threads
+            # Notify all waiting threads
             with self.condition:
                 self.condition.notify_all()
 
-            # 5. Clear the task queue
+            # Clear the task queue
             self.clear_task_queue()
 
-            # 6. Wait for the scheduler thread to finish
+            # Wait for the scheduler thread to finish
             self.join_scheduler_thread()
 
     # Task scheduler
@@ -253,8 +253,6 @@ class LineTask:
             with self.lock:
                 if task_id in self.running_tasks:
                     del self.running_tasks[task_id]
-                if task_id in self.task_results:
-                    del self.task_results[task_id]
 
             # Check if all tasks are completed
             with self.lock:
@@ -272,6 +270,7 @@ class LineTask:
         :param task_id: Task ID.
         :param status: Task status.
         """
+
         with self.lock:
             if task_id in self.running_tasks:
                 del self.running_tasks[task_id]
@@ -330,7 +329,7 @@ class LineTask:
         Wait for the scheduler thread to finish.
         """
         if self.scheduler_thread and self.scheduler_thread.is_alive():
-            self.scheduler_thread.join()
+            self.scheduler_thread.join(timeout=1)
 
     def get_queue_info(self) -> Dict:
         """
@@ -366,17 +365,20 @@ class LineTask:
         :param task_id: Task ID.
         """
         with self.lock:
-            if task_id in self.running_tasks:
-                task_manager.force_stop(task_id)
-                logger.warning(f"Task {task_id} has been forcibly cancelled")
-                self.update_task_status(task_id, "cancelled")
-                # Clean up task details and results
-                if task_id in self.task_details:
-                    del self.task_details[task_id]
-                if task_id in self.task_results:
-                    del self.task_results[task_id]
-            else:
+            if not task_id in self.running_tasks:
                 logger.warning(f"Task {task_id} does not exist or is already completed")
+                return None
+            task_manager.force_stop(task_id)
+            logger.warning(f"Task {task_id} has been forcibly cancelled")
+        # Due to the influence of the lock, it is unlocked first
+        self.update_task_status(task_id, "cancelled")
+
+        with self.lock:
+            # Clean up task details and results
+            if task_id in self.task_details:
+                del self.task_details[task_id]
+            if task_id in self.task_results:
+                del self.task_results[task_id]
 
     def cancel_all_queued_tasks_by_name(self, task_name: str) -> None:
         """

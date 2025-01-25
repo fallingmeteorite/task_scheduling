@@ -1,6 +1,6 @@
-line_task_max: 4
+line_task_max: 10
 max_idle_time: 20
-maximum_queue_async: 12
-maximum_queue_line: 12
-watch_dog_time: 16
+maximum_queue_async: 30
+maximum_queue_line: 30
 maximum_task_info_storage: 60
+watch_dog_time: 16
