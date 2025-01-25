@@ -3,3 +3,4 @@ max_idle_time: 20
 maximum_queue_async: 12
 maximum_queue_line: 12
 watch_dog_time: 16
+maximum_task_info_storage: 60

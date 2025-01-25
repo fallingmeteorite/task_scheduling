@@ -513,6 +513,33 @@ class AsynTask:
             except Exception as e:
                 logger.error(f"Error occurred while stopping the event loop: {e}")
 
+    def check_and_log_task_details(self) -> None:
+        """
+        Check if the number of task details exceeds 10 and log them to a file.
+        """
+        with self.condition:
+            task_details_copy = self.task_details.copy()
+            if len(task_details_copy) > config["maximum_task_info_storage"]:
+                logger.warning(f"More than {config["maximum_task_info_storage"]} task details detected.")
+
+            # Clear the task details and error messages
+            self.task_details = {}
+            self.error_logs = []
+
+    def get_task_status(self, task_id: str) -> Optional[Dict]:
+        """
+        Obtain task status information for a specified task_id.
+
+        :param task_id: Task ID.
+        :return: A dictionary containing information about the status of the task, or None if the task does not exist.
+        """
+        with self.condition:
+            if task_id in self.task_details:
+                return self.task_details[task_id]
+            else:
+                logger.warning(f"Task {task_id} does not exist or has been completed and removed.")
+                return None
+
 
 # Instantiate object
 asyntask = AsynTask()
