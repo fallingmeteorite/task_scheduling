@@ -468,7 +468,7 @@ class LineTask:
         with self.lock:
             task_details_copy = self.task_details.copy()
             if len(task_details_copy) > config["maximum_task_info_storage"]:
-                logger.warning(f"More than {config["maximum_task_info_storage"]} task details detected.")
+                logger.warning(f"More than {config['maximum_task_info_storage']} task details detected.")
 
                 # Clear the task details and error messages
                 with self.lock:
