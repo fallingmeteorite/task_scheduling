@@ -31,7 +31,7 @@ class AsynTask:
         self.scheduler_started = False  # Whether the scheduler thread has started
         self.scheduler_stop_event = threading.Event()  # Scheduler thread stop event
         self.task_details: Dict[str, Dict] = {}  # Details of tasks
-        self.running_tasks: [str, asyncio.Task or Any, str] = {}  # Use weak references to reduce memory usage
+        self.running_tasks: Dict[str, List[asyncio.Task or Any, str]] = {}  # Use weak references to reduce memory usage
         self.error_logs: List[Dict] = []  # Error logs, keep up to 10
         self.scheduler_thread: Optional[threading.Thread] = None  # Scheduler thread
         self.event_loop_thread: Optional[threading.Thread] = None  # Event loop thread
@@ -89,13 +89,15 @@ class AsynTask:
         """
         Start the scheduler thread and the event loop thread.
         """
-        self.scheduler_started = True
-        self.scheduler_thread = threading.Thread(target=self.scheduler, daemon=True)
-        self.scheduler_thread.start()
+        with self.condition:
+            if not self.scheduler_started:
+                self.scheduler_started = True
+                self.scheduler_thread = threading.Thread(target=self.scheduler, daemon=True)
+                self.scheduler_thread.start()
 
-        # Start the event loop thread
-        self.event_loop_thread = threading.Thread(target=self.run_event_loop, daemon=True)
-        self.event_loop_thread.start()
+                # Start the event loop thread
+                self.event_loop_thread = threading.Thread(target=self.run_event_loop, daemon=True)
+                self.event_loop_thread.start()
 
     # Stop the scheduler
     def stop_scheduler(self, force_cleanup: bool) -> None:
@@ -104,9 +106,9 @@ class AsynTask:
         Stop the scheduler and event loop, and forcibly kill all tasks if force_cleanup is True.
         """
         logger.warning("Exit cleanup")
-        self.scheduler_started = False
-        self.scheduler_stop_event.set()
         with self.condition:
+            self.scheduler_started = False
+            self.scheduler_stop_event.set()
             self.condition.notify_all()
 
         if force_cleanup:
@@ -123,7 +125,8 @@ class AsynTask:
             self.join_scheduler_thread()
 
             # Clean up all task return results
-            self.task_results.clear()
+            with self.condition:
+                self.task_results.clear()
 
             # Reset parameters for scheduler restart
             self.loop = None
@@ -145,7 +148,8 @@ class AsynTask:
             self.join_scheduler_thread()
 
             # Clean up all task return results
-            self.task_results.clear()
+            with self.condition:
+                self.task_results.clear()
 
     # Task scheduler
     def scheduler(self) -> None:
@@ -167,10 +171,11 @@ class AsynTask:
 
                 task = self.task_queue.get()
 
-                timeout_processing, task_name, task_id, func, args, kwargs = task
+            timeout_processing, task_name, task_id, func, args, kwargs = task
 
-                # Submit the task to the event loop for execution
-                future = asyncio.run_coroutine_threadsafe(self.execute_task(task), self.loop)
+            # Submit the task to the event loop for execution
+            future = asyncio.run_coroutine_threadsafe(self.execute_task(task), self.loop)
+            with self.condition:
                 self.running_tasks[task_id] = [future, task_name]
 
             # Check if running tasks have timed out
@@ -192,9 +197,9 @@ class AsynTask:
                 return
 
             # Modify the task status
-            self.task_details[task_id]["start_time"] = time.time()
-
-            self.task_details[task_id]["status"] = "running"
+            with self.condition:
+                self.task_details[task_id]["start_time"] = time.time()
+                self.task_details[task_id]["status"] = "running"
 
             logger.info(f"Start running asynchronous task, task name: {task_id}")
 
@@ -218,49 +223,48 @@ class AsynTask:
                     self.task_results[task_id].pop(0)  # Remove the oldest result
 
             # Update task status to "completed"
-            self.task_details[task_id]["status"] = "completed"
+            with self.condition:
+                self.task_details[task_id]["status"] = "completed"
 
         except asyncio.TimeoutError:
             logger.warning(f"Queue task | {task_id} | timed out, forced termination")
-
-            self.task_details[task_id]["status"] = "timeout"
-
-            self.task_details[task_id]["end_time"] = 'NaN'
+            with self.condition:
+                self.task_details[task_id]["status"] = "timeout"
+                self.task_details[task_id]["end_time"] = 'NaN'
 
         except TimeoutException:
             logger.warning(f"Queue task | {task_id} | timed out, forced termination")
-
-            self.task_details[task_id]["status"] = "timeout"
-
-            self.task_details[task_id]["end_time"] = 'NaN'
+            with self.condition:
+                self.task_details[task_id]["status"] = "timeout"
+                self.task_details[task_id]["end_time"] = 'NaN'
 
         except asyncio.CancelledError:
             logger.warning(f"Queue task | {task_id} | was cancelled")
-
-            self.task_details[task_id]["status"] = "cancelled"
+            with self.condition:
+                self.task_details[task_id]["status"] = "cancelled"
 
         except Exception as e:
             logger.error(f"Asynchronous task {task_id} execution failed: {e}")
-
-            self.task_details[task_id]["status"] = "failed"
-
-            self.log_error(task_id, e)
+            with self.condition:
+                self.task_details[task_id]["status"] = "failed"
+                self.log_error(task_id, e)
 
         finally:
             # Opt-out will result in the deletion of the information and the following processing will not be possible
-            if self.task_details.get(task_id, None) is None:
-                return None
+            with self.condition:
+                if self.task_details.get(task_id, None) is None:
+                    return None
 
-            if not self.task_details[task_id].get("end_time") == "NaN":
-                self.task_details[task_id]["end_time"] = time.time()
+                if not self.task_details[task_id].get("end_time") == "NaN":
+                    self.task_details[task_id]["end_time"] = time.time()
 
-            # Remove the task from running tasks dictionary
-            if task_id in self.running_tasks:
-                del self.running_tasks[task_id]
+                # Remove the task from running tasks dictionary
+                if task_id in self.running_tasks:
+                    del self.running_tasks[task_id]
 
-            # Check if all tasks are completed
-            if self.task_queue.empty() and len(self.running_tasks) == 0:
-                self.reset_idle_timer()
+                # Check if all tasks are completed
+                if self.task_queue.empty() and len(self.running_tasks) == 0:
+                    self.reset_idle_timer()
 
     # Update the task status
     def log_error(self, task_id: str, exception: Exception) -> None:
@@ -323,7 +327,6 @@ class AsynTask:
             Dict: Dictionary containing queue size, number of running tasks, number of failed tasks, task details, and error logs.
         """
         with self.condition:
-
             current_time = time.time()
             queue_info = {
                 "queue_size": self.task_queue.qsize(),
@@ -369,7 +372,6 @@ class AsynTask:
                 logger.warning(f"Task {task_id} has been forcibly cancelled")
             else:
                 logger.warning(f"Task {task_id} does not exist or is already completed")
-
 
     def cancel_all_queued_tasks_by_name(self, task_name: str) -> None:
         """
@@ -459,13 +461,14 @@ class AsynTask:
         Check if running tasks have timed out.
         """
         current_time = time.time()
-        for task_id, details in list(self.task_details.items()):  # Create a copy using list()
-            if details.get("status") == "running":
-                start_time = details.get("start_time")
-                if current_time - start_time > config["watch_dog_time"]:
-                    logger.warning(f"Queue task | {task_id} | timed out, but continues to run")
-                    # Do not cancel the task, just record the timeout
-                    self.task_details[task_id]["end_time"] = "NaN"
+        with self.condition:
+            for task_id, details in list(self.task_details.items()):  # Create a copy using list()
+                if details.get("status") == "running":
+                    start_time = details.get("start_time")
+                    if current_time - start_time > config["watch_dog_time"]:
+                        logger.warning(f"Queue task | {task_id} | timed out, but continues to run")
+                        # Do not cancel the task, just record the timeout
+                        self.task_details[task_id]["end_time"] = "NaN"
 
     def run_event_loop(self) -> None:
         """
@@ -478,13 +481,13 @@ class AsynTask:
         """
         Forcibly cancel all running tasks.
         """
-        for task_id in list(self.running_tasks.keys()):  # Create a copy using list()
-            future = self.running_tasks[task_id][0]
-            if not future.done():  # Check if the task is completed
-                future.cancel()
-                logger.warning(f"Task {task_id} has been forcibly cancelled")
-                # Update task status to "cancelled"
-                with self.condition:
+        with self.condition:
+            for task_id in list(self.running_tasks.keys()):  # Create a copy using list()
+                future = self.running_tasks[task_id][0]
+                if not future.done():  # Check if the task is completed
+                    future.cancel()
+                    logger.warning(f"Task {task_id} has been forcibly cancelled")
+                    # Update task status to "cancelled"
                     if task_id in self.task_details:
                         self.task_details[task_id]["status"] = "cancelled"
                         self.task_details[task_id]["end_time"] = time.time()
@@ -504,8 +507,9 @@ class AsynTask:
                 # Clean up all tasks and resources
                 self.cancel_all_running_tasks()
                 self.clear_task_queue()
-                self.task_details.clear()
-                self.task_results.clear()
+                with self.condition:
+                    self.task_details.clear()
+                    self.task_results.clear()
             except Exception as e:
                 logger.error(f"Error occurred while stopping the event loop: {e}")
 
@@ -516,7 +520,7 @@ class AsynTask:
         with self.condition:
             task_details_copy = self.task_details.copy()
             if len(task_details_copy) > config["maximum_task_info_storage"]:
-                logger.warning(f"More than {config["maximum_task_info_storage"]} task details detected.")
+                logger.warning(f"More than {config['maximum_task_info_storage']} task details detected.")
 
             # Clear the task details and error messages
             self.task_details = {}
