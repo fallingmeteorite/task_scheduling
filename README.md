@@ -492,9 +492,10 @@ task_id2 = add_task(True,
 time.sleep(1.0)
 
 print(linetask.get_task_status(task_id1))
+# {'task_name': 'task1', 'start_time': 1737857113.7971911, 'status': 'running'}
 
 print(asyntask.get_task_status(task_id2))
-
+# {'task_name': 'task1', 'start_time': 1737857113.8179326, 'status': 'running'}
 try:
     while True:
         pass
@@ -523,10 +524,19 @@ shutdown(True)
 ```
 from task_scheduling import update_config
 
-update_config("line_task_max", 10)
+print(config["line_task_max"])
+# 10
 
-# Configuration file updated and reloaded successfully: line_task_max = 10
+update_config("line_task_max", 18)
 
+# Configuration file updated and reloaded successfully: line_task_max = 18
+
+print(config["line_task_max"])
+
+# 18
+
+
+# The updated configuration is not written to the file, and the modified data is stored in memory
 ```
 
 The configuration file is stored at:
@@ -547,11 +557,11 @@ The maximum number of queues for a linear task
 
 When there are no tasks for many seconds, close the task scheduler(seconds)
 
-`max_idle_time: 260`
+`max_idle_time: 60`
 
 When a task runs for a long time without finishing, it is forced to end(seconds)
 
-`watch_dog_time: 16`
+`watch_dog_time: 200`
 
 The maximum number of records that can be stored in a task status
 
