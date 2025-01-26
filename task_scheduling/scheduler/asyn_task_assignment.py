@@ -324,7 +324,6 @@ class AsynTask:
             Dict: Dictionary containing queue size, number of running tasks, number of failed tasks, task details, and error logs.
         """
         with self.condition:
-            current_time = time.time()
             queue_info = {
                 "queue_size": self.task_queue.qsize(),
                 "running_tasks_count": 0,
@@ -338,6 +337,7 @@ class AsynTask:
                 task_name = details.get("task_name", "Unknown")
                 if status == "running":
                     start_time = details.get("start_time")
+                    current_time = time.time()
                     if current_time - start_time > config["watch_dog_time"]:
                         # Change end time of timed out tasks to NaN
                         queue_info["task_details"][task_id] = {

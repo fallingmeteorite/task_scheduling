@@ -336,27 +336,41 @@ class LineTask:
         Get detailed information about the task queue.
 
         Returns:
-            Dict: Dictionary containing queue size, number of running tasks, task details, and error logs.
+            Dict: Dictionary containing queue size, number of running tasks, number of failed tasks, task details, and error logs.
         """
-        with self.lock:
+        with self.condition:
             queue_info = {
                 "queue_size": self.task_queue.qsize(),
-                "running_tasks_count": len(self.running_tasks),
+                "running_tasks_count": 0,
+                "failed_tasks_count": 0,
                 "task_details": {},
-                "error_logs": self.error_logs.copy()
+                "error_logs": self.error_logs.copy()  # Return recent error logs
             }
 
             for task_id, details in self.task_details.items():
-                task_name = details.get("task_name", "Unknown")
                 status = details.get("status")
-                queue_info["task_details"][task_id] = {
-                    "task_name": task_name,
-                    "start_time": details.get("start_time"),
-                    "status": status,
-                    "end_time": details.get("end_time")
-                }
+                task_name = details.get("task_name", "Unknown")
+                if status == "running":
+                    start_time = details.get("start_time")
+                    current_time = time.time()
+                    if current_time - start_time > config["watch_dog_time"]:
+                        # Change end time of timed out tasks to NaN
+                        queue_info["task_details"][task_id] = {
+                            "task_name": task_name,
+                            "start_time": start_time,
+                            "status": status,
+                            "end_time": "NaN"
+                        }
+                    else:
+                        queue_info["task_details"][task_id] = details
+                    queue_info["running_tasks_count"] += 1
+                elif status == "failed":
+                    queue_info["task_details"][task_id] = details
+                    queue_info["failed_tasks_count"] += 1
+                else:
+                    queue_info["task_details"][task_id] = details
 
-            return queue_info
+        return queue_info
 
     def force_stop_task(self, task_id: str) -> None:
         """

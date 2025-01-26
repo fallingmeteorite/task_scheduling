@@ -407,7 +407,7 @@ except KeyboardInterrupt:
 
 ```
 
-### get_all_queue_info(queue_type: str) -> str:
+### get_all_queue_info(queue_type: str, show_id: bool) -> str:
 
 ```
 import asyncio
@@ -440,14 +440,23 @@ add_task(True,
          input_info
          )
 time.sleep(1.0)
-print(get_all_queue_info("line"))
-# line queue size: 0, Running tasks count: 1
+print(get_all_queue_info("line", True))
+# line queue size: 0, Running tasks count: 1, Failed tasks count: 0
 # Name: task1, ID: 736364d9-1e3a-4746-8c6b-be07178a876b, Process Status: running, Elapsed Time: 1.00 seconds
 
-print(get_all_queue_info("asyncio"))
+print(get_all_queue_info("line", False))
+# line queue size: 0, Running tasks count: 1, Failed tasks count: 0
+# Name: task1, Process Status: running, Elapsed Time: 1.00 seconds
 
-# asyncio queue size: 0, Running tasks count: 1
+print(get_all_queue_info("asyncio", True))
+
+# asyncio queue size: 0, Running tasks count: 1, Failed tasks count: 0
 # Name: task1, ID: 24964b35-c7a7-4206-9e89-df0ed8676caf, Process Status: running, Elapsed Time: 1.00 seconds
+
+print(get_all_queue_info("asyncio", False))
+# asyncio queue size: 0, Running tasks count: 1, Failed tasks count: 0
+# Name: task1, Process Status: running, Elapsed Time: 1.00 seconds
+
 try:
     while True:
         pass

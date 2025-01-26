@@ -342,6 +342,7 @@ try:
 except KeyboardInterrupt:
     shutdown(True)
 """
+
 """
 import asyncio
 import time
@@ -372,21 +373,24 @@ add_task(True,
          line_task2,
          input_info
          )
+
 time.sleep(1.0)
-print(get_all_queue_info("line"))
 # line queue size: 0, Running tasks count: 1
 # Name: task1, ID: 736364d9-1e3a-4746-8c6b-be07178a876b, Process Status: running, Elapsed Time: 1.00 seconds
 
-print(get_all_queue_info("asyncio"))
 
 # asyncio queue size: 0, Running tasks count: 1
 # Name: task1, ID: 24964b35-c7a7-4206-9e89-df0ed8676caf, Process Status: running, Elapsed Time: 1.00 seconds
 try:
     while True:
-        pass
+        print(get_all_queue_info("line", True))
+        print(get_all_queue_info("asyncio", True))
+        time.sleep(1.0)
 except KeyboardInterrupt:
     shutdown(True)
+
 """
+
 """
 import asyncio
 import time
