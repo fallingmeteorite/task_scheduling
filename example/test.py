@@ -407,21 +407,22 @@ async def line_task2(input_info):
 input_info = "test"
 
 task_id1 = add_task(True,
-         "task1",
-         line_task1,
-         input_info
-         )
+                    "task1",
+                    line_task1,
+                    input_info
+                    )
 
 task_id2 = add_task(True,
-         "task1",
-         line_task2,
-         input_info
-         )
+                    "task1",
+                    line_task2,
+                    input_info
+                    )
 time.sleep(1.0)
 
 print(linetask.get_task_status(task_id1))
-
+# {'task_name': 'task1', 'start_time': 1737857113.8179326, 'status': 'running'}
 print(asyntask.get_task_status(task_id2))
+# {'task_name': 'task1', 'start_time': 1737857113.8179326, 'status': 'running'}
 
 try:
     while True:
@@ -431,6 +432,12 @@ except KeyboardInterrupt:
 """
 """
 from task_scheduling import update_config
+from task_scheduling.common.config import config
 
-update_config("line_task_max", 10)
+print(config["line_task_max"])
+# 10
+update_config("line_task_max", 18)
+# Configuration file updated and reloaded successfully: line_task_max = 18
+print(config["line_task_max"])
+# 18
 """
