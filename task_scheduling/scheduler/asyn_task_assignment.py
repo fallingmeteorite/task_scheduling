@@ -31,7 +31,7 @@ class AsynTask:
         self.scheduler_started = False  # Whether the scheduler thread has started
         self.scheduler_stop_event = threading.Event()  # Scheduler thread stop event
         self.task_details: Dict[str, Dict] = {}  # Details of tasks
-        self.running_tasks: Dict[str, List[asyncio.Task or Any, str]] = {}  # Use weak references to reduce memory usage
+        self.running_tasks: Dict[str, Any, Any] = {}  # Use weak references to reduce memory usage
         self.error_logs: List[Dict] = []  # Error logs, keep up to 10
         self.scheduler_thread: Optional[threading.Thread] = None  # Scheduler thread
         self.event_loop_thread: Optional[threading.Thread] = None  # Event loop thread
@@ -177,9 +177,6 @@ class AsynTask:
             future = asyncio.run_coroutine_threadsafe(self.execute_task(task), self.loop)
             with self.condition:
                 self.running_tasks[task_id] = [future, task_name]
-
-            # Check if running tasks have timed out
-            self.check_running_tasks_timeout()
 
     # A function that executes a task
     @memory_release_decorator
@@ -455,20 +452,6 @@ class AsynTask:
             if task_id in self.task_results and self.task_results[task_id]:
                 return self.task_results[task_id].pop(0)  # Return and delete the oldest result
             return None
-
-    def check_running_tasks_timeout(self) -> None:
-        """
-        Check if running tasks have timed out.
-        """
-        current_time = time.time()
-        with self.condition:
-            for task_id, details in list(self.task_details.items()):  # Create a copy using list()
-                if details.get("status") == "running":
-                    start_time = details.get("start_time")
-                    if current_time - start_time > config["watch_dog_time"]:
-                        logger.warning(f"Queue task | {task_id} | timed out, but continues to run")
-                        # Do not cancel the task, just record the timeout
-                        self.task_details[task_id]["end_time"] = "NaN"
 
     def run_event_loop(self) -> None:
         """
