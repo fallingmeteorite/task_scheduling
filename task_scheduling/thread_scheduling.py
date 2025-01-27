@@ -24,7 +24,7 @@ def add_task(timeout_processing: bool, task_name: str, func: Callable, *args, **
     Generates a unique task ID and returns it.
 
     :param timeout_processing: Whether to enable timeout processing.
-    :param task_name: task name
+    :param task_name: Task name.
     :param func: Task function.
     :param args: Positional arguments for the task function.
     :param kwargs: Keyword arguments for the task function.
@@ -32,7 +32,7 @@ def add_task(timeout_processing: bool, task_name: str, func: Callable, *args, **
     """
     # Check if func is actually a function
     if not callable(func):
-        logger.warning(f"The provided func is not a callable function")
+        logger.warning("The provided func is not a callable function")
         return None
 
     # Generate a unique task ID
@@ -41,16 +41,19 @@ def add_task(timeout_processing: bool, task_name: str, func: Callable, *args, **
     if is_async_function(func):
         # Run asynchronous task
         state = asyntask.add_task(timeout_processing, task_name, task_id, func, *args, **kwargs)
+        if state:
+            logger.info(f"Asyncio queue task | {task_id} | added successfully")
+        else:
+            logger.warning(f"Asyncio queue task | {task_id} | failed to add")
     else:
         # Run linear task
         state = linetask.add_task(timeout_processing, task_name, task_id, func, *args, **kwargs)
+        if state:
+            logger.info(f"Linear queue task | {task_id} | added successfully")
+        else:
+            logger.warning(f"Linear queue task | {task_id} | failed to add")
 
-    if state:
-        logger.info(f"Task added with ID: {task_id}")
-        return task_id
-    else:
-        logger.info(f"Failed to add a task: {task_id}")
-        return None
+    return task_id if state else None
 
 
 def shutdown(force_cleanup: bool) -> None:
@@ -62,9 +65,9 @@ def shutdown(force_cleanup: bool) -> None:
     """
     # Shutdown asynchronous task scheduler if running
     if hasattr(asyntask, "scheduler_started") and asyntask.scheduler_started:
-        logger.info("Detected asynchronous task scheduler is running, shutting down...")
+        logger.info("Detected asyncio task scheduler is running, shutting down...")
         asyntask.stop_scheduler(force_cleanup)
-        logger.info("Asynchronous task scheduler has been shut down.")
+        logger.info("Asyncio task scheduler has been shut down.")
 
     # Shutdown linear task scheduler if running
     if hasattr(linetask, "scheduler_started") and linetask.scheduler_started:
@@ -72,4 +75,4 @@ def shutdown(force_cleanup: bool) -> None:
         linetask.stop_scheduler(force_cleanup)
         logger.info("Linear task scheduler has been shut down.")
 
-    logger.info("All schedulers have been shut down, resources have been released.")
+    logger.info("The closure was successful.")

@@ -28,8 +28,7 @@ def format_task_info(task_id: str, details: Dict, show_id: bool) -> str:
         elapsed_time = max(current_time - start_time, 0)
         if not elapsed_time > config["watch_dog_time"]:
             elapsed_time_display = f"{elapsed_time:.2f}"
-
-    else:
+    elif not end_time == "NaN":
         elapsed_time = max(end_time - start_time, 0)
         if not elapsed_time > config["watch_dog_time"]:
             elapsed_time_display = f"{elapsed_time:.2f}"

@@ -16,7 +16,7 @@ class AsynTask:
     Asynchronous task manager class, responsible for scheduling, executing, and monitoring asynchronous tasks.
     """
     __slots__ = [
-        'loop', 'task_queue', 'condition', 'scheduler_started', 'scheduler_stop_event',
+        'loop', 'task_queue', 'condition', 'scheduler_lock', 'scheduler_started', 'scheduler_stop_event',
         'task_details', 'running_tasks', 'error_logs', 'scheduler_thread', 'event_loop_thread',
         'banned_task_ids', 'idle_timer', 'idle_timeout', 'idle_timer_lock', 'task_results'
     ]
@@ -28,10 +28,11 @@ class AsynTask:
         self.loop: Optional[asyncio.AbstractEventLoop] = None
         self.task_queue = queue.Queue()  # Task queue
         self.condition = threading.Condition()  # Condition variable for thread synchronization
+        self.scheduler_lock = threading.RLock()  # Thread unlock
         self.scheduler_started = False  # Whether the scheduler thread has started
         self.scheduler_stop_event = threading.Event()  # Scheduler thread stop event
         self.task_details: Dict[str, Dict] = {}  # Details of tasks
-        self.running_tasks: Dict[str, Any, Any] = {}  # Use weak references to reduce memory usage
+        self.running_tasks: Dict[str, list[Any]] = {}  # Use weak references to reduce memory usage
         self.error_logs: List[Dict] = []  # Error logs, keep up to 10
         self.scheduler_thread: Optional[threading.Thread] = None  # Scheduler thread
         self.event_loop_thread: Optional[threading.Thread] = None  # Event loop thread
@@ -53,18 +54,24 @@ class AsynTask:
         :param args: Positional arguments for the task function.
         :param kwargs: Keyword arguments for the task function.
         """
-        with self.condition:
-            if task_name in self.banned_task_ids:
-                logger.warning(f"Task {task_id} is banned and will be deleted")
-                return False
+        try:
+            with self.scheduler_lock:
+                if task_id in self.banned_task_ids:
+                    logger.warning(f"Asyncio queue task | {task_id} | is banned and will be deleted")
+                    return False
 
-            if self.task_queue.qsize() <= config["maximum_queue_async"]:
-                # Store task name in task_details
-                self.task_details[task_id] = {
-                    "task_name": task_name,
-                    "start_time": None,
-                    "status": "pending"
-                }
+                if self.task_queue.qsize() >= config["maximum_queue_async"]:
+                    logger.warning(f"Asyncio queue task | {task_id} | not added, queue is full")
+                    logger.warning(f"Asyncio queue is full!!!")
+                    return False
+
+                with self.condition:
+                    # Store task name in task_details
+                    self.task_details[task_id] = {
+                        "task_name": task_name,
+                        "start_time": None,
+                        "status": "pending"
+                    }
 
                 self.task_queue.put((timeout_processing, task_name, task_id, func, args, kwargs))
 
@@ -76,13 +83,13 @@ class AsynTask:
                 # Cancel the idle timer
                 self.cancel_idle_timer()
 
-                # Notify the scheduler thread of a new task
-                self.condition.notify()
+                with self.condition:
+                    self.condition.notify()  # Notify the scheduler thread that a new task is available
+
                 return True
-            else:
-                logger.warning(f"Task {task_id} not added, queue is full")
-                logger.warning(f"Task queue is full!!!")
-                return False
+        except Exception as e:
+            logger.error(f"Error adding task | {task_id} |: {e}")
+            return False
 
     # Start the scheduler
     def start_scheduler(self) -> None:
@@ -100,23 +107,35 @@ class AsynTask:
                 self.event_loop_thread.start()
 
     # Stop the scheduler
-    def stop_scheduler(self, force_cleanup: bool) -> None:
+    def stop_scheduler(self, force_cleanup: bool, system_operations: bool = False) -> None:
         """
         :param force_cleanup: Force the end of a running task
         Stop the scheduler and event loop, and forcibly kill all tasks if force_cleanup is True.
+        :param system_operations: System execution metrics
         """
-        logger.warning("Exit cleanup")
-        with self.condition:
-            self.scheduler_started = False
-            self.scheduler_stop_event.set()
-            self.condition.notify_all()
+        with self.scheduler_lock:
+            # Check if all tasks are completed
+            if not self.task_queue.empty() or not len(self.running_tasks) == 0:
+                if system_operations:
+                    logger.warning(f"Asyncio queue task | detected running tasks | stopping operation terminated")
+                    return None
 
-        if force_cleanup:
+            logger.warning("Exit cleanup")
+
+            with self.condition:
+                self.scheduler_started = False
+                self.scheduler_stop_event.set()
+                self.condition.notify_all()
+
+            if force_cleanup:
+                # Forcibly cancel all running tasks
+                self.cancel_all_running_tasks()
+                self.scheduler_stop_event.set()
+            else:
+                self.scheduler_stop_event.set()
+
             # Clear the task queue
             self.clear_task_queue()
-
-            # Forcibly cancel all running tasks
-            self.cancel_all_running_tasks()
 
             # Stop the event loop
             self.stop_event_loop()
@@ -136,20 +155,8 @@ class AsynTask:
             self.idle_timer = None
             self.error_logs = []
 
-            logger.info("Scheduler and event loop have stopped, all resources have been released and parameters reset")
-
-        else:
-            logger.info("Notification has been given to turn off task scheduling")
-
-            # Clear the task queue
-            self.clear_task_queue()
-
-            # Wait for the scheduler thread to finish
-            self.join_scheduler_thread()
-
-            # Clean up all task return results
-            with self.condition:
-                self.task_results.clear()
+            logger.info(
+                "Scheduler and event loop have stopped, all resources have been released and parameters reset")
 
     # Task scheduler
     def scheduler(self) -> None:
@@ -180,17 +187,17 @@ class AsynTask:
 
     # A function that executes a task
     @memory_release_decorator
-    async def execute_task(self, task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> None:
+    async def execute_task(self, task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
         """
-        Execute an asynchronous task
-        :param task:  tuple, including timeout processing flag, task ID, task function, positional arguments, and keyword arguments.
+        Execute an asynchronous task.
+        :param task: Tuple, including timeout processing flag, task name, task ID, task function, positional arguments, and keyword arguments.
         """
         # Unpack task tuple into local variables
         timeout_processing, task_name, task_id, func, args, kwargs = task
 
         try:
             if task_id in self.banned_task_ids:
-                logger.warning(f"Task {task_id} is banned and will be deleted")
+                logger.warning(f"Asyncio queue task | {task_id} | is banned and will be deleted")
                 return
 
             # Modify the task status
@@ -198,11 +205,10 @@ class AsynTask:
                 self.task_details[task_id]["start_time"] = time.time()
                 self.task_details[task_id]["status"] = "running"
 
-            logger.info(f"Start running asynchronous task, task name: {task_id}")
+            logger.info(f"Start running asyncio queue task | {task_id} | ")
 
             # If the task needs timeout processing, set the timeout time
             if timeout_processing:
-                # Prevent simultaneous triggering
                 with ThreadingTimeout(seconds=config["watch_dog_time"] + 5, swallow_exc=False):
                     result = await asyncio.wait_for(
                         func(*args, **kwargs),
@@ -224,28 +230,24 @@ class AsynTask:
                 self.task_details[task_id]["status"] = "completed"
 
         except asyncio.TimeoutError:
-            logger.warning(f"Queue task | {task_id} | timed out, forced termination")
+            logger.warning(f"Asyncio queue task | {task_id} | timed out, forced termination")
             with self.condition:
                 self.task_details[task_id]["status"] = "timeout"
                 self.task_details[task_id]["end_time"] = 'NaN'
-
         except TimeoutException:
-            logger.warning(f"Queue task | {task_id} | timed out, forced termination")
+            logger.warning(f"Asyncio queue task | {task_id} | timed out, forced termination")
             with self.condition:
                 self.task_details[task_id]["status"] = "timeout"
                 self.task_details[task_id]["end_time"] = 'NaN'
-
         except asyncio.CancelledError:
-            logger.warning(f"Queue task | {task_id} | was cancelled")
+            logger.warning(f"Asyncio queue task | {task_id} | was cancelled")
             with self.condition:
                 self.task_details[task_id]["status"] = "cancelled"
-
         except Exception as e:
-            logger.error(f"Asynchronous task {task_id} execution failed: {e}")
+            logger.error(f"Asyncio queue task | {task_id} | execution failed: {e}")
             with self.condition:
                 self.task_details[task_id]["status"] = "failed"
                 self.log_error(task_id, e)
-
         finally:
             # Opt-out will result in the deletion of the information and the following processing will not be possible
             with self.condition:
@@ -263,7 +265,7 @@ class AsynTask:
                 if self.task_queue.empty() and len(self.running_tasks) == 0:
                     self.reset_idle_timer()
 
-    # Update the task status
+    # Log error information during task execution
     def log_error(self, task_id: str, exception: Exception) -> None:
         """
         Log error information during task execution.
@@ -290,7 +292,7 @@ class AsynTask:
         with self.idle_timer_lock:
             if self.idle_timer is not None:
                 self.idle_timer.cancel()
-            self.idle_timer = threading.Timer(self.idle_timeout, self.stop_scheduler, args=(True,))
+            self.idle_timer = threading.Timer(self.idle_timeout, self.stop_scheduler, args=(False, True,))
             self.idle_timer.start()
 
     def cancel_idle_timer(self) -> None:
@@ -314,7 +316,7 @@ class AsynTask:
         Wait for the scheduler thread to finish.
         """
         if self.scheduler_thread and self.scheduler_thread.is_alive():
-            self.scheduler_thread.join(timeout=1)  # Wait up to 1 second
+            self.scheduler_thread.join()
 
     def get_queue_info(self) -> Dict:
         """
@@ -366,9 +368,9 @@ class AsynTask:
             if task_id in self.running_tasks:
                 future = self.running_tasks[task_id][0]
                 future.cancel()
-                logger.warning(f"Task {task_id} has been forcibly cancelled")
+                logger.warning(f"Asyncio queue task | {task_id} | has been forcibly cancelled")
             else:
-                logger.warning(f"Task {task_id} does not exist or is already completed")
+                logger.warning(f"Asyncio queue task | {task_id} | does not exist or is already completed")
 
     def cancel_all_queued_tasks_by_name(self, task_name: str) -> None:
         """
@@ -381,12 +383,13 @@ class AsynTask:
             while not self.task_queue.empty():
                 task = self.task_queue.get()
                 if task[2] == task_name:  # Use function name to match task name
-                    logger.warning(f"Task {task_name} is waiting to be executed in the queue, has been deleted")
+                    logger.warning(
+                        f"Asyncio queue task | {task_name} | is waiting to be executed in the queue, has been deleted")
                     # Clean up task details and results
-                    if task[1] in self.task_details:  # Use task ID to delete task details and results
-                        del self.task_details[task[1]]
-                    if task[1] in self.task_results:
-                        del self.task_results[task[1]]
+                    if task[2] in self.task_details:  # Use task ID to delete task details and results
+                        del self.task_details[task[2]]
+                    if task[2] in self.task_results:
+                        del self.task_results[task[2]]
                 else:
                     temp_queue.put(task)
 
@@ -396,17 +399,22 @@ class AsynTask:
 
     def cancel_all_queued_tasks(self, task_name: str) -> None:
         """
-        Cancel all queued tasks with the banned task Name.
+        Cancel all queued tasks with the banned task name.
 
-        :param task_name: Task Name.
+        :param task_name: Task name.
         """
         with self.condition:
             temp_queue = queue.Queue()
             while not self.task_queue.empty():
                 task = self.task_queue.get()
-                if task[1] == task_name:
-                    logger.warning(f"Task Name {task_name} is waiting to be executed in the queue, has been deleted")
+                if task[2] == task_name:
+                    logger.warning(
+                        f"Asyncio queue task | {task_name} | is waiting to be executed in the queue, has been deleted")
                     # Clean up task details and results
+                    if task[2] in self.task_details:
+                        del self.task_details[task[2]]
+                    if task[2] in self.task_results:
+                        del self.task_results[task[2]]
                 else:
                     temp_queue.put(task)
 
@@ -414,31 +422,31 @@ class AsynTask:
             while not temp_queue.empty():
                 self.task_queue.put(temp_queue.get())
 
-    def ban_task_id(self, task_name: str) -> None:
+    def ban_task_name(self, task_name: str) -> None:
         """
-        Ban a task Name from execution, delete tasks directly if detected and print information.
+        Ban a task name from execution, delete tasks directly if detected and print information.
 
-        :param task_name: Task Name.
+        :param task_name: Task name.
         """
         with self.condition:
             self.banned_task_ids.append(task_name)
-            logger.warning(f"Task Name {task_name} has been banned from execution")
+            logger.warning(f"Asyncio queue task | {task_name} | has been banned from execution")
 
-            # Cancel all queued tasks with the banned task ID
-            self.cancel_all_queued_tasks(task_name)
+            # Cancel all queued tasks with the banned task name
+            self.cancel_all_queued_tasks_by_name(task_name)
 
-    def allow_task_id(self, task_name: str) -> None:
+    def allow_task_name(self, task_name: str) -> None:
         """
-        Allow a banned task Name to be executed again.
+        Allow a banned task name to be executed again.
 
-        :param task_name: Task Name.
+        :param task_name: Task name.
         """
         with self.condition:
             if task_name in self.banned_task_ids:
                 self.banned_task_ids.remove(task_name)
-                logger.info(f"Task Name {task_name} has been allowed for execution")
+                logger.info(f"Asyncio queue task | {task_name} | is allowed for execution")
             else:
-                logger.warning(f"Task Name {task_name} is not banned, no action taken")
+                logger.warning(f"Asyncio queue task | {task_name} | is not banned, no action taken")
 
     # Obtain the information returned by the corresponding task
     def get_task_result(self, task_id: str) -> Optional[Any]:
@@ -448,10 +456,14 @@ class AsynTask:
         :param task_id: Task ID.
         :return: Task return result, if the task is not completed or does not exist, return None.
         """
-        with self.condition:
-            if task_id in self.task_results and self.task_results[task_id]:
-                return self.task_results[task_id].pop(0)  # Return and delete the oldest result
-            return None
+        if task_id in self.task_results and self.task_results[task_id]:
+            result = self.task_results[task_id].pop(0)  # Return and delete the oldest result
+            with self.condition:
+                if not self.task_results[task_id]:
+                    del self.task_results[task_id]
+            return result
+        logger.warning(f"Asyncio queue task | {task_id} | does not exist or has been completed and removed")
+        return None
 
     def run_event_loop(self) -> None:
         """
@@ -469,7 +481,7 @@ class AsynTask:
                 future = self.running_tasks[task_id][0]
                 if not future.done():  # Check if the task is completed
                     future.cancel()
-                    logger.warning(f"Task {task_id} has been forcibly cancelled")
+                    logger.warning(f"Asyncio queue task | {task_id} | has been forcibly cancelled")
                     # Update task status to "cancelled"
                     if task_id in self.task_details:
                         self.task_details[task_id]["status"] = "cancelled"
@@ -494,20 +506,24 @@ class AsynTask:
                     self.task_details.clear()
                     self.task_results.clear()
             except Exception as e:
-                logger.error(f"Error occurred while stopping the event loop: {e}")
+                logger.error(f"Asyncio queue task | stopping event loop | error occurred: {e}")
 
     def check_and_log_task_details(self) -> None:
         """
-        Check if the number of task details exceeds 10 and log them to a file.
+        Check if the number of task details exceeds the configured limit and remove those with specific statuses.
         """
         with self.condition:
             task_details_copy = self.task_details.copy()
             if len(task_details_copy) > config["maximum_task_info_storage"]:
-                logger.warning(f"More than {config['maximum_task_info_storage']} task details detected.")
+                logger.warning(f"More than {config['maximum_task_info_storage']} task details detected. "
+                               f"Cleaning up old task details.")
 
-            # Clear the task details and error messages
-            self.task_details = {}
-            self.error_logs = []
+                # Filter out tasks with status 'failed', 'completed', or 'timeout'
+                new_task_details = {task_id: details for task_id, details in task_details_copy.items()
+                                    if details.get("status") in ["pending", "running"]}
+
+                # Update the task details with the filtered results
+                self.task_details = new_task_details
 
     def get_task_status(self, task_id: str) -> Optional[Dict]:
         """
@@ -516,12 +532,11 @@ class AsynTask:
         :param task_id: Task ID.
         :return: A dictionary containing information about the status of the task, or None if the task does not exist.
         """
-        with self.condition:
-            if task_id in self.task_details:
-                return self.task_details[task_id]
-            else:
-                logger.warning(f"Task {task_id} does not exist or has been completed and removed.")
-                return None
+        if task_id in self.task_details:
+            return self.task_details[task_id]
+        else:
+            logger.warning(f"Asyncio queue task | {task_id} | does not exist or has been completed and removed.")
+            return None
 
 
 # Instantiate object
