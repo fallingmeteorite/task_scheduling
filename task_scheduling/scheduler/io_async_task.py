@@ -228,7 +228,6 @@ class IoAsyncTask:
                 # Wait for the task queue to be not empty and the number of tasks in the current event loop is less than 3
                 while (self.task_queues[task_name].empty() or self.task_counters[
                     task_name] >= config["maximum_event_loop_tasks"]) and not self.scheduler_stop_event.is_set():
-                    logger.debug(f"Scheduler for {task_name} is waiting for tasks or event loop to be idle.")
                     self.condition.wait()
 
                 if self.scheduler_stop_event.is_set():

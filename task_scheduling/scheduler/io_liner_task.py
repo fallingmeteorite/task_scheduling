@@ -127,6 +127,7 @@ class IoLinerTask:
                 logger.warning("Force stopping scheduler and cleaning up tasks")
                 # Force stop all running tasks
                 task_manager.force_stop_all()
+                task_manager.skip_all()
                 self.scheduler_stop_event.set()
             else:
                 self.scheduler_stop_event.set()
@@ -398,6 +399,8 @@ class IoLinerTask:
                 logger.warning(f"Io linear task | {task_id} | does not exist or is already completed")
                 return
             task_manager.force_stop(task_id)
+            task_manager.skip_task(task_id)
+            task_manager.remove(task_id)
             logger.warning(f"Io linear task | {task_id} | has been forcibly cancelled")
         # Due to the influence of the lock, it is unlocked first
         self._update_task_status(task_id, "cancelled")
