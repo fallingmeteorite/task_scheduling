@@ -8,10 +8,10 @@ maximum_queue_async: 30
 maximum_queue_line: 30
 
 # When there are no tasks for many seconds, close the task scheduler(seconds)
-max_idle_time: 6
+max_idle_time: 60
 
 # When a task runs for a long time without finishing, it is forced to end(seconds)
-watch_dog_time: 6
+watch_dog_time: 60
 
 # The maximum number of records that can be stored in a task status
 maximum_task_info_storage: 20
