@@ -7,6 +7,24 @@ and the tasks need strong management and monitoring
 Asynchronous code and normal code are now supported,
 specifically with event loops for asynchronous code
 
+## Scope of application
+
+This task scheduling is suitable for:
+
+1.Network Requests: Handling multiple HTTP requests concurrently, where each request can be scheduled and executed asynchronously.
+
+2.File I/O Operations: Reading from or writing to multiple files concurrently, especially when dealing with large files or when the I/O operations are slow.
+
+3.Database Queries: Executing multiple database queries concurrently, especially when the queries involve waiting for database responses.
+
+4.Web Scraping: Running multiple web scraping tasks concurrently, where each task involves fetching and processing web pages.
+
+5.Real-time Data Processing: Processing real-time data streams, where tasks need to be executed as soon as data is available.
+
+6.Background Tasks: Running background tasks that perform periodic operations, such as data aggregation, cleanup, or monitoring.
+
+
+
 ## Feature description
 
 1.You can send a termination command to the execution code
@@ -505,8 +523,6 @@ try:
 except KeyboardInterrupt:
     shutdown(True)
 ```
-
-
 
 ### shutdown(force_cleanup: bool) -> None:
 
