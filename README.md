@@ -588,6 +588,10 @@ The maximum number of records that can be stored in a task status
 
 `maximum_task_info_storage: 60`
 
+The maximum number of tasks that run in a single event loop
+
+`maximum_event_loop_tasks: 3`
+
 # Reference libraries:
 
 In order to facilitate subsequent modifications,
