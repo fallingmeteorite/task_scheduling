@@ -3,8 +3,8 @@ import time
 from typing import Dict, List
 
 from .common.config import config
-from .scheduler.asyn_task_assignment import asyntask
-from .scheduler.line_task_assignment import linetask
+from .scheduler.io_liner_task import io_liner_task
+from .scheduler.io_async_task import io_async_task
 
 
 def format_task_info(task_id: str, details: Dict, show_id: bool) -> str:
@@ -92,8 +92,8 @@ def get_all_queue_info(queue_type: str, show_id: bool) -> str:
     :return: String of all queue information.
     """
     queue_mapping = {
-        "line": linetask,
-        "asyncio": asyntask,
+        "line": io_liner_task,
+        "asyncio": io_async_task,
     }
 
     task_queue = queue_mapping.get(queue_type)

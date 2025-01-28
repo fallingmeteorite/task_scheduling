@@ -6,14 +6,15 @@ from concurrent.futures import ThreadPoolExecutor, Future
 from functools import partial
 from typing import Callable, Dict, List, Tuple, Optional, Any
 
+from task_scheduling.scheduler.task_management import task_manager
 from ..common.config import config
 from ..common.log_config import logger
-from ..scheduler.memory_release import memory_release_decorator
-from ..stopit.task_destruction import task_manager
+from ..scheduler.resource_release import memory_release_decorator
+from ..stopit.force_thread_stop import skip_on_demand, StopException
 from ..stopit.threadstop import ThreadingTimeout, TimeoutException
 
 
-class LineTask:
+class IoLinerTask:
     """
     Linear task manager class, responsible for managing the scheduling, execution, and monitoring of linear tasks.
     """
@@ -29,6 +30,7 @@ class LineTask:
         self.task_details: Dict[str, Dict] = {}  # Task details
         self.lock = threading.Lock()  # Lock to protect access to shared resources
         self.scheduler_lock = threading.RLock()  # Thread unlock
+
         self.condition = threading.Condition()  # Condition variable for thread synchronization
         self.scheduler_started = False  # Whether the scheduler thread has started
         self.scheduler_stop_event = threading.Event()  # Scheduler thread stop event
@@ -57,18 +59,18 @@ class LineTask:
             with self.scheduler_lock:
                 # Check if the task is banned
                 if task_name in self.banned_task_names:
-                    logger.warning(f"Linear queue task | {task_id} | is banned and will be deleted")
+                    logger.warning(f"Io linear task | {task_id} | is banned and will be deleted")
                     return False
 
                 # Check if the queue is full
                 if self.task_queue.qsize() >= config["maximum_queue_line"]:
-                    logger.warning(f"Linear queue task | {task_id} | not added, queue is full")
+                    logger.warning(f"Io linear task | {task_id} | not added, queue is full")
                     return False
 
                 # Check if the scheduler is stopping due to idle timeout
                 if self.scheduler_stop_event.is_set() and not self.scheduler_started:
                     # Wait for the scheduler thread to fully stop
-                    self.join_scheduler_thread()
+                    self._join_scheduler_thread()
                     logger.info("Scheduler has fully stopped")
 
                 # Add the task to the queue
@@ -81,26 +83,26 @@ class LineTask:
                 self.task_queue.put((timeout_processing, task_name, task_id, func, args, kwargs))
 
                 if not self.scheduler_started:
-                    self.start_scheduler()
+                    self._start_scheduler()
 
                 # Notify the scheduler thread
                 with self.condition:
                     self.condition.notify()
 
                 # Cancel the idle timer
-                self.cancel_idle_timer()
+                self._cancel_idle_timer()
                 return True
         except Exception as e:
-            logger.error(f"Linear queue task | {task_id} | error adding task: {e}")
+            logger.error(f"Io linear task | {task_id} | error adding task: {e}")
             return False
 
     # Start the scheduler
-    def start_scheduler(self) -> None:
+    def _start_scheduler(self) -> None:
         """
         Start the scheduler thread.
         """
         self.scheduler_started = True
-        self.scheduler_thread = threading.Thread(target=self.scheduler, daemon=True)
+        self.scheduler_thread = threading.Thread(target=self._scheduler, daemon=True)
         self.scheduler_thread.start()
 
     # Stop the scheduler
@@ -116,7 +118,7 @@ class LineTask:
             # Check if all tasks are completed
             if not self.task_queue.empty() or not len(self.running_tasks) == 0:
                 if system_operations:
-                    logger.warning(f"Linear queue task | detected running tasks | stopping operation terminated")
+                    logger.warning(f"Io linear task | detected running tasks | stopping operation terminated")
                     return None
 
             logger.warning("Exit cleanup")
@@ -130,14 +132,14 @@ class LineTask:
                 self.scheduler_stop_event.set()
 
             # Clear the task queue
-            self.clear_task_queue()
+            self._clear_task_queue()
 
             # Notify all waiting threads
             with self.condition:
                 self.condition.notify_all()
 
             # Wait for the scheduler thread to finish
-            self.join_scheduler_thread()
+            self._join_scheduler_thread()
 
             # Reset state variables
             self.scheduler_started = False
@@ -152,7 +154,7 @@ class LineTask:
                 "Scheduler and event loop have stopped, all resources have been released and parameters reset")
 
     # Task scheduler
-    def scheduler(self) -> None:
+    def _scheduler(self) -> None:
         """
         Scheduler function, fetch tasks from the task queue and submit them to the thread pool for execution.
         """
@@ -177,14 +179,14 @@ class LineTask:
                         self.task_queue.put(task)
                         continue
 
-                    future = executor.submit(self.execute_task, task)
+                    future = executor.submit(self._execute_task, task)
                     self.running_tasks[task_id] = [future, task_name]
 
-                future.add_done_callback(partial(self.task_done, task_id))
+                future.add_done_callback(partial(self._task_done, task_id))
 
     # A function that executes a task
     @memory_release_decorator
-    def execute_task(self, task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
+    def _execute_task(self, task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
         """
         Execute a linear task.
 
@@ -198,24 +200,30 @@ class LineTask:
                 self.task_details[task_id]["start_time"] = time.time()
                 self.task_details[task_id]["status"] = "running"
 
-            logger.info(f"Start running linear task, task ID: {task_id}")
+            logger.info(f"Start running io linear task, task ID: {task_id}")
             if timeout_processing:
                 with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False) as task_control:
-                    task_manager.add(task_control, task_id)
-                    return_results = func(*args, **kwargs)
+                    with skip_on_demand() as skip_ctx:
+                        task_manager.add(task_control, skip_ctx, task_id)
+                        return_results = func(*args, **kwargs)
                     task_manager.remove(task_id)
             else:
                 with ThreadingTimeout(seconds=None, swallow_exc=False) as task_control:
-                    task_manager.add(task_control, task_id)
-                    return_results = func(*args, **kwargs)
+                    with skip_on_demand() as skip_ctx:
+                        task_manager.add(task_control, skip_ctx, task_id)
+                        return_results = func(*args, **kwargs)
                     task_manager.remove(task_id)
         except TimeoutException:
-            logger.warning(f"Linear queue task | {task_id} | timed out, forced termination")
-            self.update_task_status(task_id, "timeout")
+            logger.warning(f"Io linear task | {task_id} | timed out, forced termination")
+            self._update_task_status(task_id, "timeout")
+            raise  # Re-raise the exception to be handled by the task_done callback
+        except StopException:
+            logger.warning(f"Io linear task | {task_id} | timed out, forced termination")
+            self._update_task_status(task_id, "timeout")
             raise  # Re-raise the exception to be handled by the task_done callback
         except Exception as e:
-            logger.error(f"Linear queue task | {task_id} | execution failed: {e}")
-            self.log_error(task_id, e)
+            logger.error(f"Io linear task | {task_id} | execution failed: {e}")
+            self._log_error(task_id, e)
             raise  # Re-raise the exception to be handled by the task_done callback
         finally:
             if task_manager.check(task_id):
@@ -226,7 +234,7 @@ class LineTask:
             else:
                 return return_results
 
-    def task_done(self, task_id: str, future: Future) -> None:
+    def _task_done(self, task_id: str, future: Future) -> None:
         """
         Callback function after a task is completed.
 
@@ -244,16 +252,16 @@ class LineTask:
                 if len(self.task_results[task_id]) > 2:
                     self.task_results[task_id].pop(0)  # Remove the oldest result
             if not result == "error happened":
-                self.update_task_status(task_id, "completed")
+                self._update_task_status(task_id, "completed")
 
         except TimeoutException as e:
-            logger.error(f"Linear queue task | {task_id} | timed out: {e}")
-            self.update_task_status(task_id, "timeout")
-            self.log_error(task_id, e)
+            logger.error(f"Io linear task | {task_id} | timed out: {e}")
+            self._update_task_status(task_id, "timeout")
+            self._log_error(task_id, e)
         except Exception as e:
-            logger.error(f"Linear queue task | {task_id} | execution failed: {e}")
-            self.update_task_status(task_id, "failed")
-            self.log_error(task_id, e)
+            logger.error(f"Io linear task | {task_id} | execution failed: {e}")
+            self._update_task_status(task_id, "failed")
+            self._log_error(task_id, e)
         finally:
             # Ensure the Future object is deleted
             with self.lock:
@@ -263,13 +271,13 @@ class LineTask:
             # Check if all tasks are completed
             with self.lock:
                 if self.task_queue.empty() and len(self.running_tasks) == 0:
-                    self.reset_idle_timer()
+                    self._reset_idle_timer()
 
             # Check the number of task information
-            self.check_and_log_task_details()
+            self._check_and_log_task_details()
 
     # Update the task status
-    def update_task_status(self, task_id: str, status: str) -> None:
+    def _update_task_status(self, task_id: str, status: str) -> None:
         """
         Update task status.
 
@@ -287,7 +295,7 @@ class LineTask:
                 else:
                     self.task_details[task_id]["end_time"] = time.time()
 
-    def log_error(self, task_id: str, exception: Exception) -> None:
+    def _log_error(self, task_id: str, exception: Exception) -> None:
         """
         Log error information during task execution.
 
@@ -305,7 +313,7 @@ class LineTask:
                 self.error_logs.pop(0)  # Remove the oldest error log
 
     # The task scheduler closes the countdown
-    def reset_idle_timer(self) -> None:
+    def _reset_idle_timer(self) -> None:
         """
         Reset the idle timer.
         """
@@ -315,7 +323,7 @@ class LineTask:
             self.idle_timer = threading.Timer(self.idle_timeout, self.stop_scheduler, args=(False, True,))
             self.idle_timer.start()
 
-    def cancel_idle_timer(self) -> None:
+    def _cancel_idle_timer(self) -> None:
         """
         Cancel the idle timer.
         """
@@ -324,14 +332,14 @@ class LineTask:
                 self.idle_timer.cancel()
                 self.idle_timer = None
 
-    def clear_task_queue(self) -> None:
+    def _clear_task_queue(self) -> None:
         """
         Clear the task queue.
         """
         while not self.task_queue.empty():
             self.task_queue.get()
 
-    def join_scheduler_thread(self) -> None:
+    def _join_scheduler_thread(self) -> None:
         """
         Wait for the scheduler thread to finish.
         """
@@ -383,16 +391,16 @@ class LineTask:
         """
         Force stop a task by its task ID.
 
-        :param task_id: Task ID.
+        :param task_id: task ID.
         """
         with self.lock:
             if task_id not in self.running_tasks:
-                logger.warning(f"Linear queue task | {task_id} | does not exist or is already completed")
-                return None
+                logger.warning(f"Io linear task | {task_id} | does not exist or is already completed")
+                return
             task_manager.force_stop(task_id)
-            logger.warning(f"Linear queue task | {task_id} | has been forcibly cancelled")
+            logger.warning(f"Io linear task | {task_id} | has been forcibly cancelled")
         # Due to the influence of the lock, it is unlocked first
-        self.update_task_status(task_id, "cancelled")
+        self._update_task_status(task_id, "cancelled")
 
         with self.lock:
             # Clean up task details and results
@@ -413,7 +421,7 @@ class LineTask:
                 task = self.task_queue.get()
                 if task[1] == task_name:  # Use function name to match task name
                     logger.warning(
-                        f"Linear queue task | {task_name} | is waiting to be executed in the queue, has been deleted")
+                        f"Io linear task | {task_name} | is waiting to be executed in the queue, has been deleted")
                 else:
                     temp_queue.put(task)
 
@@ -429,7 +437,7 @@ class LineTask:
         """
         with self.lock:
             self.banned_task_names.append(task_name)
-            logger.warning(f"Linear queue task | {task_name} | is banned from execution")
+            logger.warning(f"Io linear task | {task_name} | is banned from execution")
 
             # Cancel all queued tasks with the banned task name
             self.cancel_all_queued_tasks_by_name(task_name)
@@ -443,9 +451,9 @@ class LineTask:
         with self.lock:
             if task_name in self.banned_task_names:
                 self.banned_task_names.remove(task_name)
-                logger.info(f"Linear queue task | {task_name} | is allowed for execution")
+                logger.info(f"Io linear task | {task_name} | is allowed for execution")
             else:
-                logger.warning(f"Linear queue task | {task_name} | is not banned, no action taken")
+                logger.warning(f"Io linear task | {task_name} | is not banned, no action taken")
 
     # Obtain the information returned by the corresponding task
     def get_task_result(self, task_id: str) -> Optional[Any]:
@@ -461,18 +469,17 @@ class LineTask:
                 if not self.task_results[task_id]:
                     del self.task_results[task_id]
             return result
-        logger.warning(f"Linear queue task | {task_id} | does not exist or has been completed and removed")
         return None
 
-    def check_and_log_task_details(self) -> None:
+    def _check_and_log_task_details(self) -> None:
         """
         Check if the number of task details exceeds the configured limit and remove those with specific statuses.
         """
         with self.lock:
             task_details_copy = self.task_details.copy()
             if len(task_details_copy) > config["maximum_task_info_storage"]:
-                logger.warning(f"More than {config['maximum_task_info_storage']} task details detected. "
-                               f"Cleaning up old task details.")
+                logger.info(f"More than {config['maximum_task_info_storage']} task details detected. "
+                            f"Cleaning up old task details.")
 
                 # Filter out tasks with status 'failed', 'completed', or 'timeout'
                 new_task_details = {task_id: details for task_id, details in task_details_copy.items()
@@ -490,9 +497,9 @@ class LineTask:
         """
         if task_id in self.task_details:
             return self.task_details[task_id]
-        logger.warning(f"Linear queue task | {task_id} | does not exist or has been completed and removed")
+        logger.warning(f"Io linear task | {task_id} | does not exist or has been completed and removed")
         return None
 
 
 # Instantiate object
-linetask = LineTask()
+io_liner_task = IoLinerTask()

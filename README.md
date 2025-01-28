@@ -89,7 +89,7 @@ except KeyboardInterrupt:
 import asyncio
 import time
 
-from task_scheduling import linetask, add_task, shutdown, asyntask
+from task_scheduling import io_async_task, add_task, shutdown, io_liner_task
 
 
 def line_task1(input_info):
@@ -110,8 +110,8 @@ add_task(True,
          input_info
          )
 
-linetask.ban_task_id("task1")
-# Task Name task1 has been banned from execution
+io_liner_task.ban_task_name("task1")
+# | Io linear task | task1 | is banned from execution
 
 add_task(True,
          "task1",
@@ -119,7 +119,7 @@ add_task(True,
          input_info
          )
 
-# Task 7fadcc68-8291-4924-af95-75e28a151c19 is banned and will be deleted
+# | Io linear task | eff3daf0-96f4-4d04-abd8-36bdfae16aa9 | is banned and will be deleted
 
 add_task(True,
          "task2",
@@ -127,15 +127,15 @@ add_task(True,
          input_info
          )
 
-asyntask.ban_task_id("task2")
-# Task Name task2 has been banned from execution
+io_async_task.ban_task_name("task2")
+# | Io asyncio task | task2 | has been banned from execution
 
 add_task(True,
          "task2",
          line_task2,
          input_info
          )
-# Task 3fa166a3-a52b-4610-bf37-9fe5cd820199 is banned and will be deleted
+# Io asyncio task | bafe8026-68d7-4753-9a55-bde5608c3dcb | is banned and will be deleted
 
 try:
     while True:
@@ -154,7 +154,7 @@ except KeyboardInterrupt:
 import asyncio
 import time
 
-from task_scheduling import linetask, add_task, shutdown, asyntask
+from task_scheduling import io_async_task, add_task, shutdown, io_liner_task
 
 
 def line_task1(input_info):
@@ -177,8 +177,8 @@ add_task(True,
          input_info
          )
 
-linetask.ban_task_id("task1")
-# Task Name task1 has been banned from execution
+io_liner_task.ban_task_name("task1")
+# | Io linear task | task1 | is banned from execution
 
 add_task(True,
          "task1",
@@ -186,11 +186,11 @@ add_task(True,
          input_info
          )
 
-# Task 78b44b9e-67ae-4b29-84b0-90a408ea0c11 is banned and will be deleted
+# | Io linear task | fa0fe12f-ad7f-4016-a76a-25285e12e21e | is banned and will be deleted
 
-linetask.allow_task_id("task1")
+io_liner_task.allow_task_name("task1")
 
-# Task Name task1 has been allowed for execution
+# | Io linear task | task1 | is allowed for execution
 
 add_task(True,
          "task1",
@@ -198,25 +198,26 @@ add_task(True,
          input_info
          )
 
-add_task(True,
-         "task2",
-         line_task2,
-         input_info
-         )
-
-asyntask.ban_task_id("task2")
-# Task Name task2 has been banned from execution
 
 add_task(True,
          "task2",
          line_task2,
          input_info
          )
-# Task 3fa166a3-a52b-4610-bf37-9fe5cd820199 is banned and will be deleted
 
-asyntask.allow_task_id("task2")
+io_async_task.ban_task_name("task2")
+# | Io asyncio task | task2 | has been banned from execution
 
-# Task Name task2 has been allowed for execution
+add_task(True,
+         "task2",
+         line_task2,
+         input_info
+         )
+# | Io asyncio task | 9747ac36-8582-4b44-80d9-1cb4d0dcd86a | is banned and will be deleted
+
+io_async_task.allow_task_name("task2")
+
+# | Io asyncio task | task2 | is allowed for execution
 
 add_task(True,
          "task2",
@@ -240,7 +241,7 @@ except KeyboardInterrupt:
 import asyncio
 import time
 
-from task_scheduling import linetask, add_task, shutdown, asyntask
+from task_scheduling import io_liner_task, add_task, shutdown, io_async_task
 
 
 def line_task1(input_info):
@@ -290,10 +291,11 @@ add_task(True,
          input_info
          )
 
-linetask.cancel_all_queued_tasks_by_name("task1")
-asyntask.cancel_all_queued_tasks_by_name("task2")
-# Task Name task1 is waiting to be executed in the queue, has been deleted
-# Task Name task1 is waiting to be executed in the queue, has been deleted
+io_liner_task.cancel_all_queued_tasks_by_name("task1")
+io_async_task.cancel_all_queued_tasks_by_name("task2")
+
+# | Io asyncio task | ce5e7f22-860a-4a62-8a6c-e9fadefd6c27 | has been forcibly cancelled
+
 try:
     while True:
         time.sleep(2)
@@ -311,7 +313,7 @@ except KeyboardInterrupt:
 import asyncio
 import time
 
-from task_scheduling import linetask, add_task, shutdown, asyntask
+from task_scheduling import io_async_task, add_task, shutdown, io_liner_task
 
 
 def line_task1(input_info):
@@ -341,11 +343,11 @@ task_id2 = add_task(True,
                     )
 
 time.sleep(2)
-linetask.force_stop_task(task_id1)
-asyntask.force_stop_task(task_id2)
+io_liner_task.force_stop_task(task_id1)
+io_async_task.force_stop_task(task_id2)
 
-# | Queue task | 619199e4-c6b5-4a10-ad31-90a23560eb1f | was cancelled
-# | Linear queue task | 5e3261e8-ad43-430f-b33f-1b9eda4ac552 | timed out, forced termination
+# | Io linear task | fb30d17e-0b15-4a88-b8c6-cbbc8163b909 | has been forcibly cancelled
+# | Io asyncio task | daa36e09-2959-44ec-98b6-8f1948535687 | has been forcibly cancelled
 try:
     while True:
         pass
@@ -363,7 +365,7 @@ except KeyboardInterrupt:
 import asyncio
 import time
 
-from task_scheduling import add_task, linetask, shutdown, asyntask
+from task_scheduling import add_task, io_async_task, shutdown, io_liner_task
 
 
 def line_task1(input_info):
@@ -383,14 +385,14 @@ task_id1 = add_task(True, "sleep", line_task1, input_info)
 task_id2 = add_task(True, "sleep", line_task2, input_info)
 
 while True:
-    result = linetask.get_task_result(task_id1)
+    result = io_liner_task.get_task_result(task_id1)
     if result is not None:
         print(f"Task result: {result}")
         break
     time.sleep(0.5)
 # Task result: test
 while True:
-    result = asyntask.get_task_result(task_id2)
+    result = io_async_task.get_task_result(task_id2)
     if result is not None:
         print(f"Task result: {result}")
         break
@@ -439,27 +441,19 @@ add_task(True,
          line_task2,
          input_info
          )
+
 time.sleep(1.0)
-print(get_all_queue_info("line", True))
-# line queue size: 0, Running tasks count: 1, Failed tasks count: 0
+# line queue size: 0, Running tasks count: 1
 # Name: task1, ID: 736364d9-1e3a-4746-8c6b-be07178a876b, Process Status: running, Elapsed Time: 1.00 seconds
 
-print(get_all_queue_info("line", False))
-# line queue size: 0, Running tasks count: 1, Failed tasks count: 0
-# Name: task1, Process Status: running, Elapsed Time: 1.00 seconds
 
-print(get_all_queue_info("asyncio", True))
-
-# asyncio queue size: 0, Running tasks count: 1, Failed tasks count: 0
+# asyncio queue size: 0, Running tasks count: 1
 # Name: task1, ID: 24964b35-c7a7-4206-9e89-df0ed8676caf, Process Status: running, Elapsed Time: 1.00 seconds
-
-print(get_all_queue_info("asyncio", False))
-# asyncio queue size: 0, Running tasks count: 1, Failed tasks count: 0
-# Name: task1, Process Status: running, Elapsed Time: 1.00 seconds
-
 try:
     while True:
-        pass
+        print(get_all_queue_info("line", True))
+        print(get_all_queue_info("asyncio", True))
+        time.sleep(1.0)
 except KeyboardInterrupt:
     shutdown(True)
 # Both asyntask and linetask contain this function, and the usage method is the same
@@ -472,7 +466,7 @@ except KeyboardInterrupt:
 import asyncio
 import time
 
-from task_scheduling import add_task, asyntask, linetask, shutdown
+from task_scheduling import add_task, io_async_task, io_liner_task, shutdown
 
 
 def line_task1(input_info):
@@ -488,29 +482,31 @@ async def line_task2(input_info):
 input_info = "test"
 
 task_id1 = add_task(True,
-         "task1",
-         line_task1,
-         input_info
-         )
+                    "task1",
+                    line_task1,
+                    input_info
+                    )
 
 task_id2 = add_task(True,
-         "task1",
-         line_task2,
-         input_info
-         )
+                    "task1",
+                    line_task2,
+                    input_info
+                    )
 time.sleep(1.0)
 
-print(linetask.get_task_status(task_id1))
-# {'task_name': 'task1', 'start_time': 1737857113.7971911, 'status': 'running'}
-
-print(asyntask.get_task_status(task_id2))
+print(io_liner_task.get_task_status(task_id1))
 # {'task_name': 'task1', 'start_time': 1737857113.8179326, 'status': 'running'}
+print(io_async_task.get_task_status(task_id2))
+# {'task_name': 'task1', 'start_time': 1737857113.8179326, 'status': 'running'}
+
 try:
     while True:
         pass
 except KeyboardInterrupt:
     shutdown(True)
 ```
+
+
 
 ### shutdown(force_cleanup: bool) -> None:
 
