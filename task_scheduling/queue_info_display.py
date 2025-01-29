@@ -22,17 +22,23 @@ def format_task_info(task_id: str, details: Dict, show_id: bool) -> str:
     end_time = details.get("end_time", 0)
     status = details.get("status", "unknown")
 
-    if start_time is None:
-        end_time = "NaN"
-
     # Calculate elapsed time
-    if end_time == 0:
-        current_time = time.time()
-        elapsed_time = max(current_time - start_time, 0)
+    if status == "pending":
+        pass
+
+    if status == "completed":
+        elapsed_time = max(end_time - start_time, 0)
         if not elapsed_time > config["watch_dog_time"]:
             elapsed_time_display = f"{elapsed_time:.2f}"
-    elif not end_time == "NaN":
+
+    if status == "failed":
         elapsed_time = max(end_time - start_time, 0)
+        if not elapsed_time > config["watch_dog_time"]:
+            elapsed_time_display = f"{elapsed_time:.2f}"
+
+    if status == "running":
+        current_time = time.time()
+        elapsed_time = max(current_time - start_time, 0)
         if not elapsed_time > config["watch_dog_time"]:
             elapsed_time_display = f"{elapsed_time:.2f}"
 
