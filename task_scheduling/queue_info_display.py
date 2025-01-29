@@ -3,8 +3,8 @@ import time
 from typing import Dict, List
 
 from .common.config import config
-from .scheduler.io_liner_task import io_liner_task
 from .scheduler.io_async_task import io_async_task
+from .scheduler.io_liner_task import io_liner_task
 
 
 def format_task_info(task_id: str, details: Dict, show_id: bool) -> str:
@@ -21,6 +21,9 @@ def format_task_info(task_id: str, details: Dict, show_id: bool) -> str:
     start_time = details.get("start_time", 0)
     end_time = details.get("end_time", 0)
     status = details.get("status", "unknown")
+
+    if start_time is None:
+        end_time = "NaN"
 
     # Calculate elapsed time
     if end_time == 0:
@@ -66,8 +69,8 @@ def get_queue_info_string(task_queue, queue_type: str, show_id: bool) -> str:
 
         # Output task details
         for task_id, details in queue_info['task_details'].items():
-            if details["status"] != "pending":
-                info.append(format_task_info(task_id, details, show_id))
+            # if details["status"] != "pending":
+            info.append(format_task_info(task_id, details, show_id))
 
         if queue_info.get("error_logs"):
             info.append(f"\n{queue_type} error logs:\n")
