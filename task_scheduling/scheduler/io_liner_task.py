@@ -195,6 +195,8 @@ class IoLinerTask:
         """
         timeout_processing, task_name, task_id, func, args, kwargs = task
 
+        # Set the default value
+        return_results = None
         try:
             with self.lock:
                 # Modify the task status
@@ -217,20 +219,21 @@ class IoLinerTask:
         except TimeoutException:
             logger.warning(f"Io linear task | {task_id} | timed out, forced termination")
             self._update_task_status(task_id, "timeout")
-            raise  # Re-raise the exception to be handled by the task_done callback
+            # raise  # Re-raise the exception to be handled by the task_done callback
         except StopException:
             logger.warning(f"Io linear task | {task_id} | timed out, forced termination")
             self._update_task_status(task_id, "timeout")
-            raise  # Re-raise the exception to be handled by the task_done callback
+            # raise  # Re-raise the exception to be handled by the task_done callback
         except Exception as e:
             logger.error(f"Io linear task | {task_id} | execution failed: {e}")
             self._log_error(task_id, e)
-            raise  # Re-raise the exception to be handled by the task_done callback
+            # raise  # Re-raise the exception to be handled by the task_done callback
         finally:
-            if task_manager.check(task_id):
-                task_manager.remove(task_id)
-                # Define variables when they are not defined
-                return_results = "error happened"
+            if return_results is None:
+                if task_manager.check(task_id):
+                    task_manager.remove(task_id)
+                    # Define variables when they are not defined
+                    return_results = "error happened"
                 return return_results
             else:
                 return return_results
@@ -254,15 +257,6 @@ class IoLinerTask:
                     self.task_results[task_id].pop(0)  # Remove the oldest result
             if not result == "error happened":
                 self._update_task_status(task_id, "completed")
-
-        except TimeoutException as e:
-            logger.error(f"Io linear task | {task_id} | timed out: {e}")
-            self._update_task_status(task_id, "timeout")
-            self._log_error(task_id, e)
-        except Exception as e:
-            logger.error(f"Io linear task | {task_id} | execution failed: {e}")
-            self._update_task_status(task_id, "failed")
-            self._log_error(task_id, e)
         finally:
             # Ensure the Future object is deleted
             with self.lock:
