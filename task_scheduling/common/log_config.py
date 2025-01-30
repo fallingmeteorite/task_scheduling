@@ -42,8 +42,6 @@ def configure_logger():
     # Mark logger as configured
     _logger_configured = True
 
-# Initialize logger configuration at module load
-configure_logger()
 
 # Example log message (only for debugging)
 # logger.info("Logger configuration completed")

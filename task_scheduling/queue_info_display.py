@@ -2,9 +2,9 @@
 import time
 from typing import Dict, List
 
-from .common.config import config
-from .scheduler.io_async_task import io_async_task
-from .scheduler.io_liner_task import io_liner_task
+from .config import config
+from .scheduler import io_async_task
+from .scheduler import io_liner_task
 
 
 def format_task_info(task_id: str, details: Dict, show_id: bool) -> str:

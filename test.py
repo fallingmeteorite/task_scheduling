@@ -1,18 +1,17 @@
 # -*- coding: utf-8 -*-
-
+"""
 import asyncio
-import time
 
-from task_scheduling import add_task, shutdown
+from task_scheduling import add_task, shutdown, interruptible_sleep
 
 
-def line_task1(input_info):
+def line_task(input_info):
     while True:
-        time.sleep(5)
+        interruptible_sleep(5)
         print(input_info)
 
 
-async def line_task2(input_info):
+async def asyncio_task(input_info):
     while True:
         await asyncio.sleep(5)
         print(input_info)
@@ -24,7 +23,7 @@ task_id1 = add_task(True,
                     # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
                     "task1",
                     # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
-                    line_task1,  # The function to be executed, parameters should not be passed here
+                    line_task,  # The function to be executed, parameters should not be passed here
                     input_info  # Pass the parameters required by the function, no restrictions
                     )
 
@@ -32,7 +31,7 @@ task_id2 = add_task(True,
                     # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
                     "task2",
                     # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
-                    line_task2,  # The function to be executed, parameters should not be passed here
+                    asyncio_task,  # The function to be executed, parameters should not be passed here
                     input_info  # Pass the parameters required by the function, no restrictions
                     )
 
@@ -44,30 +43,31 @@ try:
         pass
 except KeyboardInterrupt:
     shutdown(True)
-
+"""
 
 """
 import asyncio
-import time
 
-from task_scheduling import io_async_task, add_task, shutdown, io_liner_task
+from task_scheduling import io_async_task, add_task, shutdown, io_liner_task, interruptible_sleep
 
 
-def line_task1(input_info):
+def line_task(input_info):
     while True:
-        time.sleep(5)
+        interruptible_sleep(5)
         print(input_info)
 
-async def line_task2(input_info):
+
+async def asyncio_task(input_info):
     while True:
         await asyncio.sleep(5)
         print(input_info)
+
 
 input_info = "test"
 
 add_task(True,
          "task1",
-         line_task1,
+         line_task,
          input_info
          )
 
@@ -76,7 +76,7 @@ io_liner_task.ban_task_name("task1")
 
 add_task(True,
          "task1",
-         line_task1,
+         line_task,
          input_info
          )
 
@@ -84,7 +84,7 @@ add_task(True,
 
 add_task(True,
          "task2",
-         line_task2,
+         asyncio_task,
          input_info
          )
 
@@ -93,7 +93,7 @@ io_async_task.ban_task_name("task2")
 
 add_task(True,
          "task2",
-         line_task2,
+         asyncio_task,
          input_info
          )
 # Io asyncio task | bafe8026-68d7-4753-9a55-bde5608c3dcb | is banned and will be deleted
@@ -104,21 +104,19 @@ try:
 except KeyboardInterrupt:
     shutdown(True)
 """
-
 """
 import asyncio
-import time
 
-from task_scheduling import io_async_task, add_task, shutdown, io_liner_task
+from task_scheduling import io_async_task, add_task, shutdown, io_liner_task, interruptible_sleep
 
 
-def line_task1(input_info):
+def line_task(input_info):
     while True:
-        time.sleep(5)
+        interruptible_sleep(5)
         print(input_info)
 
 
-async def line_task2(input_info):
+async def asyncio_task(input_info):
     while True:
         await asyncio.sleep(5)
         print(input_info)
@@ -128,7 +126,7 @@ input_info = "test"
 
 add_task(True,
          "task1",
-         line_task1,
+         line_task,
          input_info
          )
 
@@ -137,7 +135,7 @@ io_liner_task.ban_task_name("task1")
 
 add_task(True,
          "task1",
-         line_task1,
+         line_task,
          input_info
          )
 
@@ -149,14 +147,13 @@ io_liner_task.allow_task_name("task1")
 
 add_task(True,
          "task1",
-         line_task1,
+         line_task,
          input_info
          )
 
-
 add_task(True,
          "task2",
-         line_task2,
+         asyncio_task,
          input_info
          )
 
@@ -165,7 +162,7 @@ io_async_task.ban_task_name("task2")
 
 add_task(True,
          "task2",
-         line_task2,
+         asyncio_task,
          input_info
          )
 # | Io asyncio task | 9747ac36-8582-4b44-80d9-1cb4d0dcd86a | is banned and will be deleted
@@ -176,7 +173,7 @@ io_async_task.allow_task_name("task2")
 
 add_task(True,
          "task2",
-         line_task2,
+         asyncio_task,
          input_info
          )
 
@@ -186,21 +183,19 @@ try:
 except KeyboardInterrupt:
     shutdown(True)
 """
-
 """
 import asyncio
-import time
 
-from task_scheduling import io_liner_task, add_task, shutdown, io_async_task
+from task_scheduling import io_liner_task, add_task, shutdown, io_async_task, interruptible_sleep
 
 
-def line_task1(input_info):
+def line_task(input_info):
     while True:
-        time.sleep(5)
+        interruptible_sleep(5)
         print(input_info)
 
 
-async def line_task2(input_info):
+async def asyncio_task(input_info):
     while True:
         await asyncio.sleep(5)
         print(input_info)
@@ -210,63 +205,61 @@ input_info = "test"
 
 add_task(True,
          "task1",
-         line_task1,
+         line_task,
          input_info
          )
 add_task(True,
          "task1",
-         line_task1,
+         line_task,
          input_info
          )
 
 add_task(True,
          "task1",
-         line_task1,
+         line_task,
          input_info
          )
 
 add_task(True,
          "task2",
-         line_task2,
+         asyncio_task,
          input_info
          )
 add_task(True,
          "task2",
-         line_task2,
+         asyncio_task,
          input_info
          )
 add_task(True,
          "task2",
-         line_task2,
+         asyncio_task,
          input_info
          )
 
 io_liner_task.cancel_all_queued_tasks_by_name("task1")
 io_async_task.cancel_all_queued_tasks_by_name("task2")
-
-# | Io asyncio task | ce5e7f22-860a-4a62-8a6c-e9fadefd6c27 | has been forcibly cancelled
+# | Io linear task | task1 | is waiting to be executed in the queue, has been deleted
 
 try:
     while True:
-        time.sleep(2)
+        pass
 except KeyboardInterrupt:
     shutdown(True)
 """
-
 """
 import asyncio
 import time
 
-from task_scheduling import io_async_task, add_task, shutdown, io_liner_task
+from task_scheduling import io_async_task, add_task, shutdown, io_liner_task, interruptible_sleep
 
 
-def line_task1(input_info):
+def line_task(input_info):
     while True:
-        time.sleep(5)
+        interruptible_sleep(5)
         print(input_info)
 
 
-async def line_task2(input_info):
+async def asyncio_task(input_info):
     while True:
         await asyncio.sleep(5)
         print(input_info)
@@ -276,17 +269,17 @@ input_info = "test"
 
 task_id1 = add_task(True,
                     "task1",
-                    line_task1,
+                    line_task,
                     input_info
                     )
 
 task_id2 = add_task(True,
                     "task1",
-                    line_task2,
+                    asyncio_task,
                     input_info
                     )
 
-time.sleep(2)
+time.sleep(3.0)
 io_liner_task.force_stop_task(task_id1)
 io_async_task.force_stop_task(task_id2)
 
@@ -298,29 +291,34 @@ try:
 except KeyboardInterrupt:
     shutdown(True)
 """
-
 """
 import asyncio
 import time
 
-from task_scheduling import add_task, io_async_task, shutdown, io_liner_task
+from task_scheduling import add_task, io_async_task, shutdown, io_liner_task, interruptible_sleep
 
 
-def line_task1(input_info):
-    time.sleep(5)
+def line_task(input_info):
+    interruptible_sleep(5)
     return input_info
 
 
-async def line_task2(input_info):
+async def asyncio_task(input_info):
     await asyncio.sleep(5)
     return input_info
 
 
 input_info = "test"
 
-task_id1 = add_task(True, "sleep", line_task1, input_info)
+task_id1 = add_task(True,
+                    "sleep",
+                    line_task,
+                    input_info)
 
-task_id2 = add_task(True, "sleep", line_task2, input_info)
+task_id2 = add_task(True,
+                    "sleep",
+                    asyncio_task,
+                    input_info)
 
 while True:
     result = io_liner_task.get_task_result(task_id1)
@@ -343,20 +341,19 @@ try:
 except KeyboardInterrupt:
     shutdown(True)
 """
-
 """
 import asyncio
 import time
 
-from task_scheduling import get_all_queue_info, add_task, shutdown
+from task_scheduling import get_all_queue_info, add_task, shutdown, interruptible_sleep
 
 
-def line_task1(input_info):
-    time.sleep(5)
+def line_task(input_info):
+    interruptible_sleep(5)
     return input_info
 
 
-async def line_task2(input_info):
+async def asyncio_task(input_info):
     await asyncio.sleep(5)
     return input_info
 
@@ -365,13 +362,13 @@ input_info = "test"
 
 add_task(True,
          "task1",
-         line_task1,
+         line_task,
          input_info
          )
 
 add_task(True,
          "task1",
-         line_task2,
+         asyncio_task,
          input_info
          )
 
@@ -390,20 +387,19 @@ try:
 except KeyboardInterrupt:
     shutdown(True)
 """
-
 """
 import asyncio
 import time
 
-from task_scheduling import add_task, io_async_task, io_liner_task, shutdown
+from task_scheduling import add_task, io_async_task, io_liner_task, shutdown, interruptible_sleep
 
 
-def line_task1(input_info):
-    time.sleep(5)
+def line_task(input_info):
+    interruptible_sleep(5)
     return input_info
 
 
-async def line_task2(input_info):
+async def asyncio_task(input_info):
     await asyncio.sleep(5)
     return input_info
 
@@ -412,13 +408,13 @@ input_info = "test"
 
 task_id1 = add_task(True,
                     "task1",
-                    line_task1,
+                    line_task,
                     input_info
                     )
 
 task_id2 = add_task(True,
                     "task1",
-                    line_task2,
+                    asyncio_task,
                     input_info
                     )
 time.sleep(1.0)
@@ -434,7 +430,6 @@ try:
 except KeyboardInterrupt:
     shutdown(True)
 """
-
 """
 from task_scheduling import update_config
 from task_scheduling.common.config import config

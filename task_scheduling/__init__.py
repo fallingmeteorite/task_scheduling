@@ -1,4 +1,17 @@
 # -*- coding: utf-8 -*-
-from .common.config import update_config
+from .common import configure_logger
+
+# Initialize logger configuration at module load
+configure_logger()
+
+from .config import ensure_config_loaded
+
+# Initialize the config dict
+ensure_config_loaded()
+
 from .queue_info_display import get_all_queue_info
-from .task_assignment import add_task, shutdown, io_liner_task, io_async_task
+from .scheduler import *
+from .task_assignment import add_task, shutdown
+
+
+__version__ = "1.1.7"
