@@ -14,4 +14,4 @@ from .scheduler import *
 from .task_assignment import add_task, shutdown
 
 
-__version__ = "1.1.7"
+__version__ = "1.1.8"

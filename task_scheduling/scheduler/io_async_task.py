@@ -48,17 +48,18 @@ class IoAsyncTask:
         The scheduled checks whether a task with a status of 'running' is actually running.
         If the task has been completed but the status is still 'running', the status is corrected and the appropriate action is taken.
         """
-
         with self.condition:
             task_details_copy = self.task_details.copy()
 
         for task_id, details in list(
                 task_details_copy.items()):  # Use list() to create a copy to avoid errors when modifying the dictionary
-
             if details.get("status") == "running":
                 start_time = details.get("start_time")
                 current_time = time.time()
-                if current_time - start_time > config["watch_dog_time"]:
+                timeout_processing = details.get("timeout_processing", False)  # 获取任务的超时管理标志
+
+                # If timeout management is enabled for the task and the maximum allowed time is exceeded, the task is forcibly canceled
+                if timeout_processing and (current_time - start_time > config["watch_dog_time"]):
                     # If the task is still running in the task dictionary, try canceling it
                     if task_id in self.running_tasks:
                         future = self.running_tasks[task_id][0]
@@ -81,13 +82,13 @@ class IoAsyncTask:
                         with self.condition:
                             self.task_counters[task_name] -= 1
 
-            # Restart the timer
-            # Prevent the shutdown operation from being started while it is executed
-            if not self.scheduler_stop_event.is_set():
-                self.status_check_timer = threading.Timer(
-                    config["status_check_interval"], self._check_running_tasks_status
-                )
-                self.status_check_timer.start()
+        # Restart the timer
+        # Prevent the shutdown operation from being started while it is executed
+        if not self.scheduler_stop_event.is_set():
+            self.status_check_timer = threading.Timer(
+                config["status_check_interval"], self._check_running_tasks_status
+            )
+            self.status_check_timer.start()
 
     def stop_status_check_timer(self) -> None:
         """
@@ -128,7 +129,8 @@ class IoAsyncTask:
                     self.task_details[task_id] = {
                         "task_name": task_name,
                         "start_time": None,
-                        "status": "pending"
+                        "status": "pending",
+                        "timeout_processing": timeout_processing
                     }
 
                 self.task_queues[task_name].put((timeout_processing, task_name, task_id, func, args, kwargs))

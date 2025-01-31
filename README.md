@@ -575,7 +575,7 @@ print(config["line_task_max"])
 
 The configuration file is stored at:
 
-`task_scheduling/common/config.yaml`
+`task_scheduling/config/config.yaml`
 
 The maximum number of linear tasks that can run at the same time
 

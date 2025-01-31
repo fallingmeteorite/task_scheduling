@@ -42,6 +42,10 @@ class IoLinerTask:
         self.status_check_timer: threading.Timer or bool = True  # check the status of a task
 
     def _check_running_tasks_status(self) -> None:
+        """
+        The scheduled checks whether a task with a status of 'running' is actually running.
+        If the task has been completed but the status is still 'running', the status is corrected and the appropriate action is taken.
+        """
         with self.lock:
             task_details_copy = self.task_details.copy()  # Make a copy of the data to reduce the holding time of the lock
 
@@ -49,7 +53,11 @@ class IoLinerTask:
             if details.get("status") == "running":
                 start_time = details.get("start_time")
                 current_time = time.time()
-                if start_time is not None and current_time - start_time > config["watch_dog_time"]:
+                timeout_processing = details.get("timeout_processing", False)  # 获取任务的超时管理标志
+
+                # If timeout management is enabled for the task and the maximum allowed time is exceeded, the task is forcibly canceled
+                if timeout_processing and (
+                        start_time is not None and current_time - start_time > config["watch_dog_time"]):
                     if task_id in self.running_tasks:
                         future = self.running_tasks[task_id][0]
                         if not future.done():
@@ -99,7 +107,8 @@ class IoLinerTask:
                     self.task_details[task_id] = {
                         "task_name": task_name,
                         "start_time": None,
-                        "status": "pending"
+                        "status": "pending",
+                        "timeout_processing": timeout_processing
                     }
                 self.task_queue.put((timeout_processing, task_name, task_id, func, args, kwargs))
 
