@@ -1,7 +1,6 @@
-import inspect
 import threading
 import time
-from typing import Callable
+from typing import Callable, Any
 
 
 def is_async_function(func: Callable) -> bool:
@@ -35,52 +34,56 @@ def interruptible_sleep(seconds: float or int) -> None:
     thread.join(timeout=0)
 
 
+import inspect
+
+
 class AwaitDetector:
     def __init__(self):
         # Used to store the has_awaited status for different task_names
         self.task_status = {}
 
-    async def run_with_detection(self, task_name, func, *args, **kwargs):
+    # Used to detect the 'await' keyword in the code at runtime
+    async def run_with_detection(self, task_name: str, func: Callable, *args, **kwargs) -> Any:
         # Initialize the status for the current task_name
         self.task_status[task_name] = False
 
         # Check if the function is a coroutine function
         if not inspect.iscoroutinefunction(func):
-            print(f"Task '{task_name}' is not a coroutine function and cannot perform await.")
             return await func(*args, **kwargs)
 
         # Check if the 'await' keyword is contained in the function body
         try:
             source = inspect.getsource(func)
-            if "await" not in source:
-                print(f"Task '{task_name}' does not contain 'await' in its source code.")
-                return await func(*args, **kwargs)
+            if "await" in source:
+                self.task_status[task_name] = True
         except (OSError, TypeError):
             # If the source code cannot be obtained (e.g., built-in functions), skip static checking
             pass
 
-        # Define a wrapper to detect await
-        async def wrapped_coroutine():
-            self.task_status[task_name] = True
-            return await func(*args, **kwargs)
+        # Run the function
+        result = await func(*args, **kwargs)
 
-        result = None
-        try:
-            # Run the wrapped coroutine
-            result = await wrapped_coroutine()
-            if not self.task_status[task_name]:
-                print(f"Task '{task_name}' did not perform any await.")
-            else:
-                print(f"Task '{task_name}' performed await.")
-        except Exception as e:
-            print(f"Task '{task_name}' encountered an error: {e}")
-        finally:
-            # Reset the status for the current task_name
-            self.task_status[task_name] = False
+        # Reset the status for the current task_name
+        self.task_status[task_name] = False
+
         if result is None:
             return None
         return result
 
+    # Get the status of the specified task_name
+    def get_task_status(self, task_name: str) -> bool or None:
+        return self.task_status.get(task_name, None)
 
-# Create an instance of AwaitDetector
+
 detector = AwaitDetector()
+
+"""
+import asyncio
+async def test_func():
+    await asyncio.sleep(1)
+    return "Done"
+
+asyncio.run(detector.run_with_detection("test", test_func))
+print(detector.get_task_status("test"))  
+# Output: True or False, depending on whether 'await' is used in test_func
+"""

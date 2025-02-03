@@ -53,7 +53,8 @@ class IoLinerTask:
             if details.get("status") == "running":
                 start_time = details.get("start_time")
                 current_time = time.time()
-                timeout_processing = details.get("timeout_processing", False)  # 获取任务的超时管理标志
+                timeout_processing = details.get("timeout_processing",
+                                                 False)  # Gets the timeout management flag for the task
 
                 # If timeout management is enabled for the task and the maximum allowed time is exceeded, the task is forcibly canceled
                 if timeout_processing and (
@@ -407,7 +408,7 @@ class IoLinerTask:
 
         return queue_info
 
-    def force_stop_task(self, task_id: str) -> None:
+    def force_stop_task(self, task_id: str) -> bool:
         """
         Force stop a task by its task ID.
 
@@ -416,7 +417,7 @@ class IoLinerTask:
         with self.lock:
             if task_id not in self.running_tasks:
                 logger.warning(f"Io linear task | {task_id} | does not exist or is already completed")
-                return
+                return False
 
         task_manager.skip_task(task_id)
 
@@ -426,6 +427,8 @@ class IoLinerTask:
                 del self.task_details[task_id]
             if task_id in self.task_results:
                 del self.task_results[task_id]
+
+        return True
 
     def cancel_all_queued_tasks_by_name(self, task_name: str) -> None:
         """
@@ -447,20 +450,25 @@ class IoLinerTask:
             while not temp_queue.empty():
                 self.task_queue.put(temp_queue.get())
 
-    def ban_task_name(self, task_name: str) -> None:
+    def ban_task_name(self, task_name: str) -> bool:
         """
         Ban a task name from execution, delete tasks directly if detected and print information.
 
         :param task_name: Task name.
         """
         with self.lock:
-            self.banned_task_names.append(task_name)
-            logger.warning(f"Io linear task | {task_name} | is banned from execution")
+            if task_name not in self.banned_task_names:
+                self.banned_task_names.append(task_name)
+                logger.warning(f"Io linear task | {task_name} | is banned from execution")
 
-            # Cancel all queued tasks with the banned task name
-            self.cancel_all_queued_tasks_by_name(task_name)
+                # Cancel all queued tasks with the banned task name
+                self.cancel_all_queued_tasks_by_name(task_name)
+                return True
+            else:
+                logger.warning(f"Io linear task | {task_name} | already exists")
+                return False
 
-    def allow_task_name(self, task_name: str) -> None:
+    def allow_task_name(self, task_name: str) -> bool:
         """
         Allow a banned task name to be executed again.
 
@@ -470,8 +478,10 @@ class IoLinerTask:
             if task_name in self.banned_task_names:
                 self.banned_task_names.remove(task_name)
                 logger.info(f"Io linear task | {task_name} | is allowed for execution")
+                return True
             else:
                 logger.warning(f"Io linear task | {task_name} | is not banned, no action taken")
+                return False
 
     # Obtain the information returned by the corresponding task
     def get_task_result(self, task_id: str) -> Optional[Any]:

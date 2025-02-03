@@ -17,7 +17,7 @@ class IoAsyncTask:
     __slots__ = [
         'task_queues', 'condition', 'scheduler_lock', 'scheduler_started', 'scheduler_stop_event',
         'task_details', 'running_tasks', 'error_logs', 'scheduler_threads', 'event_loops',
-        'banned_task_ids', 'idle_timers', 'idle_timeout', 'idle_timer_lock', 'task_results',
+        'banned_task_names', 'idle_timers', 'idle_timeout', 'idle_timer_lock', 'task_results',
         'task_counters', 'status_check_timer'
     ]
 
@@ -35,7 +35,7 @@ class IoAsyncTask:
         self.error_logs: List[Dict] = []  # Error logs, keep up to 10
         self.scheduler_threads: Dict[str, threading.Thread] = {}  # Scheduler threads for each task name
         self.event_loops: Dict[str, Any] = {}  # Event loops for each task name
-        self.banned_task_ids: List[str] = []  # List of task IDs to be banned
+        self.banned_task_names: List[str] = []  # List of task IDs to be banned
         self.idle_timers: Dict[str, threading.Timer] = {}  # Idle timers for each task name
         self.idle_timeout = config["max_idle_time"]  # Idle timeout, default is 60 seconds
         self.idle_timer_lock = threading.Lock()  # Idle timer lock
@@ -56,7 +56,8 @@ class IoAsyncTask:
             if details.get("status") == "running":
                 start_time = details.get("start_time")
                 current_time = time.time()
-                timeout_processing = details.get("timeout_processing", False)  # 获取任务的超时管理标志
+                timeout_processing = details.get("timeout_processing",
+                                                 False)  # Gets the timeout management flag for the task
 
                 # If timeout management is enabled for the task and the maximum allowed time is exceeded, the task is forcibly canceled
                 if timeout_processing and (current_time - start_time > config["watch_dog_time"]):
@@ -112,7 +113,7 @@ class IoAsyncTask:
         """
         try:
             with self.scheduler_lock:
-                if task_name in self.banned_task_ids:
+                if task_name in self.banned_task_names:
                     logger.warning(f"Io asyncio task | {task_id} | is banned and will be deleted")
                     return False
 
@@ -322,9 +323,6 @@ class IoAsyncTask:
         timeout_processing, task_name, task_id, func, args, kwargs = task
 
         try:
-            if task_id in self.banned_task_ids:
-                logger.warning(f"Io asyncio task | {task_id} | is banned and will be deleted")
-                return
 
             # Modify the task status
             with self.condition:
@@ -498,7 +496,7 @@ class IoAsyncTask:
                     queue_info["task_details"][task_id] = details
         return queue_info
 
-    def force_stop_task(self, task_id: str) -> None:
+    def force_stop_task(self, task_id: str) -> bool:
         """
         Force stop a task by its task ID.
 
@@ -509,8 +507,10 @@ class IoAsyncTask:
         if task_id in self.running_tasks:
             future = self.running_tasks[task_id][0]
             future.cancel()
+            return True
         else:
             logger.warning(f"Io asyncio task | {task_id} | does not exist or is already completed")
+            return False
 
     def cancel_all_queued_tasks_by_name(self, task_name: str) -> None:
         """
@@ -533,31 +533,38 @@ class IoAsyncTask:
                 while not temp_queue.empty():
                     self.task_queues[task_name].put(temp_queue.get())
 
-    def ban_task_name(self, task_name: str) -> None:
+    def ban_task_name(self, task_name: str) -> bool:
         """
         Ban a task name from execution, delete tasks directly if detected and print information.
 
         :param task_name: Task name.
         """
         with self.condition:
-            self.banned_task_ids.append(task_name)
-            logger.warning(f"Io asyncio task | {task_name} | has been banned from execution")
+            if task_name not in self.banned_task_names:
+                self.banned_task_names.append(task_name)
+                logger.warning(f"Io asyncio task | {task_name} | has been banned from execution")
 
-            # Cancel all queued tasks with the banned task name
-            self.cancel_all_queued_tasks_by_name(task_name)
+                # Cancel all queued tasks with the banned task name
+                self.cancel_all_queued_tasks_by_name(task_name)
+                return True
+            else:
+                logger.warning(f"Io asyncio task | {task_name} | already exists")
+                return False
 
-    def allow_task_name(self, task_name: str) -> None:
+    def allow_task_name(self, task_name: str) -> bool:
         """
         Allow a banned task name to be executed again.
 
         :param task_name: Task name.
         """
         with self.condition:
-            if task_name in self.banned_task_ids:
-                self.banned_task_ids.remove(task_name)
+            if task_name in self.banned_task_names:
+                self.banned_task_names.remove(task_name)
                 logger.info(f"Io asyncio task | {task_name} | is allowed for execution")
+                return True
             else:
                 logger.warning(f"Io asyncio task | {task_name} | is not banned, no action taken")
+                return False
 
     # Obtain the information returned by the corresponding task
     def get_task_result(self, task_id: str) -> Optional[Any]:
