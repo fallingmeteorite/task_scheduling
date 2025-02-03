@@ -99,7 +99,7 @@ except KeyboardInterrupt:
     shutdown(True)
 ```
 
-### ban_task_name(task_name: str) -> None:
+### ban_task_name(task_name: str) -> bool:
 
 ```
 
@@ -166,7 +166,7 @@ except KeyboardInterrupt:
 
 ```
 
-### allow_task_name(task_name: str) -> None:
+### allow_task_name(task_name: str) -> bool:
 
 ```
 import asyncio
@@ -321,7 +321,7 @@ except KeyboardInterrupt:
             
 ```
 
-### force_stop_task(task_id: str) -> None:
+### force_stop_task(task_id: str) -> bool:
 
 ```
 
