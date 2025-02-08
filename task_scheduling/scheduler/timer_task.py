@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from functools import partial
 from typing import Callable, Dict, List, Tuple, Optional, Any
 
-from task_scheduling.manager.task_details_queue import task_status_manager
+from ..manager import task_status_manager
 from ..common import logger
 from ..config import config
 from ..stopit import task_manager, skip_on_demand, StopException, ThreadingTimeout, TimeoutException
@@ -43,16 +43,12 @@ class TimerTask:
                  func: Callable = None, *args, **kwargs) -> bool:
         try:
             with self.scheduler_lock:
-                if self.task_queue.qsize() >= config["maximum_queue_line"]:
-                    logger.warning(f"Timer task | {task_id} | not added, queue is full")
-                    return False
-
                 if self.scheduler_stop_event.is_set() and not self.scheduler_started:
                     self._join_scheduler_thread()
                     logger.info("Scheduler has fully stopped")
 
                 # Reduce the granularity of the lock
-                task_status_manager.add_task_status(task_id, task_name, "pending", None, None, None,
+                task_status_manager.add_task_status(task_id, task_name, "waiting", None, None, None,
                                                     timeout_processing)
 
                 if delay is not None:
@@ -166,10 +162,6 @@ class TimerTask:
                         continue
 
                 with self.lock:
-                    if task_name in [details[1] for details in self.running_tasks.values()]:
-                        self.task_queue.put(
-                            (timeout_processing, task_name, task_id, func, execution_time, args, kwargs))
-                        continue
 
                     future = executor.submit(self._execute_task,
                                              (timeout_processing, task_name, task_id, func, args, kwargs))
