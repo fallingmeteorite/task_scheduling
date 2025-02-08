@@ -9,7 +9,10 @@ from typing import Callable, Dict, List, Tuple, Optional, Any
 from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
-from ..stopit import task_manager, skip_on_demand, StopException, ThreadingTimeout, TimeoutException
+from ..stopit import TaskManager, skip_on_demand, StopException, ThreadingTimeout, TimeoutException
+
+# Create Manager instance
+task_manager = TaskManager()
 
 
 def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
@@ -25,15 +28,14 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
         if timeout_processing:
             with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False) as task_control:
                 with skip_on_demand() as skip_ctx:
-                    task_manager.add(task_control, skip_ctx, task_id)
+                    task_manager.add(None, skip_ctx, None, task_id)
                     return_results = func(*args, **kwargs)
-            task_manager.remove(task_id)
         else:
             with ThreadingTimeout(seconds=None, swallow_exc=False) as task_control:
                 with skip_on_demand() as skip_ctx:
-                    task_manager.add(task_control, skip_ctx, task_id)
+                    task_manager.add(None, skip_ctx, None, task_id)
                     return_results = func(*args, **kwargs)
-            task_manager.remove(task_id)
+        task_manager.remove(task_id)
     except TimeoutException:
         logger.warning(f"Io linear task | {task_id} | timed out, forced termination")
         task_status_manager.add_task_status(task_id, task_name, "timeout", None, None, None,
@@ -143,8 +145,7 @@ class IoLinerTask:
             if force_cleanup:
                 logger.warning("Force stopping scheduler and cleaning up tasks")
                 # Force stop all running tasks
-                task_manager.force_stop_all()
-                task_manager.skip_all()
+                task_manager.skip_all_tasks()
                 self.scheduler_stop_event.set()
             else:
                 self.scheduler_stop_event.set()
@@ -266,10 +267,10 @@ class IoLinerTask:
 
         :param task_id: task ID.
         """
-        with self.lock:
-            if task_id not in self.running_tasks:
-                logger.warning(f"Io linear task | {task_id} | does not exist or is already completed")
-                return False
+
+        if not task_manager.check(task_id):
+            logger.warning(f"Io linear task | {task_id} | does not exist or is already completed")
+            return False
 
         task_manager.skip_task(task_id)
 
