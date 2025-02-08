@@ -1,15 +1,17 @@
-# The maximum number of linear tasks that can run at the same time
-line_task_max: 10
+# cpu型密集异步任务中同种类任务最大运行数
+cpu_asyncio_task: 5
 
-# The maximum number of queues for a asyncio task
-maximum_queue_async: 30
+# io型密集异步任务中同种类任务最大运行数
+io_asyncio_task: 5
 
-# The maximum number of queues for a linear task
-maximum_queue_line: 30
+# cpu型密集线性任务中同种类任务最大运行数
+cpu_liner_task: 5
+
+# io型密集线性任务中同种类任务最大运行数
+io_liner_task: 5
 
 # When there are no tasks for many seconds, close the task scheduler(seconds)
 max_idle_time: 60
-
 
 
 # When a task runs for a long time without finishing, it is forced to end(seconds)
