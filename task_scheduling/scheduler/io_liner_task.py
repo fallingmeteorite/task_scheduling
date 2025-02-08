@@ -6,10 +6,52 @@ from concurrent.futures import ThreadPoolExecutor, Future
 from functools import partial
 from typing import Callable, Dict, List, Tuple, Optional, Any
 
-from task_scheduling.manager.task_details_queue import task_status_manager
 from ..common import logger
 from ..config import config
+from ..manager import task_status_manager
 from ..stopit import task_manager, skip_on_demand, StopException, ThreadingTimeout, TimeoutException
+
+
+def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
+    timeout_processing, task_name, task_id, func, args, kwargs = task
+
+    return_results = None
+    try:
+
+        task_status_manager.add_task_status(task_id, task_name, "running", time.time(), None, None,
+                                            timeout_processing)
+
+        logger.info(f"Start running io linear task, task ID: {task_id}")
+        if timeout_processing:
+            with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False) as task_control:
+                with skip_on_demand() as skip_ctx:
+                    task_manager.add(task_control, skip_ctx, task_id)
+                    return_results = func(*args, **kwargs)
+            task_manager.remove(task_id)
+        else:
+            with ThreadingTimeout(seconds=None, swallow_exc=False) as task_control:
+                with skip_on_demand() as skip_ctx:
+                    task_manager.add(task_control, skip_ctx, task_id)
+                    return_results = func(*args, **kwargs)
+            task_manager.remove(task_id)
+    except TimeoutException:
+        logger.warning(f"Io linear task | {task_id} | timed out, forced termination")
+        task_status_manager.add_task_status(task_id, task_name, "timeout", None, None, None,
+                                            timeout_processing)
+    except StopException:
+        logger.warning(f"Io linear task | {task_id} | was cancelled")
+        task_status_manager.add_task_status(task_id, task_name, "cancelled", None, None, None,
+                                            timeout_processing)
+    except Exception as e:
+        logger.error(f"Io linear task | {task_id} | execution failed: {e}")
+        task_status_manager.add_task_status(task_id, task_name, "failed", None, None, e,
+                                            timeout_processing)
+    finally:
+        if return_results is None:
+            if task_manager.check(task_id):
+                task_manager.remove(task_id)
+                return_results = "error happened"
+        return return_results
 
 
 class IoLinerTask:
@@ -42,8 +84,11 @@ class IoLinerTask:
         try:
             with self.scheduler_lock:
 
-                if self.task_queue.qsize() >= config["maximum_queue_line"]:
+                if self.task_queue.qsize() >= config["io_liner_task"]:
                     logger.warning(f"Io linear task | {task_id} | not added, queue is full")
+                    return False
+
+                if task_name in [details[1] for details in self.running_tasks.values()]:
                     return False
 
                 if self.scheduler_stop_event.is_set() and not self.scheduler_started:
@@ -51,7 +96,7 @@ class IoLinerTask:
                     logger.info("Scheduler has fully stopped")
 
                 # Reduce the granularity of the lock
-                task_status_manager.add_task_status(task_id, task_name, "pending", None, None, None,
+                task_status_manager.add_task_status(task_id, task_name, "waiting", None, None, None,
                                                     timeout_processing)
 
                 self.task_queue.put((timeout_processing, task_name, task_id, func, args, kwargs))
@@ -129,7 +174,7 @@ class IoLinerTask:
         """
         Scheduler function, fetch tasks from the task queue and submit them to the thread pool for execution.
         """
-        with ThreadPoolExecutor(max_workers=int(config["line_task_max"])) as executor:
+        with ThreadPoolExecutor(max_workers=int(config["io_liner_task"])) as executor:
             while not self.scheduler_stop_event.is_set():
                 with self.condition:
                     while self.task_queue.empty() and not self.scheduler_stop_event.is_set():
@@ -144,59 +189,13 @@ class IoLinerTask:
                     task = self.task_queue.get()
 
                 timeout_processing, task_name, task_id, func, args, kwargs = task
-
                 with self.lock:
-                    if task_name in [details[1] for details in self.running_tasks.values()]:
-                        self.task_queue.put(task)
-                        continue
-
-                    future = executor.submit(self._execute_task, task)
+                    future = executor.submit(_execute_task, task)
                     self.running_tasks[task_id] = [future, task_name]
 
-                future.add_done_callback(partial(self._task_done, task_id))
+                    future.add_done_callback(partial(self._task_done, task_id))
 
     # A function that executes a task
-    def _execute_task(self, task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
-        timeout_processing, task_name, task_id, func, args, kwargs = task
-
-        return_results = None
-        try:
-
-            task_status_manager.add_task_status(task_id, task_name, "running", time.time(), None, None,
-                                                timeout_processing)
-
-            logger.info(f"Start running io linear task, task ID: {task_id}")
-            if timeout_processing:
-                with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False) as task_control:
-                    with skip_on_demand() as skip_ctx:
-                        task_manager.add(task_control, skip_ctx, task_id)
-                        return_results = func(*args, **kwargs)
-                task_manager.remove(task_id)
-            else:
-                with ThreadingTimeout(seconds=None, swallow_exc=False) as task_control:
-                    with skip_on_demand() as skip_ctx:
-                        task_manager.add(task_control, skip_ctx, task_id)
-                        return_results = func(*args, **kwargs)
-                task_manager.remove(task_id)
-        except TimeoutException:
-            logger.warning(f"Io linear task | {task_id} | timed out, forced termination")
-            task_status_manager.add_task_status(task_id, task_name, "timeout", None, None, None,
-                                                timeout_processing)
-        except StopException:
-            logger.warning(f"Io linear task | {task_id} | was cancelled")
-            task_status_manager.add_task_status(task_id, task_name, "cancelled", None, None, None,
-                                                timeout_processing)
-        except Exception as e:
-            logger.error(f"Io linear task | {task_id} | execution failed: {e}")
-            task_status_manager.add_task_status(task_id, task_name, "failed", None, None, e,
-                                                timeout_processing)
-        finally:
-            if return_results is None:
-                if task_manager.check(task_id):
-                    task_manager.remove(task_id)
-                    return_results = "error happened"
-            return return_results
-
     def _task_done(self, task_id: str, future: Future) -> None:
         """
         Callback function after a task is completed.
@@ -279,26 +278,6 @@ class IoLinerTask:
             if task_id in self.task_results:
                 del self.task_results[task_id]
         return True
-
-    def cancel_all_queued_tasks_by_name(self, task_name: str) -> None:
-        """
-        Cancel all queued tasks with the same name.
-
-        :param task_name: Task name.
-        """
-        with self.condition:
-            temp_queue = queue.Queue()
-            while not self.task_queue.empty():
-                task = self.task_queue.get()
-                if task[1] == task_name:  # Use function name to match task name
-                    logger.warning(
-                        f"Io linear task | {task_name} | is waiting to be executed in the queue, has been deleted")
-                else:
-                    temp_queue.put(task)
-
-            # Put uncancelled tasks back into the queue
-            while not temp_queue.empty():
-                self.task_queue.put(temp_queue.get())
 
     # Obtain the information returned by the corresponding task
     def get_task_result(self, task_id: str) -> Optional[Any]:
