@@ -1,15 +1,43 @@
-# -*- coding: utf-8 -*-
 import queue
 import threading
 import time
 from concurrent.futures import ProcessPoolExecutor, Future
 from functools import partial
-from multiprocessing import Event, Lock, RLock, Condition
+from multiprocessing import Manager, TimeoutError
 from typing import Callable, Dict, List, Tuple, Optional, Any
 
-from task_scheduling.manager.task_details_queue import task_status_manager
 from ..common import logger
 from ..config import config
+from ..manager import task_status_manager
+
+
+def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict], task_status_queue: queue.Queue) -> Any:
+    timeout_processing, task_name, task_id, func, args, kwargs = task
+
+    return_results = None
+    try:
+        task_status_queue.put(("running", task_id, task_name, time.time(), None, None, timeout_processing))
+
+        logger.info(f"Start running io linear task, task ID: {task_id}")
+        if timeout_processing:
+            result = func(*args, **kwargs)
+            return_results = result
+        else:
+            result = func(*args, **kwargs)
+            return_results = result
+    except TimeoutError:
+        logger.warning(f"Io linear task | {task_id} | timed out, forced termination")
+        task_status_queue.put(("timeout", task_id, task_name, None, None, None, timeout_processing))
+        return_results = f"error happened: timeout"
+    except Exception as e:
+        logger.error(f"Io linear task | {task_id} | execution failed: {e}")
+        task_status_queue.put(("failed", task_id, task_name, None, None, e, timeout_processing))
+        return_results = f"error happened: {e}"
+    finally:
+        if return_results is None:
+            return_results = "error happened"
+        task_status_queue.put(("completed", task_id, task_name, None, time.time(), None, timeout_processing))
+        return return_results
 
 
 class CpuLinerTask:
@@ -19,31 +47,53 @@ class CpuLinerTask:
     __slots__ = [
         'task_queue', 'running_tasks', 'lock', 'condition', 'scheduler_lock',
         'scheduler_started', 'scheduler_stop_event', 'scheduler_thread',
-        'idle_timer', 'idle_timeout', 'idle_timer_lock', 'task_results'
+        'idle_timer', 'idle_timeout', 'idle_timer_lock', 'task_results', 'task_status_queue',
+        'status_thread'
     ]
 
     def __init__(self) -> None:
+        manager = Manager()
+
         self.task_queue = queue.Queue()  # Task queue
         self.running_tasks = {}  # Running tasks
-        self.lock = Lock()  # Lock to protect access to shared resources
-        self.scheduler_lock = RLock()  # Thread unlock
+        self.lock = threading.Lock()  # Lock to protect access to shared resources
+        self.scheduler_lock = threading.RLock()  # Thread unlock
 
-        self.condition = Condition()  # Condition variable for thread synchronization
+        self.condition = threading.Condition()  # Condition variable for thread synchronization
         self.scheduler_started = False  # Whether the scheduler thread has started
-        self.scheduler_stop_event = Event()  # Scheduler thread stop event
+        self.scheduler_stop_event = threading.Event()  # Scheduler thread stop event
         self.scheduler_thread: Optional[threading.Thread] = None  # Scheduler thread
         self.idle_timer: Optional[threading.Timer] = None  # Idle timer
         self.idle_timeout = config["max_idle_time"]  # Idle timeout, default is 60 seconds
-        self.idle_timer_lock = Lock()  # Idle timer lock
+        self.idle_timer_lock = threading.Lock()  # Idle timer lock
         self.task_results: Dict[str, List[Any]] = {}  # Store task return results, keep up to 2 results for each task ID
+        self.task_status_queue = manager.Queue()  # Queue for task status updates
+
+        # Start a thread to handle task status updates
+        self.status_thread = threading.Thread(target=self._handle_task_status_updates, daemon=True)
+
+    # Handle task status updates from the task status queue
+    def _handle_task_status_updates(self) -> None:
+        while not self.scheduler_stop_event.is_set():
+            try:
+                if not self.task_status_queue.empty():
+                    status, task_id, task_name, start_time, end_time, error, timeout_processing = self.task_status_queue.get(
+                        timeout=1)
+                    task_status_manager.add_task_status(task_id, task_name, status, start_time, end_time, error,
+                                                        timeout_processing)
+            finally:
+                continue
 
     # Add the task to the scheduler
     def add_task(self, timeout_processing: bool, task_name: str, task_id: str, func: Callable, *args, **kwargs) -> bool:
         try:
             with self.scheduler_lock:
 
-                if self.task_queue.qsize() >= config["maximum_queue_line"]:
-                    logger.warning(f"Cpu linear task | {task_id} | not added, queue is full")
+                if self.task_queue.qsize() >= config["io_liner_task"]:
+                    logger.warning(f"Io linear task | {task_id} | not added, queue is full")
+                    return False
+
+                if task_name in [details[1] for details in self.running_tasks.values()]:
                     return False
 
                 if self.scheduler_stop_event.is_set() and not self.scheduler_started:
@@ -51,8 +101,7 @@ class CpuLinerTask:
                     logger.info("Scheduler has fully stopped")
 
                 # Reduce the granularity of the lock
-                task_status_manager.add_task_status(task_id, task_name, "pending", None, None, None,
-                                                    timeout_processing)
+                self.task_status_queue.put(("waiting", task_id, task_name, None, None, None, timeout_processing))
 
                 self.task_queue.put((timeout_processing, task_name, task_id, func, args, kwargs))
 
@@ -66,7 +115,7 @@ class CpuLinerTask:
 
                 return True
         except Exception as e:
-            logger.error(f"Cpu linear task | {task_id} | error adding task: {e}")
+            logger.error(f"Io linear task | {task_id} | error adding task: {e}")
             return False
 
     # Start the scheduler
@@ -77,8 +126,8 @@ class CpuLinerTask:
         self.scheduler_started = True
         self.scheduler_thread = threading.Thread(target=self._scheduler, daemon=True)
         self.scheduler_thread.start()
+        self.status_thread.start()
 
-    # Stop the scheduler
     def stop_scheduler(self, force_cleanup: bool, system_operations: bool = False) -> None:
         """
         Stop the scheduler thread.
@@ -87,18 +136,19 @@ class CpuLinerTask:
                               If False, gracefully stop the scheduler (e.g., due to idle timeout).
         :param system_operations: System execution metrics
         """
+
         with self.scheduler_lock:
-            # Check if all tasks are completed
+            # Check if there are any running tasks
             if not self.task_queue.empty() or not len(self.running_tasks) == 0:
                 if system_operations:
-                    logger.warning(f"Cpu linear task | detected running tasks | stopping operation terminated")
+                    logger.warning("Running tasks found, not stopping scheduler yet")
                     return None
 
-            logger.warning("Exit cleanup")
             if force_cleanup:
                 logger.warning("Force stopping scheduler and cleaning up tasks")
                 self.scheduler_stop_event.set()
             else:
+                # Wait for all running tasks to complete
                 self.scheduler_stop_event.set()
 
             # Clear the task queue
@@ -126,7 +176,7 @@ class CpuLinerTask:
         """
         Scheduler function, fetch tasks from the task queue and submit them to the process pool for execution.
         """
-        with ProcessPoolExecutor(max_workers=int(config["line_task_max"])) as executor:
+        with ProcessPoolExecutor(max_workers=int(config["io_liner_task"])) as executor:
             while not self.scheduler_stop_event.is_set():
                 with self.condition:
                     while self.task_queue.empty() and not self.scheduler_stop_event.is_set():
@@ -141,74 +191,17 @@ class CpuLinerTask:
                     task = self.task_queue.get()
 
                 timeout_processing, task_name, task_id, func, args, kwargs = task
-
                 with self.lock:
-                    if task_name in [details[1] for details in self.running_tasks.values()]:
-                        self.task_queue.put(task)
-                        continue
+                    future = executor.submit(_execute_task, task, self.task_status_queue)
+                    process = next(iter(executor._processes.values()))
+                    self.running_tasks[task_id] = [future, task_name, process]
 
-                    future = executor.submit(self._execute_task, task)
-                    self.running_tasks[task_id] = [future, task_name]
+                    future.add_done_callback(partial(self._task_done, task_id))
 
-                future.add_done_callback(partial(self._task_done, task_id))
+            # Ensure the executor is properly shut down
+            executor.shutdown(wait=True)
 
     # A function that executes a task
-    def _execute_task(self, task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
-        timeout_processing, task_name, task_id, func, args, kwargs = task
-
-        return_results = None
-        try:
-            task_status_manager.add_task_status(task_id, task_name, "running", time.time(), None, None,
-                                                timeout_processing)
-
-            logger.info(f"Start running cpu linear task, task ID: {task_id}")
-            if timeout_processing:
-                return_results = self._run_with_timeout(func, args, kwargs, config["watch_dog_time"])
-            else:
-                return_results = func(*args, **kwargs)
-        except TimeoutError:
-            logger.warning(f"Cpu linear task | {task_id} | timed out, forced termination")
-            task_status_manager.add_task_status(task_id, task_name, "timeout", None, None, None,
-                                                timeout_processing)
-        except Exception as e:
-            logger.error(f"Cpu linear task | {task_id} | execution failed: {e}")
-            task_status_manager.add_task_status(task_id, task_name, "failed", None, None, e,
-                                                timeout_processing)
-        finally:
-            if return_results is None:
-                return_results = "error happened"
-            return return_results
-
-    def _run_with_timeout(self, func: Callable, args: Tuple, kwargs: Dict, timeout: int) -> Any:
-        """
-        Run a function with a timeout.
-
-        :param func: The function to run.
-        :param args: Positional arguments for the function.
-        :param kwargs: Keyword arguments for the function.
-        :param timeout: Timeout in seconds.
-        :return: The result of the function or None if it times out.
-        """
-
-        def target(result_queue):
-            try:
-                result_queue.put(func(*args, **kwargs))
-            except Exception as e:
-                result_queue.put(e)
-
-        result_queue = queue.Queue()
-        process = threading.Thread(target=target, args=(result_queue,))
-        process.start()
-        process.join(timeout=timeout)
-
-        if process.is_alive():
-            raise TimeoutError("Task timed out")
-        else:
-            result = result_queue.get()
-            if isinstance(result, Exception):
-                raise result
-            return result
-
     def _task_done(self, task_id: str, future: Future) -> None:
         """
         Callback function after a task is completed.
@@ -217,29 +210,33 @@ class CpuLinerTask:
         :param future: Future object corresponding to the task.
         """
         try:
-            result = future.result()  # Get task result, exceptions will be raised here
+            result = future.result()  # 获取任务结果，异常将在该处抛出
 
-            # Store task return results, keep up to 2 results
+            # 存储任务返回结果，最多保留2个结果
             with self.lock:
                 if task_id not in self.task_results:
                     self.task_results[task_id] = []
                 self.task_results[task_id].append(result)
                 if len(self.task_results[task_id]) > 2:
-                    self.task_results[task_id].pop(0)  # Remove the oldest result
-            if not result == "error happened":
-                task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None)
+                    self.task_results[task_id].pop(0)  # 删除最旧的结果
+            if result != "error happened":
+                self.task_status_queue.put(("completed", task_id, None, None, time.time(), None, None))
+        except Exception as e:
+            logger.error(f"Io linear task | {task_id} | execution failed in callback: {e}")
+            with self.lock:
+                if task_id not in self.task_results:
+                    self.task_results[task_id] = []
+                self.task_results[task_id].append(f"error happened: {e}")
+            self.task_status_queue.put(("failed", task_id, None, None, time.time(), e, None))
         finally:
-            # Ensure the Future object is deleted
+            # 确保 Future 对象被删除
             with self.lock:
                 if task_id in self.running_tasks:
                     del self.running_tasks[task_id]
 
-            # Check if all tasks are completed
-            with self.lock:
                 if self.task_queue.empty() and len(self.running_tasks) == 0:
                     self._reset_idle_timer()
 
-    # The task scheduler closes the countdown
     def _reset_idle_timer(self) -> None:
         """
         Reset the idle timer.
@@ -277,38 +274,22 @@ class CpuLinerTask:
         """
         Force stop a task by its task ID.
 
-        :param task_id: task ID.
+        :param task_id: task ID
         """
         with self.lock:
             if task_id not in self.running_tasks:
-                logger.warning(f"Cpu linear task | {task_id} | does not exist or is already completed")
+                logger.warning(f"Io linear task | {task_id} | does not exist or is already completed")
                 return False
 
-        task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None)
+        process = self.running_tasks[task_id][2]
+        if process is not None:
+            process.terminate()
+
+        self.task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
         with self.lock:
             if task_id in self.task_results:
                 del self.task_results[task_id]
         return True
-
-    def cancel_all_queued_tasks_by_name(self, task_name: str) -> None:
-        """
-        Cancel all queued tasks with the same name.
-
-        :param task_name: Task name.
-        """
-        with self.condition:
-            temp_queue = queue.Queue()
-            while not self.task_queue.empty():
-                task = self.task_queue.get()
-                if task[1] == task_name:  # Use function name to match task name
-                    logger.warning(
-                        f"Cpu linear taskCpu linear task | {task_name} | is waiting to be executed in the queue, has been deleted")
-                else:
-                    temp_queue.put(task)
-
-            # Put uncancelled tasks back into the queue
-            while not temp_queue.empty():
-                self.task_queue.put(temp_queue.get())
 
     # Obtain the information returned by the corresponding task
     def get_task_result(self, task_id: str) -> Optional[Any]:
@@ -325,6 +306,3 @@ class CpuLinerTask:
                     del self.task_results[task_id]
             return result
         return None
-
-
-cpu_liner_task = CpuLinerTask()
