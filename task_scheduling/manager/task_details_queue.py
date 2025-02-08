@@ -1,43 +1,21 @@
-import threading
-import time
 from collections import OrderedDict
 from typing import Dict, Optional, Union
 
 from ..config import config
-from ..scheduler import io_async_task, io_liner_task, timer_task, cpu_liner_task
 
 
 class TaskStatusManager:
-    __slots__ = ['task_status_dict', 'max_storage', 'timeout_check_interval', '_timeout_checker']
+    __slots__ = ['task_status_dict', 'max_storage']
 
-    def __init__(self, max_storage: int = config["maximum_task_info_storage"],
-                 timeout_check_interval: int = config["status_check_interval"]):
+    def __init__(self, max_storage: int = config["maximum_task_info_storage"]):
         """
         Initialize the task status manager.
 
         :param max_storage: Maximum number of task status entries to store.
-        :param timeout_check_interval: Interval in seconds to check for timeout tasks.
+
         """
         self.task_status_dict: OrderedDict[str, Dict[str, Optional[Union[str, float, bool]]]] = OrderedDict()
         self.max_storage = max_storage
-        self.timeout_check_interval = timeout_check_interval
-        self._timeout_checker = None  # Initialize timer flag
-        self._start_timeout_checker()
-
-    def _start_timeout_checker(self):
-        """
-        Start a timer that will periodically check for timeout tasks.
-        """
-        self._timeout_checker = threading.Timer(self.timeout_check_interval, self._check_timeouts)
-        self._timeout_checker.start()
-
-    def _stop_timeout_checker(self):
-        """
-        Stop the timeout checker timer if it is running.
-        """
-        if self._timeout_checker is not None:
-            self._timeout_checker.cancel()
-            self._timeout_checker = None
 
     def add_task_status(self, task_id: str, task_name: str, status: Optional[str] = None,
                         start_time: Optional[float] = None,
@@ -96,21 +74,6 @@ class TaskStatusManager:
             for k in to_remove:
                 self.task_status_dict.pop(k)
 
-    def _check_timeouts(self) -> None:
-        """
-        Check for tasks that have exceeded their timeout time based on task start times.
-        """
-        current_time = time.time()
-        for task_id, task_status in self.task_status_dict.items():
-            if task_status['status'] == "running" and task_status['is_timeout_enabled']:
-                if current_time - task_status['start_time'] > config["watch_dog_time"]:
-                    # Stop task
-                    io_async_task.force_stop_task(task_id)
-                    io_liner_task.force_stop_task(task_id)
-                    timer_task.force_stop_task(task_id)
-                    cpu_liner_task.force_stop_task(task_id)
-        self._start_timeout_checker()  # Restart the timer
-
     def get_task_status(self, task_id: str) -> Optional[Dict[str, Optional[Union[str, float, bool]]]]:
         """
         Retrieve task status information by task ID.
@@ -118,7 +81,6 @@ class TaskStatusManager:
         :param task_id: Task ID.
         :return: Task status information as a dictionary, or None if the task ID is not found.
         """
-        self._check_timeouts()
         return self.task_status_dict.get(task_id)
 
     def get_all_task_statuses(self) -> Dict[str, Dict[str, Optional[Union[str, float, bool]]]]:
@@ -127,14 +89,4 @@ class TaskStatusManager:
 
         :return: A copy of the dictionary containing all task status information.
         """
-        self._check_timeouts()
         return self.task_status_dict.copy()
-
-    def shutdown(self):
-        """
-        Shutdown the TaskStatusManager, stopping the timeout checker.
-        """
-        self._stop_timeout_checker()
-
-
-task_status_manager = TaskStatusManager()
