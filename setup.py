@@ -11,7 +11,8 @@ setup(
     packages=find_packages(),
     install_requires=[
         "loguru",
-        "pyyaml"
+        "pyyaml",
+        "psutil"
     ],
     project_urls={
         "Bug Tracker": "https://github.com/fallingmeteorite/task_scheduling/issues",
