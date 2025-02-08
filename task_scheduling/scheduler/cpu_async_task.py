@@ -1,360 +1,330 @@
-# -*- coding: utf-8 -*-
 import asyncio
-import multiprocessing
 import queue
+import threading
 import time
-from typing import Dict, List, Tuple, Callable, Optional, Any
+from concurrent.futures import ProcessPoolExecutor, Future
+from functools import partial
+from multiprocessing import Manager, TimeoutError
+from typing import Callable, Dict, List, Tuple, Optional, Any
 
-from task_scheduling.manager.task_details_queue import task_status_manager
 from ..common import logger
 from ..config import config
-from ..stopit import ThreadingTimeout, TimeoutException
+from ..manager import task_status_manager
+
+
+async def _execute_task_async(task: Tuple[bool, str, str, Callable, Tuple, Dict],
+                              task_status_queue: queue.Queue) -> Any:
+    timeout_processing, task_name, task_id, func, args, kwargs = task
+
+    return_results = None
+    try:
+        task_status_queue.put(("running", task_id, task_name, time.time(), None, None, timeout_processing))
+
+        logger.info(f"Start running io linear task, task ID: {task_id}")
+        if timeout_processing:
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(func, *args, **kwargs)
+            return_results = result
+        else:
+            result = await func(*args, **kwargs)
+            return_results = result
+    except TimeoutError:
+        logger.warning(f"Io linear task | {task_id} | timed out, forced termination")
+        task_status_queue.put(("timeout", task_id, task_name, None, None, None, timeout_processing))
+        return_results = f"error happened: timeout"
+    except Exception as e:
+        logger.error(f"Io linear task | {task_id} | execution failed: {e}")
+        task_status_queue.put(("failed", task_id, task_name, None, None, e, timeout_processing))
+        return_results = f"error happened: {e}"
+    finally:
+        if return_results is None:
+            return_results = "error happened"
+        task_status_queue.put(("completed", task_id, task_name, None, time.time(), None, timeout_processing))
+        return return_results
+
+
+def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict], task_status_queue: queue.Queue) -> Any:
+    async def run_task():
+        return await _execute_task_async(task, task_status_queue)
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    result = loop.run_until_complete(run_task())
+    loop.close()
+    return result
 
 
 class CpuAsyncTask:
     """
-    Asynchronous task manager class, responsible for scheduling, executing, and monitoring asynchronous tasks.
+    Linear task manager class, responsible for managing the scheduling, execution, and monitoring of linear tasks.
     """
     __slots__ = [
-        'task_queues', 'scheduler_lock', 'scheduler_started', 'scheduler_stop_event',
-        'running_tasks', 'scheduler_processes', 'event_loops', 'idle_timers',
-        'idle_timeout', 'idle_timer_lock', 'task_results', 'task_counters'
+        'task_queue', 'running_tasks', 'lock', 'condition', 'scheduler_lock',
+        'scheduler_started', 'scheduler_stop_event', 'scheduler_thread',
+        'idle_timer', 'idle_timeout', 'idle_timer_lock', 'task_tasks', 'task_status_queue',
+        'status_thread', 'manager', 'task_results'
     ]
 
     def __init__(self) -> None:
-        """
-        Initialize the asynchronous task manager.
-        """
-        self.task_queues: Dict[str, multiprocessing.Queue] = {}  # Task queues for each task name
-        self.scheduler_lock = multiprocessing.Lock()  # Process lock
-        self.scheduler_started = False  # Whether the scheduler process has started
-        self.scheduler_stop_event = multiprocessing.Event()  # Scheduler process stop event
-        self.running_tasks: Dict[str, list[Any]] = {}  # Use weak references to reduce memory usage
-        self.scheduler_processes: Dict[str, multiprocessing.Process] = {}  # Scheduler processes for each task name
-        self.event_loops: Dict[str, Any] = {}  # Event loops for each task name
-        self.idle_timers: Dict[str, multiprocessing.Process] = {}  # Idle timers for each task name
+        self.manager = Manager()
+
+        self.task_queue = queue.Queue()  # Task queue
+        self.running_tasks = {}  # Running tasks
+        self.lock = threading.Lock()  # Lock to protect access to shared resources
+        self.scheduler_lock = threading.RLock()  # Thread unlock
+
+        self.condition = threading.Condition()  # Condition variable for thread synchronization
+        self.scheduler_started = False  # Whether the scheduler thread has started
+        self.scheduler_stop_event = threading.Event()  # Scheduler thread stop event
+        self.scheduler_thread: Optional[threading.Thread] = None  # Scheduler thread
+        self.idle_timer: Optional[threading.Timer] = None  # Idle timer
         self.idle_timeout = config["max_idle_time"]  # Idle timeout, default is 60 seconds
-        self.idle_timer_lock = multiprocessing.Lock()  # Idle timer lock
+        self.idle_timer_lock = threading.Lock()  # Idle timer lock
         self.task_results: Dict[str, List[Any]] = {}  # Store task return results, keep up to 2 results for each task ID
-        self.task_counters: Dict[str, int] = {}  # Used to track the number of tasks being executed in each event loop
+        self.task_status_queue = self.manager.Queue()  # Queue for task status updates
+
+        # Start a thread to handle task status updates
+        self.status_thread = threading.Thread(target=self._handle_task_status_updates, daemon=True)
+        self.status_thread.start()
+
+    # Handle task status updates from the task status queue
+    def _handle_task_status_updates(self) -> None:
+        while not self.scheduler_stop_event.is_set():
+            try:
+                if not self.task_status_queue.empty():
+                    status, task_id, task_name, start_time, end_time, error, timeout_processing = self.task_status_queue.get(
+                        timeout=1)
+                    task_status_manager.add_task_status(task_id, task_name, status, start_time, end_time, error,
+                                                        timeout_processing)
+            finally:
+                continue
 
     # Add the task to the scheduler
     def add_task(self, timeout_processing: bool, task_name: str, task_id: str, func: Callable, *args, **kwargs) -> bool:
-        """
-        Add a task to the task queue.
-
-        :param timeout_processing: Whether to enable timeout processing.
-        :param task_name: Task name (can be repeated).
-        :param task_id: Task ID (must be unique).
-        :param func: Task function.
-        :param args: Positional arguments for the task function.
-        :param kwargs: Keyword arguments for the task function.
-        """
         try:
             with self.scheduler_lock:
-                if task_name not in self.task_queues:
-                    self.task_queues[task_name] = multiprocessing.Queue()
-
-                if self.task_queues[task_name].qsize() >= config["maximum_queue_async"]:
-                    logger.warning(f"Cpu asyncio taskCpu asyncio task | {task_id} | not added, queue is full")
-                    logger.warning(f"Asyncio queue is full!!!")
+                if self.task_queue.qsize() >= config["io_liner_task"]:
+                    logger.warning(f"Io linear task | {task_id} | not added, queue is full")
                     return False
 
-                task_status_manager.add_task_status(task_id, task_name, "pending", None, None, None,
-                                                    timeout_processing)
+                if task_name in [details[1] for details in self.running_tasks.values()]:
+                    logger.warning(f"Io linear task | {task_id} | not added, task name already running")
+                    return False
 
-                self.task_queues[task_name].put((timeout_processing, task_name, task_id, func, args, kwargs))
+                if self.scheduler_stop_event.is_set() and not self.scheduler_started:
+                    self._join_scheduler_thread()
+                    logger.info("Scheduler has fully stopped")
 
-                # If the scheduler process has not started, start it
-                if task_name not in self.scheduler_processes or not self.scheduler_processes[task_name].is_alive():
-                    self.task_counters[task_name] = 0  # Initialize the task counter
-                    self._start_scheduler(task_name)
+                # Reduce the granularity of the lock
+                self.task_status_queue.put(("waiting", task_id, task_name, None, None, None, timeout_processing))
 
-                # Cancel the idle timer
-                self._cancel_idle_timer(task_name)
+                self.task_queue.put((timeout_processing, task_name, task_id, func, args, kwargs))
+
+                if not self.scheduler_started:
+                    self._start_scheduler()
+
+                with self.condition:
+                    self.condition.notify()
+
+                self._cancel_idle_timer()
 
                 return True
         except Exception as e:
-            logger.error(f"Error adding task | {task_id} |: {e}")
+            logger.error(f"Io linear task | {task_id} | error adding task: {e}")
             return False
 
     # Start the scheduler
-    def _start_scheduler(self, task_name: str) -> None:
+    def _start_scheduler(self) -> None:
         """
-        Start the scheduler process and the event loop process for a specific task name.
+        Start the scheduler thread.
+        """
+        self.scheduler_started = True
+        self.scheduler_thread = threading.Thread(target=self._scheduler, daemon=True)
+        self.scheduler_thread.start()
 
-        :param task_name: Task name.
+    def stop_scheduler(self, force_cleanup: bool, system_operations: bool = False) -> None:
         """
-        with self.scheduler_lock:
-            if task_name not in self.scheduler_processes or not self.scheduler_processes[task_name].is_alive():
-                self.scheduler_started = True
-                self.scheduler_processes[task_name] = multiprocessing.Process(target=self._scheduler, args=(task_name,))
-                self.scheduler_processes[task_name].start()
+        Stop the scheduler thread.
 
-    # Stop the scheduler
-    def _stop_scheduler(self, task_name: str, force_cleanup: bool, system_operations: bool = False) -> None:
-        """
-        :param task_name: Task name.
-        :param force_cleanup: Force the end of a running task
-        Stop the scheduler and event loop, and forcibly kill all tasks if force_cleanup is True.
+        :param force_cleanup: If True, force stop all tasks and clear the queue
+
+                              If False, gracefully stop the scheduler (e.g., due to idle timeout).
         :param system_operations: System execution metrics
         """
+
         with self.scheduler_lock:
-            # Check if all tasks are completed
-            if not self.task_queues[task_name].empty() or not len(self.running_tasks) == 0:
+            # Check if there are any running tasks
+            if not self.task_queue.empty() or not len(self.running_tasks) == 0:
                 if system_operations:
-                    logger.warning(f"Cpu asyncio task | detected running tasks | stopping operation terminated")
-                    return None
-
-            logger.warning("Exit cleanup")
-
-            self.scheduler_started = False
-            self.scheduler_stop_event.set()
+                    logger.warning("Running tasks found, not stopping scheduler yet")
+                    return
 
             if force_cleanup:
-                # Forcibly cancel all running tasks
-                self._cancel_all_running_tasks(task_name)
+                logger.warning("Force stopping scheduler and cleaning up tasks")
                 self.scheduler_stop_event.set()
             else:
+                # Wait for all running tasks to complete
                 self.scheduler_stop_event.set()
 
             # Clear the task queue
-            self._clear_task_queue(task_name)
+            self._clear_task_queue()
 
-            # Stop the event loop
-            self._stop_event_loop(task_name)
+            # Notify all waiting threads
+            with self.condition:
+                self.condition.notify_all()
 
-            # Wait for the scheduler process to finish
-            self._join_scheduler_process(task_name)
+            # Wait for the scheduler thread to finish
+            self._join_scheduler_thread()
 
-            # Clean up all task return results
-            self.task_results.clear()
+            # Drain the task status queue after the stop event is set
+            self._drain_task_status_queue()
 
-            # Reset parameters for scheduler restart
-            if task_name in self.event_loops:
-                del self.event_loops[task_name]
-            if task_name in self.scheduler_processes:
-                del self.scheduler_processes[task_name]
-            if task_name in self.task_queues:
-                del self.task_queues[task_name]
+            # Ensure the manager is properly shut down
+            self.manager.shutdown()
 
-            logger.info(
-                f"Scheduler and event loop for task {task_name} have stopped, all resources have been released and parameters reset")
-
-    def stop_all_schedulers(self, force_cleanup: bool, system_operations: bool = False) -> None:
-        """
-        Stop all schedulers and event loops, and forcibly kill all tasks if force_cleanup is True.
-
-        :param force_cleanup: Force the end of all running tasks.
-        :param system_operations: System execution metrics.
-        """
-        with self.scheduler_lock:
-            # Check if all tasks are completed
-            if not all(q.empty() for q in self.task_queues.values()) or len(self.running_tasks) != 0:
-                if system_operations:
-                    logger.warning(f"Cpu asyncio task | detected running tasks | stopping operation terminated")
-                    return None
-
-            logger.warning("Exit cleanup")
-
+            # Reset state variables
             self.scheduler_started = False
-            self.scheduler_stop_event.set()
-
-            if force_cleanup:
-                # Forcibly cancel all running tasks
-                for task_name in list(self.running_tasks.keys()):  # Create a copy using list()
-                    self._cancel_all_running_tasks(task_name)
-                self.scheduler_stop_event.set()
-            else:
-                self.scheduler_stop_event.set()
-
-            # Clear all task queues
-            for task_name in list(self.task_queues.keys()):
-                self._clear_task_queue(task_name)
-
-            # Stop all event loops
-            for task_name in list(self.event_loops.keys()):
-                self._stop_event_loop(task_name)
-
-            # Wait for all scheduler processes to finish
-            for task_name in list(self.scheduler_processes.keys()):
-                self._join_scheduler_process(task_name)
-
-            # Clean up all task return results
-            self.task_results.clear()
-
-            # Reset parameters for scheduler restart
-            self.event_loops.clear()
-            self.scheduler_processes.clear()
-            self.task_queues.clear()
+            self.scheduler_stop_event.clear()
+            self.scheduler_thread = None
+            self.idle_timer = None
+            self.task_results = {}
 
             logger.info(
-                f"All schedulers and event loops have stopped, all resources have been released and parameters reset")
+                "Scheduler and event loop have stopped, all resources have been released and parameters reset")
+
+    def _drain_task_status_queue(self) -> None:
+        """
+        Drain the task status queue after the stop event is set.
+        """
+        while not self.task_status_queue.empty():
+            try:
+                status, task_id, task_name, start_time, end_time, error, timeout_processing = self.task_status_queue.get(
+                    timeout=1)
+                task_status_manager.add_task_status(task_id, task_name, status, start_time, end_time, error,
+                                                    timeout_processing)
+            except queue.Empty:
+                break
 
     # Task scheduler
-    def _scheduler(self, task_name: str) -> None:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+    def _scheduler(self) -> None:
+        """
+        Scheduler function, fetch tasks from the task queue and submit them to the process pool for execution.
+        """
+        with ProcessPoolExecutor(max_workers=int(config["io_liner_task"])) as executor:
+            while not self.scheduler_stop_event.is_set():
+                with self.condition:
+                    while self.task_queue.empty() and not self.scheduler_stop_event.is_set():
+                        self.condition.wait()
 
-        while not self.scheduler_stop_event.is_set():
-            try:
-                task = self.task_queues[task_name].get(timeout=1)
-            except queue.Empty:
-                continue
+                    if self.scheduler_stop_event.is_set():
+                        break
 
-            # Execute the task after the lock is released
-            timeout_processing, task_name, task_id, func, args, kwargs = task
-            future = asyncio.run_coroutine_threadsafe(self._execute_task(task), loop)
+                    if self.task_queue.qsize() == 0:
+                        continue
 
-            with self.scheduler_lock:
-                self.running_tasks[task_id] = [future, task_name]
-                self.task_counters[task_name] += 1
+                    task = self.task_queue.get()
+
+                timeout_processing, task_name, task_id, func, args, kwargs = task
+                with self.lock:
+                    future = executor.submit(_execute_task, task, self.task_status_queue)
+                    process = next(iter(executor._processes.values()))
+                    self.running_tasks[task_id] = [future, task_name, process]
+
+                    future.add_done_callback(partial(self._task_done, task_id))
+
+            # Ensure the executor is properly shut down
+            executor.shutdown(wait=True)
 
     # A function that executes a task
-    async def _execute_task(self, task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
+    def _task_done(self, task_id: str, future: Future) -> None:
         """
-        Execute an asynchronous task.
-        :param task: Tuple, including timeout processing flag, task name, task ID, task function, positional arguments, and keyword arguments.
-        """
-        # Unpack task tuple into local variables
-        timeout_processing, task_name, task_id, func, args, kwargs = task
+        Callback function after a task is completed.
 
+        :param task_id: Task ID
+
+        :param future: Future object corresponding to the task.
+        """
         try:
-            # Modify the task status
-            task_status_manager.add_task_status(task_id, task_name, "running", time.time(), None, None,
-                                                timeout_processing)
+            result = future.result()  # 获取任务结果，异常将在该处抛出
 
-            logger.info(f"Start running cpu asyncio task | {task_id} | ")
-
-            # If the task needs timeout processing, set the timeout time
-            if timeout_processing:
-                with ThreadingTimeout(seconds=config["watch_dog_time"] + 5, swallow_exc=False):
-                    result = await asyncio.wait_for(
-                        func(*args, **kwargs),
-                        timeout=config["watch_dog_time"]
-                    )
-            else:
-                result = await func(*args, **kwargs)
-
-            # Store task return results, keep up to 2 results
-            with self.scheduler_lock:
+            # 存储任务返回结果，最多保留2个结果
+            with self.lock:
                 if task_id not in self.task_results:
                     self.task_results[task_id] = []
                 self.task_results[task_id].append(result)
                 if len(self.task_results[task_id]) > 2:
-                    self.task_results[task_id].pop(0)  # Remove the oldest result
-
-            # Update task status to "completed"
-            task_status_manager.add_task_status(task_id, task_name, "completed", None, time.time(), None,
-                                                timeout_processing)
-
-        except (asyncio.TimeoutError, TimeoutException):
-            logger.warning(f"Cpu asyncio task | {task_id} | timed out, forced termination")
-            task_status_manager.add_task_status(task_id, task_name, "timeout", None, None, None,
-                                                timeout_processing)
-        except asyncio.CancelledError:
-            logger.warning(f"Cpu asyncio task | {task_id} | was cancelled")
-            task_status_manager.add_task_status(task_id, task_name, "cancelled", None, None, None,
-                                                timeout_processing)
+                    self.task_results[task_id].pop(0)  # 删除最旧的结果
+            if result != "error happened":
+                self.task_status_queue.put(("completed", task_id, None, None, time.time(), None, None))
         except Exception as e:
-            logger.error(f"Cpu asyncio task | {task_id} | execution failed: {e}")
-            task_status_manager.add_task_status(task_id, task_name, "failed", None, None, e,
-                                                timeout_processing)
+            logger.error(f"Io linear task | {task_id} | execution failed in callback: {e}")
+            with self.lock:
+                if task_id not in self.task_results:
+                    self.task_results[task_id] = []
+                self.task_results[task_id].append(f"error happened: {e}")
+            self.task_status_queue.put(("failed", task_id, None, None, time.time(), e, None))
         finally:
-            # Opt-out will result in the deletion of the information and the following processing will not be possible
-            with self.scheduler_lock:
-                if self.task_results.get(task_id, None) is None:
-                    return None
-
-                # Remove the task from running tasks dictionary
+            # 确保 Future 对象被删除
+            with self.lock:
                 if task_id in self.running_tasks:
                     del self.running_tasks[task_id]
 
-                # Reduce task counters (ensure it doesn't go below 0)
-                if task_name in self.task_counters and self.task_counters[task_name] > 0:
-                    self.task_counters[task_name] -= 1
+                if self.task_queue.empty() and len(self.running_tasks) == 0:
+                    self._reset_idle_timer()
 
-                # Check if all tasks are completed
-                if self.task_queues[task_name].empty() and len(self.running_tasks) == 0:
-                    self._reset_idle_timer(task_name)
-
-    # The task scheduler closes the countdown
-    def _reset_idle_timer(self, task_name: str) -> None:
+    def _reset_idle_timer(self) -> None:
         """
-        Reset the idle timer for a specific task name.
-
-        :param task_name: Task name.
+        Reset the idle timer.
         """
         with self.idle_timer_lock:
-            if task_name in self.idle_timers and self.idle_timers[task_name] is not None:
-                self.idle_timers[task_name].terminate()
-            self.idle_timers[task_name] = multiprocessing.Process(target=self._stop_scheduler,
-                                                                  args=(task_name, False, True,))
-            self.idle_timers[task_name].start()
+            if self.idle_timer is not None:
+                self.idle_timer.cancel()
+            self.idle_timer = threading.Timer(self.idle_timeout, self.stop_scheduler, args=(False, True,))
+            self.idle_timer.start()
 
-    def _cancel_idle_timer(self, task_name: str) -> None:
+    def _cancel_idle_timer(self) -> None:
         """
-        Cancel the idle timer for a specific task name.
-
-        :param task_name: Task name.
+        Cancel the idle timer.
         """
         with self.idle_timer_lock:
-            if task_name in self.idle_timers and self.idle_timers[task_name] is not None:
-                self.idle_timers[task_name].terminate()
-                del self.idle_timers[task_name]
+            if self.idle_timer is not None:
+                self.idle_timer.cancel()
+                self.idle_timer = None
 
-    def _clear_task_queue(self, task_name: str) -> None:
+    def _clear_task_queue(self) -> None:
         """
-        Clear the task queue for a specific task name.
+        Clear the task queue.
+        """
+        while not self.task_queue.empty():
+            self.task_queue.get(timeout=1)
 
-        :param task_name: Task name.
+    def _join_scheduler_thread(self) -> None:
         """
-        while not self.task_queues[task_name].empty():
-            self.task_queues[task_name].get(timeout=1)
-
-    def _join_scheduler_process(self, task_name: str) -> None:
+        Wait for the scheduler thread to finish.
         """
-        Wait for the scheduler process to finish for a specific task name.
-
-        :param task_name: Task name.
-        """
-        if task_name in self.scheduler_processes and self.scheduler_processes[task_name].is_alive():
-            self.scheduler_processes[task_name].join()
+        if self.scheduler_thread and self.scheduler_thread.is_alive():
+            self.scheduler_thread.join()
 
     def force_stop_task(self, task_id: str) -> bool:
         """
         Force stop a task by its task ID.
 
-        :param task_id: Task ID.
+        :param task_id: task ID
         """
-        if task_id in self.running_tasks:
-            future = self.running_tasks[task_id][0]
-            future.cancel()
-            return True
-        else:
-            logger.warning(f"Cpu asyncio task | {task_id} | does not exist or is already completed")
-            return False
+        with self.lock:
+            if task_id not in self.running_tasks:
+                logger.warning(f"Io linear task | {task_id} | does not exist or is already completed")
+                return False
 
-    def cancel_all_queued_tasks_by_name(self, task_name: str) -> None:
-        """
-        Cancel all queued tasks with the same name.
+        process = self.running_tasks[task_id][2]
+        if process is not None:
+            process.terminate()
 
-        :param task_name: Task name.
-        """
-        with self.scheduler_lock:
-            if task_name in self.task_queues:
-                temp_queue = multiprocessing.Queue()
-                while not self.task_queues[task_name].empty():
-                    task = self.task_queues[task_name].get()
-                    if task[1] == task_name:  # Use function name to match task name
-                        logger.warning(
-                            f"Cpu asyncio task | {task_name} | is waiting to be executed in the queue, has been deleted")
-                    else:
-                        temp_queue.put(task)
-
-                # Put uncancelled tasks back into the queue
-                while not temp_queue.empty():
-                    self.task_queues[task_name].put(temp_queue.get())
+        self.task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
+        with self.lock:
+            if task_id in self.task_results:
+                del self.task_results[task_id]
+        return True
 
     # Obtain the information returned by the corresponding task
     def get_task_result(self, task_id: str) -> Optional[Any]:
@@ -366,50 +336,8 @@ class CpuAsyncTask:
         """
         if task_id in self.task_results and self.task_results[task_id]:
             result = self.task_results[task_id].pop(0)  # Return and delete the oldest result
-            with self.scheduler_lock:
+            with self.lock:
                 if not self.task_results[task_id]:
                     del self.task_results[task_id]
             return result
         return None
-
-    def _cancel_all_running_tasks(self, task_name: str) -> None:
-        """
-        Forcibly cancel all running tasks for a specific task name.
-
-        :param task_name: Task name.
-        """
-        with self.scheduler_lock:
-            for task_id in list(self.running_tasks.keys()):  # Create a copy using list()
-                if self.running_tasks[task_id][1] == task_name:
-                    future = self.running_tasks[task_id][0]
-                    if not future.done():  # Check if the task is completed
-                        future.cancel()
-                        logger.warning(f"Cpu asyncio task | {task_id} | has been forcibly cancelled")
-                        if task_id in self.task_results:
-                            del self.task_results[task_id]
-
-    def _stop_event_loop(self, task_name: str) -> None:
-        """
-        Stop the event loop for a specific task name.
-
-        :param task_name: Task name.
-        """
-        if task_name in self.event_loops:
-            try:
-                # Stop the event loop
-                loop = self.event_loops[task_name]
-                if loop.is_running():
-                    loop.call_soon_threadsafe(loop.stop)
-                    if task_name in self.scheduler_processes and self.scheduler_processes[task_name].is_alive():
-                        self.scheduler_processes[task_name].join(timeout=1)  # Wait up to 1 second
-
-                # Clean up all tasks and resources
-                self._cancel_all_running_tasks(task_name)
-                self._clear_task_queue(task_name)
-                if task_name in self.task_results:
-                    self.task_results[task_name].clear()
-                if task_name in self.event_loops:
-                    del self.event_loops[task_name]
-
-            except Exception as e:
-                logger.error(f"Cpu asyncio task | stopping event loop | error occurred: {e}")
