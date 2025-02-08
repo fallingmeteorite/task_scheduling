@@ -6,7 +6,7 @@ from .io_async_task import IoAsyncTask
 from .io_liner_task import IoLinerTask
 
 from .timer_task import TimerTask
-
+from .tag_added import FunctionRunner
 
 from .utils import *
 
