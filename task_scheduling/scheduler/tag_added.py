@@ -1,9 +1,12 @@
 import asyncio
 import multiprocessing
-import psutil
 import time
 from typing import Callable
+
+import psutil
+
 from ..common import logger
+
 
 class FunctionRunner:
     def __init__(self, func: Callable, *args, **kwargs):
