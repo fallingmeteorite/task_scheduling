@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import sys
+
 from loguru import logger
 
 # Hardcoded log format for performance
@@ -15,6 +16,7 @@ LOG_LEVEL: str = "INFO"
 
 # Flag to check if logger is already configured
 _logger_configured: bool = False
+
 
 def configure_logger():
     """
@@ -41,7 +43,6 @@ def configure_logger():
 
     # Mark logger as configured
     _logger_configured = True
-
 
 # Example log message (only for debugging)
 # logger.info("Logger configuration completed")
