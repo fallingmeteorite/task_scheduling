@@ -6,12 +6,16 @@ from .common.log_config import logger
 from .scheduler.utils import is_async_function
 from .scheduler_management import task_scheduler
 
-def task_creation(function_type: str, timeout_processing: bool, task_name: str, func: Callable, *args,
+
+def task_creation(delay: int or None, daily_time: str or None, function_type: str, timeout_processing: bool, task_name: str,
+                  func: Callable, *args,
                   **kwargs) -> str or None:
     """
     Add a task to the queue, choosing between asynchronous or linear task based on the function type.
     Generate a unique task ID and return it.
 
+    :param delay:Countdown time.
+    :param daily_time:The time it will run.
     :param function_type:The type of the function.
     :param timeout_processing: Whether to enable timeout processing.
     :param task_name: The task name.
@@ -31,12 +35,20 @@ def task_creation(function_type: str, timeout_processing: bool, task_name: str, 
 
     if async_function:
         # Add asynchronous task
-        task_scheduler.add_task(async_function, function_type, timeout_processing, task_name, task_id, func, *args,
+        task_scheduler.add_task(None, None, async_function, function_type, timeout_processing, task_name, task_id, func,
+                                *args,
                                 **kwargs)
 
     if not async_function:
         # Add linear task
-        task_scheduler.add_task(async_function, function_type, timeout_processing, task_name, task_id, func, *args,
+        task_scheduler.add_task(None, None, async_function, function_type, timeout_processing, task_name, task_id, func,
+                                *args,
+                                **kwargs)
+
+    if function_type == "time":
+        # Add timer task
+        task_scheduler.add_task(delay, daily_time, None, function_type, timeout_processing, task_name, task_id, func,
+                                *args,
                                 **kwargs)
 
     return task_id
