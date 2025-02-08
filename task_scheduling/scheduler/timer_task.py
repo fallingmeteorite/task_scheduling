@@ -15,6 +15,46 @@ from ..stopit import TaskManager, skip_on_demand, StopException, ThreadingTimeou
 task_manager = TaskManager()
 
 
+def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
+    timeout_processing, task_name, task_id, func, args, kwargs = task
+
+    return_results = None
+    try:
+        task_status_manager.add_task_status(task_id, task_name, "running", time.time(), None, None,
+                                            timeout_processing)
+
+        logger.info(f"Start running timer task, task ID: {task_id}")
+        if timeout_processing:
+            with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
+                with skip_on_demand() as skip_ctx:
+                    task_manager.add(None, skip_ctx, None, task_id)
+                    return_results = func(*args, **kwargs)
+        else:
+            with skip_on_demand() as skip_ctx:
+                task_manager.add(None, skip_ctx, None, task_id)
+                return_results = func(*args, **kwargs)
+        task_manager.remove(task_id)
+    except TimeoutException:
+        logger.warning(f"Timer task | {task_id} | timed out, forced termination")
+        task_status_manager.add_task_status(task_id, task_name, "timeout", None, None, None,
+                                            timeout_processing)
+        return_results = "error happened"
+    except StopException:
+        logger.warning(f"Timer task | {task_id} | was cancelled")
+        task_status_manager.add_task_status(task_id, task_name, "cancelled", None, None, None,
+                                            timeout_processing)
+        return_results = "error happened"
+    except Exception as e:
+        logger.error(f"Timer task | {task_id} | execution failed: {e}")
+        task_status_manager.add_task_status(task_id, task_name, "failed", None, None, e,
+                                            timeout_processing)
+        return_results = "error happened"
+    finally:
+        if task_manager.check(task_id):
+            task_manager.remove(task_id)
+        return return_results
+
+
 class TimerTask:
     """
     Linear task manager class, responsible for managing the scheduling, execution, and monitoring of linear tasks.
@@ -48,7 +88,6 @@ class TimerTask:
             with self.scheduler_lock:
                 if self.scheduler_stop_event.is_set() and not self.scheduler_started:
                     self._join_scheduler_thread()
-                    logger.info("Scheduler has fully stopped")
 
                 # Reduce the granularity of the lock
                 task_status_manager.add_task_status(task_id, task_name, "waiting", None, None, None,
@@ -106,10 +145,9 @@ class TimerTask:
             # Check if all tasks are completed
             if not self.task_queue.empty() or not len(self.running_tasks) == 0:
                 if system_operations:
-                    logger.warning(f"Timer task | detected running tasks | stopping operation terminated")
+                    logger.warning(f"Cpu asyncio task was detected to be running, and the task stopped terminating")
                     return None
 
-            logger.warning("Exit cleanup")
             if force_cleanup:
                 logger.warning("Force stopping scheduler and cleaning up tasks")
                 # Force stop all running tasks
@@ -134,9 +172,6 @@ class TimerTask:
             self.scheduler_thread = None
             self.idle_timer = None
             self.task_results = {}
-
-            logger.info(
-                "Scheduler and event loop have stopped, all resources have been released and parameters reset")
 
     # Scheduler function
     def _scheduler(self) -> None:
@@ -165,7 +200,7 @@ class TimerTask:
 
                 with self.lock:
 
-                    future = executor.submit(self._execute_task,
+                    future = executor.submit(_execute_task,
                                              (timeout_processing, task_name, task_id, func, args, kwargs))
                     self.running_tasks[task_id] = [future, task_name]
 
@@ -173,45 +208,6 @@ class TimerTask:
                     partial(self._task_done, task_id, timeout_processing, task_name, task_id, func, args, kwargs))
 
     # A function that executes a task
-    def _execute_task(self, task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
-        timeout_processing, task_name, task_id, func, args, kwargs = task
-
-        return_results = None
-        try:
-            task_status_manager.add_task_status(task_id, task_name, "running", time.time(), None, None,
-                                                timeout_processing)
-
-            logger.info(f"Start running timer task, task ID: {task_id}")
-            if timeout_processing:
-                with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False) as task_control:
-                    with skip_on_demand() as skip_ctx:
-                        task_manager.add(task_control, skip_ctx, task_id)
-                        return_results = func(*args, **kwargs)
-            else:
-                with ThreadingTimeout(seconds=None, swallow_exc=False) as task_control:
-                    with skip_on_demand() as skip_ctx:
-                        task_manager.add(task_control, skip_ctx, task_id)
-                        return_results = func(*args, **kwargs)
-            task_manager.remove(task_id)
-        except TimeoutException:
-            logger.warning(f"Timer task | {task_id} | timed out, forced termination")
-            task_status_manager.add_task_status(task_id, task_name, "timeout", None, None, None,
-                                                timeout_processing)
-        except StopException:
-            logger.warning(f"Timer task | {task_id} | was cancelled")
-            task_status_manager.add_task_status(task_id, task_name, "cancelled", None, None, None,
-                                                timeout_processing)
-        except Exception as e:
-            logger.error(f"Timer task | {task_id} | execution failed: {e}")
-            task_status_manager.add_task_status(task_id, task_name, "failed", None, None, e,
-                                                timeout_processing)
-        finally:
-            if return_results is None:
-                if task_manager.check(task_id):
-                    task_manager.remove(task_id)
-                    return_results = "error happened"
-            return return_results
-
     def _task_done(self, task_id: str, timeout_processing: bool, task_name: str, task_id_: str, func: Callable,
                    args: Tuple, kwargs: Dict, future: Future) -> None:
         """
@@ -302,23 +298,3 @@ class TimerTask:
             if task_id in self.task_results:
                 del self.task_results[task_id]
         return True
-
-    def cancel_all_queued_tasks_by_name(self, task_name: str) -> None:
-        """
-        Cancel all queued tasks with the same name.
-
-        :param task_name: Task name.
-        """
-        with self.condition:
-            temp_queue = queue.PriorityQueue()
-            while not self.task_queue.empty():
-                task = self.task_queue.get()
-                if task[2] == task_name:  # Use function name to match task name
-                    logger.warning(
-                        f"Timer task | {task_name} | is waiting to be executed in the queue, has been deleted")
-                else:
-                    temp_queue.put(task)
-
-            # Put uncancelled tasks back into the queue
-            while not temp_queue.empty():
-                self.task_queue.put(temp_queue.get())
