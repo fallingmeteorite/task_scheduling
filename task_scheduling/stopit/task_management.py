@@ -108,4 +108,3 @@ class TaskManager:
         """
         for task_id in self.tasks:
             self.terminate_task(task_id)
-            print(task_id)
