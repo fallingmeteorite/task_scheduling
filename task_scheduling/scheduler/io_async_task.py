@@ -5,9 +5,9 @@ import threading
 import time
 from typing import Dict, List, Tuple, Callable, Optional, Any
 
-from task_scheduling.manager.task_details_queue import task_status_manager
 from ..common import logger
 from ..config import config
+from ..manager import task_status_manager
 from ..stopit import ThreadingTimeout, TimeoutException
 
 
@@ -56,12 +56,11 @@ class IoAsyncTask:
                 if task_name not in self.task_queues:
                     self.task_queues[task_name] = queue.Queue()
 
-                if self.task_queues[task_name].qsize() >= config["maximum_queue_async"]:
+                if self.task_queues[task_name].qsize() >= config["io_asyncio_task"]:
                     logger.warning(f"Io asyncio task | {task_id} | not added, queue is full")
-                    logger.warning(f"Asyncio queue is full!!!")
                     return False
 
-                task_status_manager.add_task_status(task_id, task_name, "pending", None, None, None,
+                task_status_manager.add_task_status(task_id, task_name, "waiting", None, None, None,
                                                     timeout_processing)
 
                 self.task_queues[task_name].put((timeout_processing, task_name, task_id, func, args, kwargs))
@@ -214,7 +213,7 @@ class IoAsyncTask:
         while not self.scheduler_stop_event.is_set():
             with self.condition:
                 while (self.task_queues[task_name].empty() or self.task_counters[
-                    task_name] >= config["maximum_event_loop_tasks"]) and not self.scheduler_stop_event.is_set():
+                    task_name] >= config["io_asyncio_task"]) and not self.scheduler_stop_event.is_set():
                     self.condition.wait()
 
                 if self.scheduler_stop_event.is_set():
@@ -363,27 +362,6 @@ class IoAsyncTask:
         else:
             logger.warning(f"Io asyncio task | {task_id} | does not exist or is already completed")
             return False
-
-    def cancel_all_queued_tasks_by_name(self, task_name: str) -> None:
-        """
-        Cancel all queued tasks with the same name.
-
-        :param task_name: Task name.
-        """
-        with self.condition:
-            if task_name in self.task_queues:
-                temp_queue = queue.Queue()
-                while not self.task_queues[task_name].empty():
-                    task = self.task_queues[task_name].get()
-                    if task[1] == task_name:  # Use function name to match task name
-                        logger.warning(
-                            f"Io asyncio task | {task_name} | is waiting to be executed in the queue, has been deleted")
-                    else:
-                        temp_queue.put(task)
-
-                # Put uncancelled tasks back into the queue
-                while not temp_queue.empty():
-                    self.task_queues[task_name].put(temp_queue.get())
 
     # Obtain the information returned by the corresponding task
     def get_task_result(self, task_id: str) -> Optional[Any]:
