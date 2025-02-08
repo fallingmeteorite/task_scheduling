@@ -1,11 +1,12 @@
-import multiprocessing
-#import psutil
-import time
 import asyncio
-
+import multiprocessing
+import psutil
+import time
+from typing import Callable
+from ..common import logger
 
 class FunctionRunner:
-    def __init__(self, func, *args, **kwargs):
+    def __init__(self, func: Callable, *args, **kwargs):
         self.func = func
         self.args = args
         self.kwargs = kwargs
@@ -37,8 +38,8 @@ class FunctionRunner:
                 memory_usage = self.process_info.memory_info().rss / (1024 * 1024)
                 self.memory_usage_history.append(memory_usage)
 
-                print(f"CPU Usage: {cpu_usage}%")
-                print(f"Memory Usage: {memory_usage:.2f} MB")
+                logger.info(f"CPU Usage: {cpu_usage}%")
+                logger.info(f"Memory Usage: {memory_usage:.2f} MB")
 
                 time.sleep(1)
         except psutil.NoSuchProcess:
@@ -49,20 +50,20 @@ class FunctionRunner:
 
     def _analyze_task_type(self):
         if not self.cpu_usage_history or not self.memory_usage_history:
-            print("No data to analyze.")
+            logger.info("No data to analyze.")
             return
 
         avg_cpu_usage = sum(self.cpu_usage_history) / len(self.cpu_usage_history)
         avg_memory_usage = sum(self.memory_usage_history) / len(self.memory_usage_history)
 
-        print(f"Average CPU Usage: {avg_cpu_usage}%")
-        print(f"Average Memory Usage: {avg_memory_usage:.2f} MB")
+        logger.info(f"Average CPU Usage: {avg_cpu_usage}%")
+        logger.info(f"Average Memory Usage: {avg_memory_usage:.2f} MB")
 
         # Heuristic to determine task type
         if avg_cpu_usage > 50:
-            print("Task is likely CPU-intensive.")
+            logger.info("Task is likely CPU-intensive.")
         else:
-            print("Task is likely I/O-intensive.")
+            logger.info("Task is likely I/O-intensive.")
 
 
 # Example usage
