@@ -7,7 +7,8 @@ from .scheduler.utils import is_async_function
 from .scheduler_management import task_scheduler
 
 
-def task_creation(delay: int or None, daily_time: str or None, function_type: str, timeout_processing: bool, task_name: str,
+def task_creation(delay: int or None, daily_time: str or None, function_type: str, timeout_processing: bool,
+                  task_name: str,
                   func: Callable, *args,
                   **kwargs) -> str or None:
     """
