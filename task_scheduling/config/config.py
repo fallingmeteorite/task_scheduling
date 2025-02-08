@@ -39,7 +39,6 @@ def load_config(file_path: str = None) -> bool:
             # Safely load the YAML file using yaml.safe_load
             global config
             config.update(yaml.safe_load(f) or {})
-            logger.info("Configuration file loaded successfully")
             return True  # Return True indicating successful loading
     except Exception as error:
         logger.error(f"Unknown error occurred while loading configuration file: {error}")
