@@ -2,9 +2,9 @@ import asyncio
 import queue
 import threading
 import time
-from concurrent.futures import ProcessPoolExecutor, Future
+from concurrent.futures import ProcessPoolExecutor, Future, BrokenExecutor
 from functools import partial
-from multiprocessing import Manager, TimeoutError
+from multiprocessing import Manager
 from typing import Callable, Dict, List, Tuple, Optional, Any
 
 from ..common import logger
@@ -31,20 +31,15 @@ async def _execute_task_async(task: Tuple[bool, str, str, Callable, Tuple, Dict]
         else:
             result = await func(*args, **kwargs)
             return_results = result
-    except TimeoutError:
+    except asyncio.TimeoutError:
         logger.warning(f"Cpu asyncio task | {task_id} | timed out, forced termination")
         task_status_queue.put(("timeout", task_id, task_name, None, None, None, timeout_processing))
-        return_results = f"error happened: timeout"
+        return_results = "error happened"
     except Exception as e:
         logger.error(f"Cpu asyncio task | {task_id} | execution failed: {e}")
         task_status_queue.put(("failed", task_id, task_name, None, None, e, timeout_processing))
-        return_results = f"error happened: {e}"
+        return_results = "error happened"
     finally:
-        if task_manager.check(task_id):
-            task_manager.remove(task_id)
-
-        if return_results is None:
-            return_results = "error happened"
         task_status_queue.put(("completed", task_id, task_name, None, time.time(), None, timeout_processing))
         return return_results
 
@@ -57,11 +52,8 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict], task_statu
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-
         result = loop.run_until_complete(run_task())
     finally:
-        if result is None:
-            result = "error"
         loop.close()
         return result
 
@@ -106,6 +98,9 @@ class CpuAsyncTask:
                 if not self.task_status_queue.empty():
                     status, task_id, task_name, start_time, end_time, error, timeout_processing = self.task_status_queue.get(
                         timeout=1)
+                    # Terminate the running process in a timely manner
+                    if status in ["completed", "failed", "timeout"]:
+                        task_manager.terminate_task(task_id)
                     task_status_manager.add_task_status(task_id, task_name, status, start_time, end_time, error,
                                                         timeout_processing)
             finally:
@@ -125,7 +120,6 @@ class CpuAsyncTask:
 
                 if self.scheduler_stop_event.is_set() and not self.scheduler_started:
                     self._join_scheduler_thread()
-                    logger.info("Scheduler has fully stopped")
 
                 # Reduce the granularity of the lock
                 self.task_status_queue.put(("waiting", task_id, task_name, None, None, None, timeout_processing))
@@ -168,7 +162,7 @@ class CpuAsyncTask:
             # Check if there are any running tasks
             if not self.task_queue.empty() or not len(self.running_tasks) == 0:
                 if system_operations:
-                    logger.warning("Running tasks found, not stopping scheduler yet")
+                    logger.warning(f"Cpu asyncio task was detected to be running, and the task stopped terminating")
                     return
 
             if force_cleanup:
@@ -201,9 +195,6 @@ class CpuAsyncTask:
             self.scheduler_thread = None
             self.idle_timer = None
             self.task_results = {}
-
-            logger.info(
-                "Scheduler and event loop have stopped, all resources have been released and parameters reset")
 
     def _drain_task_status_queue(self) -> None:
         """
@@ -259,26 +250,26 @@ class CpuAsyncTask:
         :param future: Future object corresponding to the task.
         """
         try:
-            result = future.result()  # 获取任务结果，异常将在该处抛出
+            result = future.result()  # Get the task result, where the exception will be thrown
 
-            # 存储任务返回结果，最多保留2个结果
+            # The results returned by the storage task can be retained for a maximum of two results
             with self.lock:
                 if task_id not in self.task_results:
                     self.task_results[task_id] = []
                 self.task_results[task_id].append(result)
                 if len(self.task_results[task_id]) > 2:
-                    self.task_results[task_id].pop(0)  # 删除最旧的结果
+                    self.task_results[task_id].pop(0)  # Delete the oldest results
             if result != "error happened":
                 self.task_status_queue.put(("completed", task_id, None, None, time.time(), None, None))
+
+        except BrokenExecutor:
+            # Catch the error caused by the forced termination of the process separately
+            pass
         except Exception as e:
             logger.error(f"Cpu asyncio task | {task_id} | execution failed in callback: {e}")
-            with self.lock:
-                if task_id not in self.task_results:
-                    self.task_results[task_id] = []
-                self.task_results[task_id].append(f"error happened: {e}")
             self.task_status_queue.put(("failed", task_id, None, None, time.time(), e, None))
         finally:
-            # 确保 Future 对象被删除
+            # Make sure the Future object is deleted
             with self.lock:
                 if task_id in self.running_tasks:
                     del self.running_tasks[task_id]
