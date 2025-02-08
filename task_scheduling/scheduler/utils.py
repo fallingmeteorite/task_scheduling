@@ -74,9 +74,6 @@ class AwaitDetector:
     def get_task_status(self, task_name: str) -> bool or None:
         return self.task_status.get(task_name, None)
 
-
-detector = AwaitDetector()
-
 """
 import asyncio
 async def test_func():
