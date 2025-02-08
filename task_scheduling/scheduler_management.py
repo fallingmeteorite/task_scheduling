@@ -27,7 +27,8 @@ class TaskScheduler:
         self.timeout_check_interval: int = config["status_check_interval"]
         self._timeout_checker: Optional[threading.Timer]
 
-    def add_task(self, async_function: bool, function_type: str, timeout_processing: bool, task_name: str, task_id: str,
+    def add_task(self, delay: int, daily_time: str, async_function: bool, function_type: str, timeout_processing: bool,
+                 task_name: str, task_id: str,
                  func: Callable, *args, **kwargs):
         # Check if the task name is in the ban list
         if task_name in self.ban_task_names:
@@ -35,7 +36,9 @@ class TaskScheduler:
             return None
 
         self.core_task_queue.put(
-            (async_function, function_type, timeout_processing, task_name, task_id, func, args, kwargs))
+            (delay, daily_time, async_function, function_type, timeout_processing, task_name, task_id, func, args,
+             kwargs))
+        task_status_manager.add_task_status(task_id, task_name, "queuing", None, None, None, timeout_processing)
 
         if not self.allocator_started:
             self.allocator_started = True
@@ -45,7 +48,7 @@ class TaskScheduler:
     def _allocator(self):
         while self.allocator_running:
             if not self.core_task_queue.empty():
-                async_function, function_type, timeout_processing, task_name, task_id, func, args, kwargs = self.core_task_queue.get()
+                delay, daily_time, async_function, function_type, timeout_processing, task_name, task_id, func, args, kwargs = self.core_task_queue.get()
                 state = False
                 if async_function:
                     if function_type == "io":
@@ -58,6 +61,10 @@ class TaskScheduler:
                         state = io_liner_task.add_task(timeout_processing, task_name, task_id, func, *args, **kwargs)
                     if function_type == "cpu":
                         state = cpu_liner_task.add_task(timeout_processing, task_name, task_id, func, *args, **kwargs)
+
+                if function_type == "timer":
+                    timer_task.add_task(delay, daily_time, timeout_processing, task_name, task_id, func, *args,
+                                        **kwargs)
 
                 if not state:
                     self.core_task_queue.put(
@@ -100,6 +107,7 @@ class TaskScheduler:
         """
         Check for tasks that have exceeded their timeout time based on task start times.
         """
+        logger.warning("Start checking the status of all tasks and fix them")
         current_time = time.time()
         for task_id, task_status in task_status_manager.task_status_dict.items():
             if task_status['status'] == "running" and task_status['is_timeout_enabled']:
@@ -110,6 +118,7 @@ class TaskScheduler:
                     timer_task.force_stop_task(task_id)
                     cpu_liner_task.force_stop_task(task_id)
                     cpu_async_task.force_stop_task(task_id)
+
         self._start_timeout_checker()  # Restart the timer
 
     def _start_timeout_checker(self):
@@ -143,6 +152,12 @@ def shutdown(force_cleanup: bool) -> None:
         logger.info("Detected Cpu linear task scheduler is running, shutting down...")
         timer_task.stop_scheduler(force_cleanup)
         logger.info("Cpu linear task scheduler has been shut down.")
+
+    # Shutdown asynchronous task scheduler if running
+    if hasattr(cpu_async_task, "scheduler_started") and cpu_async_task.scheduler_started:
+        logger.info("Detected Cpu asyncio task scheduler is running, shutting down...")
+        cpu_async_task.stop_scheduler(force_cleanup)
+        logger.info("Cpu asyncio task scheduler has been shut down.")
 
     # Shutdown asynchronous task scheduler if running
     if hasattr(cpu_liner_task, "scheduler_started") and cpu_liner_task.scheduler_started:
