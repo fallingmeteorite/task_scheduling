@@ -37,21 +37,21 @@ def task_creation(delay: int or None, daily_time: str or None, function_type: st
     task_id = str(uuid.uuid4())
     async_function = is_async_function(func)
 
-    if async_function:
+    if async_function and not function_type == "timer":
         # Add asynchronous task
         task_scheduler.add_task(None, None, async_function, function_type, timeout_processing, task_name, task_id, func,
                                 *args,
                                 **kwargs)
 
-    if not async_function:
+    if not async_function and not function_type == "timer":
         # Add linear task
         task_scheduler.add_task(None, None, async_function, function_type, timeout_processing, task_name, task_id, func,
                                 *args,
                                 **kwargs)
 
-    if function_type == "time":
+    if function_type == "timer":
         # Add timer task
-        task_scheduler.add_task(delay, daily_time, None, function_type, timeout_processing, task_name, task_id, func,
+        task_scheduler.add_task(delay, daily_time, async_function, function_type, timeout_processing, task_name, task_id, func,
                                 *args,
                                 **kwargs)
 
