@@ -1,49 +1,75 @@
+# -*- coding: utf-8 -*-
+# Author: fallingmeteorite
+import inspect
+import json
+import os
 import threading
 import time
-from typing import Callable, Any
+from typing import Callable, Any, Optional
+
+from ..common import logger
 
 
 def is_async_function(func: Callable) -> bool:
     """
     Determine if a function is an asynchronous function.
 
-    :param func: The function to check
+    Args:
+        func (Callable): The function to check.
 
-    :return: True if the function is asynchronous; otherwise, False.
+    Returns:
+        bool: True if the function is asynchronous; otherwise, False.
     """
     return inspect.iscoroutinefunction(func)
 
 
 def interruptible_sleep(seconds: float or int) -> None:
-    # Create an event object
+    """
+    Sleep for a specified number of seconds, but can be interrupted by setting an event.
+
+    Args:
+        seconds (float or int): Number of seconds to sleep.
+    """
     event = threading.Event()
 
-    # Define a function that sets the event after a specified number of seconds
     def set_event():
         time.sleep(seconds)
         event.set()
 
-    # Start a thread to execute set_event functions
     thread = threading.Thread(target=set_event, daemon=True)
     thread.start()
 
-    # The main thread waits for the event to be set
     while not event.is_set():
         event.wait(0.01)
 
     thread.join(timeout=0)
 
 
-import inspect
-
-
 class AwaitDetector:
     def __init__(self):
+        """
+        Initialize the AwaitDetector class to keep track of whether tasks use the 'await' keyword.
+        """
         # Used to store the has_awaited status for different task_names
         self.task_status = {}
 
     # Used to detect the 'await' keyword in the code at runtime
-    async def run_with_detection(self, task_name: str, func: Callable, *args, **kwargs) -> Any:
+    async def run_with_detection(self,
+                                 task_name: str,
+                                 func: Callable,
+                                 *args, **kwargs) -> Any:
+        """
+        Run a task and detect if it uses the 'await' keyword.
+
+        Args:
+            task_name (str): The name of the task.
+            func (Callable): The function to execute.
+            *args: Positional arguments for the function.
+            **kwargs: Keyword arguments for the function.
+
+        Returns:
+            Any: Result of the task execution.
+        """
         # Initialize the status for the current task_name
         self.task_status[task_name] = False
 
@@ -66,22 +92,41 @@ class AwaitDetector:
         # Reset the status for the current task_name
         self.task_status[task_name] = False
 
-        if result is None:
-            return None
         return result
 
-    # Get the status of the specified task_name
-    def get_task_status(self, task_name: str) -> bool or None:
+    def get_task_status(self,
+                        task_name: str) -> bool or None:
+        """
+        Get the status of the specified task_name.
+
+        Args:
+            task_name (str): The name of the task.
+
+        Returns:
+            bool or None: True if the task used 'await', False if it did not, and None if the task_name is not found.
+        """
         return self.task_status.get(task_name, None)
 
 
+def get_package_directory() -> str:
+    """
+    Get the path of the directory containing the __init__.py file.
+
+    Returns:
+        str: Path of the package directory.
+    """
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+
 """
-import asyncio
+# Example usage of AwaitDetector
+detector = AwaitDetector()
+
 async def test_func():
     await asyncio.sleep(1)
     return "Done"
 
 asyncio.run(detector.run_with_detection("test", test_func))
-print(detector.get_task_status("test"))  
-# Output: True or False, depending on whether 'await' is used in test_func
+print(detector.get_task_status("test"))  # Output: True or False, depending on whether 'await' is used in test_func
 """
