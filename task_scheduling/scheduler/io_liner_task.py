@@ -4,7 +4,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, Future
 from functools import partial
-from typing import Callable, Dict, List, Tuple, Optional, Any
+from typing import Callable, Dict, Tuple, Optional, Any
 
 from ..common import logger
 from ..config import config
@@ -78,7 +78,7 @@ class IoLinerTask:
         self.idle_timer: Optional[threading.Timer] = None  # Idle timer
         self.idle_timeout = config["max_idle_time"]  # Idle timeout, default is 60 seconds
         self.idle_timer_lock = threading.Lock()  # Idle timer lock
-        self.task_results: Dict[str, List[Any]] = {}  # Store task return results, keep up to 2 results for each task ID
+        self.task_results: Dict[str, Any] = {}  # Store task return results, keep up to 2 results for each task ID
 
     # Add the task to the scheduler
     def add_task(self, timeout_processing: bool, task_name: str, task_id: str, func: Callable, *args, **kwargs) -> bool:
