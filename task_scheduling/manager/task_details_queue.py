@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+# Author: fallingmeteorite
 from collections import OrderedDict
 from typing import Dict, Optional, Union
 
@@ -7,12 +9,13 @@ from ..config import config
 class TaskStatusManager:
     __slots__ = ['task_status_dict', 'max_storage']
 
-    def __init__(self, max_storage: int = config["maximum_task_info_storage"]):
+    def __init__(self,
+                 max_storage: int = config["maximum_task_info_storage"]):
         """
         Initialize the task status manager.
 
-        :param max_storage: Maximum number of task status entries to store.
-
+        Args:
+            max_storage (int): Maximum number of task status entries to store. Defaults to the value from the configuration file.
         """
         self.task_status_dict: OrderedDict[str, Dict[str, Optional[Union[str, float, bool]]]] = OrderedDict()
         self.max_storage = max_storage
@@ -23,13 +26,15 @@ class TaskStatusManager:
                         is_timeout_enabled: Optional[bool] = None) -> None:
         """
         Add or update task status information in the dictionary.
-        :param task_name: Task Name.
-        :param task_id: Task ID.
-        :param status: Task status. If not provided, it is not updated.
-        :param start_time: The start time of the task in seconds. If not provided, the current time is used.
-        :param end_time: The end time of the task in seconds. If not provided, it is not updated.
-        :param error_info: Error information. If not provided, it is not updated.
-        :param is_timeout_enabled: Boolean indicating if timeout processing is enabled. If not provided, it is not updated.
+
+        Args:
+            task_id (str): Task ID.
+            task_name (str): Task Name.
+            status (Optional[str]): Task status. If not provided, it is not updated.
+            start_time (Optional[float]): The start time of the task in seconds. If not provided, the current time is used.
+            end_time (Optional[float]): The end time of the task in seconds. If not provided, it is not updated.
+            error_info (Optional[str]): Error information. If not provided, it is not updated.
+            is_timeout_enabled (Optional[bool]): Boolean indicating if timeout processing is enabled. If not provided, it is not updated.
         """
         if task_id not in self.task_status_dict:
             self.task_status_dict[task_id] = {
@@ -74,12 +79,16 @@ class TaskStatusManager:
             for k in to_remove:
                 self.task_status_dict.pop(k)
 
-    def get_task_status(self, task_id: str) -> Optional[Dict[str, Optional[Union[str, float, bool]]]]:
+    def get_task_status(self,
+                        task_id: str) -> Optional[Dict[str, Optional[Union[str, float, bool]]]]:
         """
         Retrieve task status information by task ID.
 
-        :param task_id: Task ID.
-        :return: Task status information as a dictionary, or None if the task ID is not found.
+        Args:
+            task_id (str): Task ID.
+
+        Returns:
+            Optional[Dict[str, Optional[Union[str, float, bool]]]]: Task status information as a dictionary, or None if the task ID is not found.
         """
         return self.task_status_dict.get(task_id)
 
@@ -87,6 +96,7 @@ class TaskStatusManager:
         """
         Retrieve all task status information.
 
-        :return: A copy of the dictionary containing all task status information.
+        Returns:
+            Dict[str, Dict[str, Optional[Union[str, float, bool]]]]: A copy of the dictionary containing all task status information.
         """
         return self.task_status_dict.copy()
