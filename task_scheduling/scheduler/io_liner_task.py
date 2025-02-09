@@ -205,13 +205,10 @@ class IoLinerTask:
             result = future.result()  # Get task result, exceptions will be raised here
 
             # Store task return results, keep up to 2 results
-            with self.lock:
-                if task_id not in self.task_results:
-                    self.task_results[task_id] = []
-                self.task_results[task_id].append(result)
-                if len(self.task_results[task_id]) > 2:
-                    self.task_results[task_id].pop(0)  # Remove the oldest result
             if not result == "error happened":
+                if result is not None:
+                    with self.lock:
+                        self.task_results[task_id] = result
                 task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None)
         finally:
             # Ensure the Future object is deleted
@@ -285,10 +282,9 @@ class IoLinerTask:
         :param task_id: Task ID.
         :return: Task return result, if the task is not completed or does not exist, return None.
         """
-        if task_id in self.task_results and self.task_results[task_id]:
-            result = self.task_results[task_id].pop(0)  # Return and delete the oldest result
+        if task_id in self.task_results:
+            result = self.task_results[task_id]
             with self.lock:
-                if not self.task_results[task_id]:
-                    del self.task_results[task_id]
+                del self.task_results[task_id]
             return result
         return None
