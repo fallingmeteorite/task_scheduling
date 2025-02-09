@@ -2,10 +2,10 @@ import asyncio
 import queue
 import threading
 import time
-from concurrent.futures import ProcessPoolExecutor, Future
+from concurrent.futures import ProcessPoolExecutor, Future, BrokenExecutor
 from functools import partial
 from multiprocessing import Manager, TimeoutError
-from typing import Callable, Dict, List, Tuple, Optional, Any
+from typing import Callable, Dict, Tuple, Optional, Any
 
 from ..common import logger
 from ..config import config
@@ -85,7 +85,7 @@ class CpuAsyncTask:
         self.idle_timer: Optional[threading.Timer] = None  # Idle timer
         self.idle_timeout = config["max_idle_time"]  # Idle timeout, default is 60 seconds
         self.idle_timer_lock = threading.Lock()  # Idle timer lock
-        self.task_results: Dict[str, List[Any]] = {}  # Store task return results, keep up to 2 results for each task ID
+        self.task_results: Dict[str, Any] = {}  # Store task return results, keep up to 2 results for each task ID
         self.task_status_queue = self.manager.Queue()  # Queue for task status updates
 
         # Start a thread to handle task status updates
@@ -251,12 +251,10 @@ class CpuAsyncTask:
             result = future.result()  # Get the task result, where the exception will be thrown
 
             # The results returned by the storage task can be retained for a maximum of two results
-            with self.lock:
-                if task_id not in self.task_results:
-                    self.task_results[task_id] = []
-                self.task_results[task_id].append(result)
-                if len(self.task_results[task_id]) > 2:
-                    self.task_results[task_id].pop(0)  # Delete the oldest results
+            if result is not None:
+                if not result == "error happened":
+                    with self.lock:
+                        self.task_results[task_id] = result
         except Exception as e:
             logger.error(f"Cpu asyncio task | {task_id} | execution failed in callback: {e}")
             self.task_status_queue.put(("failed", task_id, None, None, time.time(), e, None))
@@ -329,10 +327,9 @@ class CpuAsyncTask:
         :param task_id: Task ID.
         :return: Task return result, if the task is not completed or does not exist, return None.
         """
-        if task_id in self.task_results and self.task_results[task_id]:
-            result = self.task_results[task_id].pop(0)  # Return and delete the oldest result
+        if task_id in self.task_results:
             with self.lock:
-                if not self.task_results[task_id]:
-                    del self.task_results[task_id]
+                result = self.task_results[task_id]
+                del self.task_results[task_id]
             return result
         return None
