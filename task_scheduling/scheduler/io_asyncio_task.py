@@ -166,7 +166,7 @@ class IoAsyncTask:
             # Check if all tasks are completed
             if not all(q.empty() for q in self.task_queues.values()) or len(self.running_tasks) != 0:
                 if system_operations:
-                    logger.warning(f"Io asyncio task | detected running tasks | stopping operation terminated")
+                    logger.warning(f"Io asyncio task was detected to be running, and the task stopped terminating")
                     return None
 
             with self.condition:
@@ -175,7 +175,7 @@ class IoAsyncTask:
                 self.condition.notify_all()
 
             if force_cleanup:
-                logger.warning(f"Io asyncio task was detected to be running, and the task stopped terminating")
+                logger.warning("Force stopping scheduler and cleaning up tasks")
                 # Forcibly cancel all running tasks
                 task_manager.cancel_all_tasks()
                 self.scheduler_stop_event.set()
