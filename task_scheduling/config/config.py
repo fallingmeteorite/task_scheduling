@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+# Author: fallingmeteorite
 import os
 from functools import lru_cache
 from typing import Dict, Any
@@ -26,7 +28,7 @@ def load_config(file_path: str = None) -> bool:
     Load the configuration file into the global variable `config`.
 
     Args:
-        file_path (str): Path to the configuration file.
+        file_path (str): Path to the configuration file. If not provided, defaults to 'config.yaml' in the package directory.
 
     Returns:
         bool: Whether the configuration file was successfully loaded.
@@ -45,7 +47,8 @@ def load_config(file_path: str = None) -> bool:
     return False  # Return False indicating loading failure
 
 
-def update_config(key: str, value: Any) -> bool:
+def update_config(key: str,
+                  value: Any) -> bool:
     """
     Update a specific key-value pair in the global configuration dictionary.
     Changes are only applied in memory and do not persist to the file.
@@ -73,7 +76,7 @@ def save_config(file_path: str = None) -> bool:
     Save the current in-memory configuration to the configuration file.
 
     Args:
-        file_path (str): Path to the configuration file.
+        file_path (str): Path to the configuration file. If not provided, defaults to 'config.yaml' in the package directory.
 
     Returns:
         bool: Whether the configuration was successfully saved to the file.
@@ -92,8 +95,11 @@ def save_config(file_path: str = None) -> bool:
     return False
 
 
-# Load configuration file only when needed
 def ensure_config_loaded():
+    """
+    Ensure that the configuration file is loaded into the global variable `config`.
+    If the configuration is not loaded, attempt to load it and log a warning if loading fails.
+    """
     global config
     if not config and not load_config():
         logger.warning("Configuration file loading failed, the program may not run normally")
