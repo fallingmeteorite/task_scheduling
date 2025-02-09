@@ -11,7 +11,6 @@ ensure_config_loaded()
 
 from .queue_info_display import get_tasks_info
 from .scheduler import *
-from .task_creation import task_creation
-from .scheduler_management import shutdown
+from .task_creation import task_creation, shutdown
 
 __version__ = "2.0.0"
