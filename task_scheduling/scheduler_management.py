@@ -25,7 +25,9 @@ class TaskScheduler:
         self.allocator_started: bool = False
         self.allocator_thread: Optional[threading.Thread] = None
         self.timeout_check_interval: int = config["status_check_interval"]
-        self._timeout_checker: Optional[threading.Timer]
+        self._timeout_checker: Optional[threading.Timer] = None
+        if self._timeout_checker is not None:
+            self._start_timeout_checker()
 
     def add_task(self, delay: int, daily_time: str, async_function: bool, function_type: str, timeout_processing: bool,
                  task_name: str, task_id: str,
@@ -136,45 +138,22 @@ class TaskScheduler:
             self._timeout_checker.cancel()
             self._timeout_checker = None
 
+    def shutdown(self) -> None:
+        """
+        Clean up all resources in the task scheduler, stop running tasks, and empty the task queue.
+        """
+        logger.info("Starting shutdown process for TaskScheduler.")
 
-task_scheduler = TaskScheduler()
+        # Stop the task allocator
+        self.allocator_running = False
+        if self.allocator_thread and self.allocator_thread.is_alive():
+            self.allocator_thread.join()
+        logger.info("Allocator thread has been stopped.")
 
+        # Stop the timeout checker
+        self._stop_timeout_checker()
+        logger.info("Timeout checker has been stopped.")
 
-def shutdown(force_cleanup: bool) -> None:
-    """
-    :param force_cleanup: Force the end of a running task
-
-    Shutdown the scheduler, stop all tasks, and release resources.
-    Only checks if the scheduler is running and forces a shutdown if necessary.
-    """
-    # Shutdown asynchronous task scheduler if running
-    if hasattr(timer_task, "scheduler_started") and timer_task.scheduler_started:
-        logger.info("Detected Cpu linear task scheduler is running, shutting down...")
-        timer_task.stop_scheduler(force_cleanup)
-        logger.info("Cpu linear task scheduler has been shut down.")
-
-    # Shutdown asynchronous task scheduler if running
-    if hasattr(cpu_async_task, "scheduler_started") and cpu_async_task.scheduler_started:
-        logger.info("Detected Cpu asyncio task scheduler is running, shutting down...")
-        cpu_async_task.stop_scheduler(force_cleanup)
-        logger.info("Cpu asyncio task scheduler has been shut down.")
-
-    # Shutdown asynchronous task scheduler if running
-    if hasattr(cpu_liner_task, "scheduler_started") and cpu_liner_task.scheduler_started:
-        logger.info("Detected Cpu linear task scheduler is running, shutting down...")
-        cpu_liner_task.stop_scheduler(force_cleanup)
-        logger.info("Cpu linear task scheduler has been shut down.")
-
-    # Shutdown asynchronous task scheduler if running
-    if hasattr(io_async_task, "scheduler_started") and io_async_task.scheduler_started:
-        logger.info("Detected io asyncio task scheduler is running, shutting down...")
-        io_async_task.stop_all_schedulers(force_cleanup)
-        logger.info("Io asyncio task scheduler has been shut down.")
-
-    # Shutdown linear task scheduler if running
-    if hasattr(io_liner_task, "scheduler_started") and io_liner_task.scheduler_started:
-        logger.info("Detected io linear task scheduler is running, shutting down...")
-        io_liner_task.stop_scheduler(force_cleanup)
-        logger.info("Io linear task scheduler has been shut down.")
-
-    logger.info("All scheduler has been shut down.")
+        # Clear the core task queue
+        with self.core_task_queue.mutex:
+            self.core_task_queue.queue.clear()
