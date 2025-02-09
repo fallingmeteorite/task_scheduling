@@ -3,13 +3,13 @@ import threading
 import time
 from concurrent.futures import ProcessPoolExecutor, Future
 from functools import partial
-from multiprocessing import Manager
+from multiprocessing import Manager, TimeoutError
 from typing import Callable, Dict, List, Tuple, Optional, Any
 
 from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
-from ..stopit import TaskManager, ThreadingTimeout, TimeoutException
+from ..stopit import TaskManager
 
 # Create Manager instance
 task_manager = TaskManager()
@@ -24,13 +24,10 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict], task_statu
 
         logger.info(f"Start running cpu linear task, task ID: {task_id}")
         if timeout_processing:
-            with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
-                result = func(*args, **kwargs)
-                return_results = result
+            return_results = func(*args, **kwargs)
         else:
-            result = func(*args, **kwargs)
-            return_results = result
-    except TimeoutException:
+            return_results = func(*args, **kwargs)
+    except TimeoutError:
         logger.warning(f"Cpu linear task | {task_id} | timed out, forced termination")
         task_status_queue.put(("timeout", task_id, task_name, None, None, None, timeout_processing))
         return_results = "error happened"
@@ -82,9 +79,6 @@ class CpuLinerTask:
                 if not self.task_status_queue.empty():
                     status, task_id, task_name, start_time, end_time, error, timeout_processing = self.task_status_queue.get(
                         timeout=1)
-                    # Terminate the running process in a timely manner
-                    if status in ["completed", "failed", "timeout"]:
-                        task_manager.terminate_task(task_id)
                     task_status_manager.add_task_status(task_id, task_name, status, start_time, end_time, error,
                                                         timeout_processing)
             finally:
@@ -95,7 +89,7 @@ class CpuLinerTask:
         try:
             with self.scheduler_lock:
 
-                if self.task_queue.qsize() >= config["io_liner_task"]:
+                if self.task_queue.qsize() >= config["cpu_liner_task"]:
                     logger.warning(f"Cpu linear task | {task_id} | not added, queue is full")
                     return False
 
@@ -147,7 +141,7 @@ class CpuLinerTask:
             # Check if there are any running tasks
             if not self.task_queue.empty() or not len(self.running_tasks) == 0:
                 if system_operations:
-                    logger.warning(f"Cpu linear task was detected to be running, and the task stopped terminating")
+                    logger.warning(f"Cpu liner task | detected running tasks | stopping operation terminated")
                     return None
 
             if force_cleanup:
@@ -198,6 +192,7 @@ class CpuLinerTask:
                 with self.lock:
                     future = executor.submit(_execute_task, task, self.task_status_queue)
                     process = next(iter(executor._processes.values()))
+
                     task_manager.add(None, None, process, task_id)
                     self.running_tasks[task_id] = [future, task_name, process]
 
@@ -224,13 +219,11 @@ class CpuLinerTask:
                 self.task_results[task_id].append(result)
                 if len(self.task_results[task_id]) > 2:
                     self.task_results[task_id].pop(0)  # Delete the oldest results
-            if result != "error happened":
-                self.task_status_queue.put(("completed", task_id, None, None, time.time(), None, None))
         except Exception as e:
             logger.error(f"Cpu linear task | {task_id} | execution failed in callback: {e}")
             self.task_status_queue.put(("failed", task_id, None, None, time.time(), e, None))
         finally:
-            # Make sure that the Future object is deleted
+            # Make sure the Future object is deleted
             with self.lock:
                 if task_id in self.running_tasks:
                     del self.running_tasks[task_id]
