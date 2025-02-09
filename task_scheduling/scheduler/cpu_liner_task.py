@@ -48,7 +48,7 @@ class CpuLinerTask:
         'task_queue', 'running_tasks', 'lock', 'condition', 'scheduler_lock',
         'scheduler_started', 'scheduler_stop_event', 'scheduler_thread',
         'idle_timer', 'idle_timeout', 'idle_timer_lock', 'task_results',
-        'task_status_queue', 'status_thread'
+        'task_status_queue', 'status_thread', 'executor'
     ]
 
     def __init__(self) -> None:
@@ -68,6 +68,7 @@ class CpuLinerTask:
         self.idle_timer_lock = threading.Lock()  # Idle timer lock
         self.task_results: Dict[str, Any] = {}  # Store task return results, keep up to 2 results for each task ID
         self.task_status_queue = manager.Queue()  # Queue for task status updates
+        self.executor: Optional[ProcessPoolExecutor]
 
         # Start a thread to handle task status updates
         self.status_thread = threading.Thread(target=self._handle_task_status_updates, daemon=True)
@@ -146,9 +147,13 @@ class CpuLinerTask:
 
             if force_cleanup:
                 logger.warning("Force stopping scheduler and cleaning up tasks")
-                task_manager.terminate_all_tasks()
+                # Ensure the executor is properly shut down
+                self.executor.shutdown(wait=False, cancel_futures=True)
+                # Wait for all running tasks to complete
                 self.scheduler_stop_event.set()
             else:
+                # Ensure the executor is properly shut down
+                self.executor.shutdown(wait=True, cancel_futures=True)
                 # Wait for all running tasks to complete
                 self.scheduler_stop_event.set()
 
@@ -175,6 +180,7 @@ class CpuLinerTask:
         Scheduler function, fetch tasks from the task queue and submit them to the process pool for execution.
         """
         with ProcessPoolExecutor(max_workers=int(config["io_liner_task"])) as executor:
+            self.executor = executor
             while not self.scheduler_stop_event.is_set():
                 with self.condition:
                     while self.task_queue.empty() and not self.scheduler_stop_event.is_set():
@@ -197,9 +203,6 @@ class CpuLinerTask:
                     self.running_tasks[task_id] = [future, task_name, process]
 
                     future.add_done_callback(partial(self._task_done, task_id))
-
-            # Ensure the executor is properly shut down
-            executor.shutdown(wait=False)
 
     # A function that executes a task
     def _task_done(self, task_id: str, future: Future) -> None:
