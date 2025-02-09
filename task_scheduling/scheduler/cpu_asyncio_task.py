@@ -2,7 +2,7 @@ import asyncio
 import queue
 import threading
 import time
-from concurrent.futures import ProcessPoolExecutor, Future, BrokenExecutor
+from concurrent.futures import ProcessPoolExecutor, Future
 from functools import partial
 from multiprocessing import Manager, TimeoutError
 from typing import Callable, Dict, Tuple, Optional, Any
@@ -67,7 +67,7 @@ class CpuAsyncTask:
         'task_queue', 'running_tasks', 'lock', 'condition', 'scheduler_lock',
         'scheduler_started', 'scheduler_stop_event', 'scheduler_thread',
         'idle_timer', 'idle_timeout', 'idle_timer_lock', 'task_tasks', 'task_status_queue',
-        'status_thread', 'manager', 'task_results'
+        'status_thread', 'manager', 'task_results', 'executor'
     ]
 
     def __init__(self) -> None:
@@ -87,6 +87,8 @@ class CpuAsyncTask:
         self.idle_timer_lock = threading.Lock()  # Idle timer lock
         self.task_results: Dict[str, Any] = {}  # Store task return results, keep up to 2 results for each task ID
         self.task_status_queue = self.manager.Queue()  # Queue for task status updates
+
+        self.executor: Optional[ProcessPoolExecutor]
 
         # Start a thread to handle task status updates
         self.status_thread = threading.Thread(target=self._handle_task_status_updates, daemon=True)
@@ -165,9 +167,12 @@ class CpuAsyncTask:
 
             if force_cleanup:
                 logger.warning("Force stopping scheduler and cleaning up tasks")
-                task_manager.terminate_all_tasks()
+                self.executor.shutdown(wait=False, cancel_futures=True)
+                # Wait for all running tasks to complete
                 self.scheduler_stop_event.set()
             else:
+                # Ensure the executor is properly shut down
+                self.executor.shutdown(wait=True, cancel_futures=True)
                 # Wait for all running tasks to complete
                 self.scheduler_stop_event.set()
 
@@ -213,6 +218,7 @@ class CpuAsyncTask:
         Scheduler function, fetch tasks from the task queue and submit them to the process pool for execution.
         """
         with ProcessPoolExecutor(max_workers=int(config["cpu_asyncio_task"])) as executor:
+            self.executor = executor
             while not self.scheduler_stop_event.is_set():
                 with self.condition:
                     while self.task_queue.empty() and not self.scheduler_stop_event.is_set():
