@@ -28,14 +28,14 @@ class TaskScheduler:
         if self._timeout_checker is not None:
             self._start_timeout_checker()
 
-    def add_task(self, delay: int, daily_time: str, async_function: bool, function_type: str, timeout_processing: bool,
+    def add_task(self, delay: int or None, daily_time: str or None, async_function: bool, function_type: str,
+                 timeout_processing: bool,
                  task_name: str, task_id: str,
                  func: Callable, *args, **kwargs):
         # Check if the task name is in the ban list
         if task_name in self.ban_task_names:
             logger.warning(f"Task name '{task_name}' is banned, cannot add task.")
             return None
-
         self.core_task_queue.put(
             (delay, daily_time, async_function, function_type, timeout_processing, task_name, task_id, func, args,
              kwargs))
@@ -64,12 +64,13 @@ class TaskScheduler:
                         state = cpu_liner_task.add_task(timeout_processing, task_name, task_id, func, *args, **kwargs)
 
                 if function_type == "timer":
-                    timer_task.add_task(delay, daily_time, timeout_processing, task_name, task_id, func, *args,
+                    state = timer_task.add_task(delay, daily_time, timeout_processing, task_name, task_id, func, *args,
                                         **kwargs)
 
                 if not state:
                     self.core_task_queue.put(
-                        (async_function, function_type, timeout_processing, task_name, task_id, func, args, kwargs))
+                        (delay, daily_time, async_function, function_type, timeout_processing, task_name, task_id, func,
+                         args, kwargs))
 
             else:
                 time.sleep(0.1)
