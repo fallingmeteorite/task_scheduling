@@ -15,8 +15,7 @@ def is_banana(item: Tuple, task_name: str) -> bool:
 
 class TaskScheduler:
     __slots__ = ['ban_task_names', 'core_task_queue', 'allocator_running', 'allocator_started', 'allocator_thread',
-                 'timeout_check_interval',
-                 '_timeout_checker']
+                 'timeout_check_interval', '_timeout_checker']
 
     def __init__(self):
         self.ban_task_names: List[str] = []
