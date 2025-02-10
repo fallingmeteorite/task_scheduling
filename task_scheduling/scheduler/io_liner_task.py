@@ -13,7 +13,7 @@ from ..manager import task_status_manager
 from ..stopit import ThreadTaskManager, skip_on_demand, StopException, ThreadingTimeout, TimeoutException
 
 # Create Manager instance
-task_manager = ThreadTaskManager()
+_task_manager = ThreadTaskManager()
 
 
 def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
@@ -37,19 +37,17 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
     return_results = None
     try:
         with skip_on_demand() as skip_ctx:
-            task_manager.add(None, skip_ctx, task_id)
+            _task_manager.add(None, skip_ctx, task_id)
 
             task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None, None)
             logger.info(f"Start running io linear task, task ID: {task_id}")
             if timeout_processing:
                 with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
-
                     return_results = func(*args, **kwargs)
             else:
-
                 return_results = func(*args, **kwargs)
 
-        task_manager.remove(task_id)
+        _task_manager.remove(task_id)
     except TimeoutException:
         logger.warning(f"Io linear task | {task_id} | timed out, forced termination")
         task_status_manager.add_task_status(task_id, None, "timeout", None, None, None, None)
@@ -62,8 +60,8 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
         task_status_manager.add_task_status(task_id, None, "failed", None, None, e, None)
         return_results = "error happened"
     finally:
-        if task_manager.check(task_id):
-            task_manager.remove(task_id)
+        if _task_manager.check(task_id):
+            _task_manager.remove(task_id)
         return return_results
 
 
@@ -72,33 +70,33 @@ class IoLinerTask:
     Linear task manager class, responsible for managing the scheduling, execution, and monitoring of linear tasks.
     """
     __slots__ = [
-        'task_queue', 'running_tasks',
-        'lock', 'condition', 'scheduler_lock',
-        'scheduler_started', 'scheduler_stop_event', 'scheduler_thread',
-        'idle_timer', 'idle_timeout', 'idle_timer_lock',
-        'task_results'
+        '_task_queue', '_running_tasks',
+        '_lock', '_condition', '_scheduler_lock',
+        '_scheduler_started', '_scheduler_stop_event', '_scheduler_thread',
+        '_idle_timer', '_idle_timeout', '_idle_timer_lock',
+        '_task_results'
     ]
 
     def __init__(self) -> None:
         """
         Initialize the IoLinerTask manager.
         """
-        self.task_queue = queue.Queue()  # Task queue
-        self.running_tasks = {}  # Running tasks
+        self._task_queue = queue.Queue()  # Task queue
+        self._running_tasks = {}  # Running tasks
 
-        self.lock = threading.Lock()  # Lock to protect access to shared resources
-        self.scheduler_lock = threading.RLock()  # Reentrant lock for scheduler operations
-        self.condition = threading.Condition()  # Condition variable for thread synchronization
+        self._lock = threading.Lock()  # Lock to protect access to shared resources
+        self._scheduler_lock = threading.RLock()  # Reentrant lock for scheduler operations
+        self._condition = threading.Condition()  # Condition variable for thread synchronization
 
-        self.scheduler_started = False  # Whether the scheduler thread has started
-        self.scheduler_stop_event = threading.Event()  # Scheduler thread stop event
-        self.scheduler_thread: Optional[threading.Thread] = None  # Scheduler thread
+        self._scheduler_started = False  # Whether the scheduler thread has started
+        self._scheduler_stop_event = threading.Event()  # Scheduler thread stop event
+        self._scheduler_thread: Optional[threading.Thread] = None  # Scheduler thread
 
-        self.idle_timer: Optional[threading.Timer] = None  # Idle timer
-        self.idle_timeout = config["max_idle_time"]  # Idle timeout, default is 60 seconds
-        self.idle_timer_lock = threading.Lock()  # Idle timer lock
+        self._idle_timer: Optional[threading.Timer] = None  # Idle timer
+        self._idle_timeout = config["max_idle_time"]  # Idle timeout, default is 60 seconds
+        self._idle_timer_lock = threading.Lock()  # Idle timer lock
 
-        self.task_results: Dict[str, Any] = {}  # Store task return results, keep up to 2 results for each task ID
+        self._task_results: Dict[str, Any] = {}  # Store task return results, keep up to 2 results for each task ID
 
     # Add the task to the scheduler
     def add_task(self,
@@ -123,29 +121,29 @@ class IoLinerTask:
             bool: Whether the task was successfully added.
         """
         try:
-            with self.scheduler_lock:
+            with self._scheduler_lock:
 
-                if self.task_queue.qsize() >= config["io_liner_task"]:
+                if self._task_queue.qsize() >= config["io_liner_task"]:
                     logger.warning(f"Io linear task | {task_id} | not added, queue is full")
                     return False
 
-                if task_name in [details[1] for details in self.running_tasks.values()]:
+                if task_name in [details[1] for details in self._running_tasks.values()]:
                     logger.warning(f"Io linear task | {task_id} | not added, task name already running")
                     return False
 
-                if self.scheduler_stop_event.is_set() and not self.scheduler_started:
+                if self._scheduler_stop_event.is_set() and not self._scheduler_started:
                     self._join_scheduler_thread()
 
                 # Reduce the granularity of the lock
                 task_status_manager.add_task_status(task_id, None, "waiting", None, None, None, None)
 
-                self.task_queue.put((timeout_processing, task_name, task_id, func, args, kwargs))
+                self._task_queue.put((timeout_processing, task_name, task_id, func, args, kwargs))
 
-                if not self.scheduler_started:
+                if not self._scheduler_started:
                     self._start_scheduler()
 
-                with self.condition:
-                    self.condition.notify()
+                with self._condition:
+                    self._condition.notify()
 
                 self._cancel_idle_timer()
 
@@ -159,9 +157,9 @@ class IoLinerTask:
         """
         Start the scheduler thread.
         """
-        self.scheduler_started = True
-        self.scheduler_thread = threading.Thread(target=self._scheduler, daemon=True)
-        self.scheduler_thread.start()
+        self._scheduler_started = True
+        self._scheduler_thread = threading.Thread(target=self._scheduler, daemon=True)
+        self._scheduler_thread.start()
 
     # Stop the scheduler
     def stop_scheduler(self,
@@ -174,9 +172,9 @@ class IoLinerTask:
                               If False, gracefully stop the scheduler (e.g., due to idle timeout).
         :param system_operations: System execution metrics.
         """
-        with self.scheduler_lock:
+        with self._scheduler_lock:
             # Check if all tasks are completed
-            if not self.task_queue.empty() or not len(self.running_tasks) == 0:
+            if not self._task_queue.empty() or not len(self._running_tasks) == 0:
                 if system_operations:
                     logger.warning(f"Io liner task was detected to be running, and the task stopped terminating")
                     return None
@@ -184,27 +182,27 @@ class IoLinerTask:
             if force_cleanup:
                 logger.warning("Force stopping scheduler and cleaning up tasks")
                 # Force stop all running tasks
-                task_manager.skip_all_tasks()
-                self.scheduler_stop_event.set()
+                _task_manager.skip_all_tasks()
+                self._scheduler_stop_event.set()
             else:
-                self.scheduler_stop_event.set()
+                self._scheduler_stop_event.set()
 
             # Clear the task queue
             self._clear_task_queue()
 
             # Notify all waiting threads
-            with self.condition:
-                self.condition.notify_all()
+            with self._condition:
+                self._condition.notify_all()
 
             # Wait for the scheduler thread to finish
             self._join_scheduler_thread()
 
             # Reset state variables
-            self.scheduler_started = False
-            self.scheduler_stop_event.clear()
-            self.scheduler_thread = None
-            self.idle_timer = None
-            self.task_results = {}
+            self._scheduler_started = False
+            self._scheduler_stop_event.clear()
+            self._scheduler_thread = None
+            self._idle_timer = None
+            self._task_results = {}
 
             logger.info(
                 "Scheduler and event loop have stopped, all resources have been released and parameters reset")
@@ -215,23 +213,23 @@ class IoLinerTask:
         Scheduler function, fetch tasks from the task queue and submit them to the thread pool for execution.
         """
         with ThreadPoolExecutor(max_workers=int(config["io_liner_task"])) as executor:
-            while not self.scheduler_stop_event.is_set():
-                with self.condition:
-                    while self.task_queue.empty() and not self.scheduler_stop_event.is_set():
-                        self.condition.wait()
+            while not self._scheduler_stop_event.is_set():
+                with self._condition:
+                    while self._task_queue.empty() and not self._scheduler_stop_event.is_set():
+                        self._condition.wait()
 
-                    if self.scheduler_stop_event.is_set():
+                    if self._scheduler_stop_event.is_set():
                         break
 
-                    if self.task_queue.qsize() == 0:
+                    if self._task_queue.qsize() == 0:
                         continue
 
-                    task = self.task_queue.get()
+                    task = self._task_queue.get()
 
                 timeout_processing, task_name, task_id, func, args, kwargs = task
-                with self.lock:
+                with self._lock:
                     future = executor.submit(_execute_task, task)
-                    self.running_tasks[task_id] = [future, task_name]
+                    self._running_tasks[task_id] = [future, task_name]
 
                     future.add_done_callback(partial(self._task_done, task_id))
 
@@ -251,21 +249,21 @@ class IoLinerTask:
             # Store task return results, keep up to 2 results
             if result != "error happened":
                 if result is not None:
-                    with self.lock:
-                        self.task_results[task_id] = result
+                    with self._lock:
+                        self._task_results[task_id] = result
                 task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None)
         except Exception as e:
             logger.error(f"Io linear task | {task_id} | execution failed in callback: {e}")
             task_status_manager.add_task_status(task_id, None, "failed", None, None, e, None)
         finally:
             # Ensure the Future object is deleted
-            with self.lock:
-                if task_id in self.running_tasks:
-                    del self.running_tasks[task_id]
+            with self._lock:
+                if task_id in self._running_tasks:
+                    del self._running_tasks[task_id]
 
             # Check if all tasks are completed
-            with self.lock:
-                if self.task_queue.empty() and len(self.running_tasks) == 0:
+            with self._lock:
+                if self._task_queue.empty() and len(self._running_tasks) == 0:
                     self._reset_idle_timer()
 
     # The task scheduler closes the countdown
@@ -273,34 +271,34 @@ class IoLinerTask:
         """
         Reset the idle timer.
         """
-        with self.idle_timer_lock:
-            if self.idle_timer is not None:
-                self.idle_timer.cancel()
-            self.idle_timer = threading.Timer(self.idle_timeout, self.stop_scheduler, args=(False, True,))
-            self.idle_timer.start()
+        with self._idle_timer_lock:
+            if self._idle_timer is not None:
+                self._idle_timer.cancel()
+            self._idle_timer = threading.Timer(self._idle_timeout, self.stop_scheduler, args=(False, True,))
+            self._idle_timer.start()
 
     def _cancel_idle_timer(self) -> None:
         """
         Cancel the idle timer.
         """
-        with self.idle_timer_lock:
-            if self.idle_timer is not None:
-                self.idle_timer.cancel()
-                self.idle_timer = None
+        with self._idle_timer_lock:
+            if self._idle_timer is not None:
+                self._idle_timer.cancel()
+                self._idle_timer = None
 
     def _clear_task_queue(self) -> None:
         """
         Clear the task queue.
         """
-        while not self.task_queue.empty():
-            self.task_queue.get(timeout=1)
+        while not self._task_queue.empty():
+            self._task_queue.get(timeout=1)
 
     def _join_scheduler_thread(self) -> None:
         """
         Wait for the scheduler thread to finish.
         """
-        if self.scheduler_thread and self.scheduler_thread.is_alive():
-            self.scheduler_thread.join()
+        if self._scheduler_thread and self._scheduler_thread.is_alive():
+            self._scheduler_thread.join()
 
     def force_stop_task(self,
                         task_id: str) -> bool:
@@ -311,16 +309,16 @@ class IoLinerTask:
 
         :return: bool: Whether the task was successfully force stopped.
         """
-        if not task_manager.check(task_id):
+        if not _task_manager.check(task_id):
             logger.warning(f"Io linear task | {task_id} | does not exist or is already completed")
             return False
 
-        task_manager.skip_task(task_id)
+        _task_manager.skip_task(task_id)
 
         task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None)
-        with self.lock:
-            if task_id in self.task_results:
-                del self.task_results[task_id]
+        with self._lock:
+            if task_id in self._task_results:
+                del self._task_results[task_id]
         return True
 
     # Obtain the information returned by the corresponding task
@@ -333,9 +331,9 @@ class IoLinerTask:
 
         :return: Optional[Any]: Task return result, or None if the task is not completed or does not exist.
         """
-        if task_id in self.task_results:
-            result = self.task_results[task_id]
-            with self.lock:
-                del self.task_results[task_id]
+        if task_id in self._task_results:
+            result = self._task_results[task_id]
+            with self._lock:
+                del self._task_results[task_id]
             return result
         return None

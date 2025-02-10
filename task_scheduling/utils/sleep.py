@@ -12,16 +12,16 @@ def interruptible_sleep(seconds: float or int) -> None:
     Args:
         seconds (float or int): Number of seconds to sleep.
     """
-    event = threading.Event()
+    _event = threading.Event()
 
     def set_event():
         time.sleep(seconds)
-        event.set()
+        _event.set()
 
-    thread = threading.Thread(target=set_event, daemon=True)
-    thread.start()
+    _thread = threading.Thread(target=set_event, daemon=True)
+    _thread.start()
 
-    while not event.is_set():
-        event.wait(0.01)
+    while not _event.is_set():
+        _event.wait(0.01)
 
-    thread.join(timeout=0)
+    _thread.join(timeout=0)

@@ -7,7 +7,7 @@ from .config import config
 from .manager import task_status_manager
 
 
-def format_tasks_info(tasks_dict):
+def format_tasks_info(tasks_dict) -> str:
     # Initialize counters
     tasks_queue_size = 0
     running_tasks_count = 0
@@ -55,5 +55,5 @@ def format_tasks_info(tasks_dict):
     return output
 
 
-def get_tasks_info():
+def get_tasks_info() -> str:
     return format_tasks_info(task_status_manager.task_status_dict)

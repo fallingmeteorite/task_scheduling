@@ -71,27 +71,27 @@ def shutdown(force_cleanup: bool) -> None:
     task_scheduler.shutdown()
 
     # Shutdown scheduler if running
-    if hasattr(timer_task, "scheduler_started") and timer_task.scheduler_started:
+    if hasattr(timer_task, "_scheduler_started") and timer_task._scheduler_started:
         logger.info("Detected Timer task scheduler is running, shutting down...")
         timer_task.stop_scheduler(force_cleanup)
 
     # Shutdown scheduler if running
-    if hasattr(cpu_async_task, "scheduler_started") and cpu_async_task.scheduler_started:
+    if hasattr(cpu_async_task, "_scheduler_started") and cpu_async_task._scheduler_started:
         logger.info("Detected Cpu asyncio task scheduler is running, shutting down...")
         cpu_async_task.stop_scheduler(force_cleanup)
 
     # Shutdown scheduler if running
-    if hasattr(cpu_liner_task, "scheduler_started") and cpu_liner_task.scheduler_started:
+    if hasattr(cpu_liner_task, "_scheduler_started") and cpu_liner_task._scheduler_started:
         logger.info("Detected Cpu linear task scheduler is running, shutting down...")
         cpu_liner_task.stop_scheduler(force_cleanup)
 
     # Shutdown scheduler if running
-    if hasattr(io_async_task, "scheduler_started") and io_async_task.scheduler_started:
+    if hasattr(io_async_task, "_scheduler_started") and io_async_task._scheduler_started:
         logger.info("Detected io asyncio task scheduler is running, shutting down...")
         io_async_task.stop_all_schedulers(force_cleanup)
 
     # Shutdown scheduler if running
-    if hasattr(io_liner_task, "scheduler_started") and io_liner_task.scheduler_started:
+    if hasattr(io_liner_task, "_scheduler_started") and io_liner_task._scheduler_started:
         logger.info("Detected io linear task scheduler is running, shutting down...")
         io_liner_task.stop_scheduler(force_cleanup)
 

@@ -10,7 +10,7 @@ class AwaitDetector:
         Initialize the AwaitDetector class to keep track of whether tasks use the 'await' keyword.
         """
         # Used to store the has_awaited status for different task_names
-        self.task_status = {}
+        self._task_status = {}
 
     # Used to detect the 'await' keyword in the code at runtime
     async def run_with_detection(self,
@@ -30,7 +30,7 @@ class AwaitDetector:
             Any: Result of the task execution.
         """
         # Initialize the status for the current task_name
-        self.task_status[task_name] = False
+        self._task_status[task_name] = False
 
         # Check if the function is a coroutine function
         if not inspect.iscoroutinefunction(func):
@@ -40,7 +40,7 @@ class AwaitDetector:
         try:
             source = inspect.getsource(func)
             if "await" in source:
-                self.task_status[task_name] = True
+                self._task_status[task_name] = True
         except (OSError, TypeError):
             # If the source code cannot be obtained (e.g., built-in functions), skip static checking
             pass
@@ -49,7 +49,7 @@ class AwaitDetector:
         result = await func(*args, **kwargs)
 
         # Reset the status for the current task_name
-        self.task_status[task_name] = False
+        self._task_status[task_name] = False
 
         return result
 
@@ -64,7 +64,7 @@ class AwaitDetector:
         Returns:
             bool or None: True if the task used 'await', False if it did not, and None if the task_name is not found.
         """
-        return self.task_status.get(task_name, None)
+        return self._task_status.get(task_name, None)
 
 
 """

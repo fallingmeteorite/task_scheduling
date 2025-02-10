@@ -6,7 +6,7 @@ from loguru import logger
 
 # Hardcoded log format for performance
 # The log format includes the timestamp, log level, name of the file and line number where the log was generated, and the log message
-DEFAULT_FORMAT: str = (
+_DEFAULT_FORMAT: str = (
     "<g>{time:YYYY-MM-DD HH:mm:ss}</g> "  # Timestamp, formatted as year-month-day hour:minute:second, displayed in green
     "[<lvl>{level}</lvl>] "  # Log level, automatically colored based on the level
     "<c><u>{name}:{line}</u></c> | "  # Name of the file and line number where the log was generated, displayed in cyan with underline
@@ -14,7 +14,7 @@ DEFAULT_FORMAT: str = (
 )
 
 # Default log level
-LOG_LEVEL: str = "INFO"
+_LOG_LEVEL: str = "INFO"
 
 # Flag to check if logger is already configured
 _logger_configured: bool = False
@@ -36,8 +36,8 @@ def configure_logger():
     # Configure logger to output to console with the specified format, level, and features
     logger.add(
         sys.stdout,
-        format=DEFAULT_FORMAT,  # Use the predefined log format
-        level=LOG_LEVEL,  # Set the default log level
+        format=_DEFAULT_FORMAT,  # Use the predefined log format
+        level=_LOG_LEVEL,  # Set the default log level
         colorize=True,  # Enable log colorization
         backtrace=True,  # Enable backtrace in case of exceptions
         diagnose=True  # Enable diagnostic information in case of exceptions

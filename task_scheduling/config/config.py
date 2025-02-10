@@ -13,7 +13,7 @@ config: Dict = {}
 
 
 @lru_cache(maxsize=1)
-def get_package_directory() -> str:
+def _get_package_directory() -> str:
     """
     Get the path of the directory containing the __init__.py file.
 
@@ -23,21 +23,21 @@ def get_package_directory() -> str:
     return os.path.dirname(os.path.abspath(__file__))
 
 
-def load_config(file_path: str = None) -> bool:
+def _load_config(_file_path: str = None) -> bool:
     """
     Load the configuration file into the global variable `config`.
 
     Args:
-        file_path (str): Path to the configuration file. If not provided, defaults to 'config.yaml' in the package directory.
+        _file_path (str): Path to the configuration file. If not provided, defaults to 'config.yaml' in the package directory.
 
     Returns:
         bool: Whether the configuration file was successfully loaded.
     """
-    if file_path is None:
-        file_path = f'{get_package_directory()}/config.yaml'
+    if _file_path is None:
+        _file_path = f'{_get_package_directory()}/config.yaml'
 
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(_file_path, 'r', encoding='utf-8') as f:
             # Safely load the YAML file using yaml.safe_load
             global config
             config.update(yaml.safe_load(f) or {})
@@ -71,21 +71,21 @@ def update_config(key: str,
     return False  # Return False indicating update failure
 
 
-def save_config(file_path: str = None) -> bool:
+def _save_config(_file_path: str = None) -> bool:
     """
     Save the current in-memory configuration to the configuration file.
 
     Args:
-        file_path (str): Path to the configuration file. If not provided, defaults to 'config.yaml' in the package directory.
+        _file_path (str): Path to the configuration file. If not provided, defaults to 'config.yaml' in the package directory.
 
     Returns:
         bool: Whether the configuration was successfully saved to the file.
     """
-    if file_path is None:
-        file_path = f'{get_package_directory()}/config.yaml'
+    if _file_path is None:
+        _file_path = f'{_get_package_directory()}/config.yaml'
 
     try:
-        with open(file_path, 'w', encoding='utf-8') as f:
+        with open(_file_path, 'w', encoding='utf-8') as f:
             global config
             yaml.safe_dump(config, f, default_flow_style=False, allow_unicode=True)
         logger.info("Configuration saved to file successfully")
@@ -101,5 +101,5 @@ def ensure_config_loaded():
     If the configuration is not loaded, attempt to load it and log a warning if loading fails.
     """
     global config
-    if not config and not load_config():
+    if not config and not _load_config():
         logger.warning("Configuration file loading failed, the program may not run normally")

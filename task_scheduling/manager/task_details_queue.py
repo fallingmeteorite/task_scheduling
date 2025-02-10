@@ -7,18 +7,14 @@ from ..config import config
 
 
 class TaskStatusManager:
-    __slots__ = ['task_status_dict', 'max_storage']
+    __slots__ = ['_task_status_dict', '_max_storage']
 
-    def __init__(self,
-                 max_storage: int = config["maximum_task_info_storage"]):
+    def __init__(self) -> None:
         """
         Initialize the task status manager.
-
-        Args:
-            max_storage (int): Maximum number of task status entries to store. Defaults to the value from the configuration file.
         """
-        self.task_status_dict: OrderedDict[str, Dict[str, Optional[Union[str, float, bool]]]] = OrderedDict()
-        self.max_storage = max_storage
+        self._task_status_dict: OrderedDict[str, Dict[str, Optional[Union[str, float, bool]]]] = OrderedDict()
+        self._max_storage = config["maximum_task_info_storage"]
 
     def add_task_status(self, task_id: str, task_name: str, status: Optional[str] = None,
                         start_time: Optional[float] = None,
@@ -36,8 +32,8 @@ class TaskStatusManager:
             error_info (Optional[str]): Error information. If not provided, it is not updated.
             is_timeout_enabled (Optional[bool]): Boolean indicating if timeout processing is enabled. If not provided, it is not updated.
         """
-        if task_id not in self.task_status_dict:
-            self.task_status_dict[task_id] = {
+        if task_id not in self._task_status_dict:
+            self._task_status_dict[task_id] = {
                 'task_name': None,
                 'status': None,
                 'start_time': None,
@@ -46,7 +42,7 @@ class TaskStatusManager:
                 'is_timeout_enabled': None
             }
 
-        task_status = self.task_status_dict[task_id]
+        task_status = self._task_status_dict[task_id]
 
         if status is not None:
             task_status['status'] = status
@@ -62,8 +58,8 @@ class TaskStatusManager:
         if is_timeout_enabled is not None:
             task_status['is_timeout_enabled'] = is_timeout_enabled
 
-        self.task_status_dict[task_id] = task_status
-        if len(self.task_status_dict) > self.max_storage:
+        self._task_status_dict[task_id] = task_status
+        if len(self._task_status_dict) > self._max_storage:
             self._clean_up()
 
     def _clean_up(self) -> None:
@@ -71,13 +67,13 @@ class TaskStatusManager:
         Clean up old task status entries if the dictionary exceeds the maximum storage limit.
         """
         # Remove old entries until the dictionary size is within the limit
-        if len(self.task_status_dict) > self.max_storage:
+        if len(self._task_status_dict) > self._max_storage:
             to_remove = []
-            for k, v in self.task_status_dict.items():
+            for k, v in self._task_status_dict.items():
                 if v['status'] in ["failed", "completed", "timeout", "cancelled"]:
                     to_remove.append(k)
             for k in to_remove:
-                self.task_status_dict.pop(k)
+                self._task_status_dict.pop(k)
 
     def get_task_status(self,
                         task_id: str) -> Optional[Dict[str, Optional[Union[str, float, bool]]]]:
@@ -90,7 +86,7 @@ class TaskStatusManager:
         Returns:
             Optional[Dict[str, Optional[Union[str, float, bool]]]]: Task status information as a dictionary, or None if the task ID is not found.
         """
-        return self.task_status_dict.get(task_id)
+        return self._task_status_dict.get(task_id)
 
     def get_all_task_statuses(self) -> Dict[str, Dict[str, Optional[Union[str, float, bool]]]]:
         """
@@ -99,4 +95,4 @@ class TaskStatusManager:
         Returns:
             Dict[str, Dict[str, Optional[Union[str, float, bool]]]]: A copy of the dictionary containing all task status information.
         """
-        return self.task_status_dict.copy()
+        return self._task_status_dict.copy()
