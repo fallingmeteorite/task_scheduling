@@ -8,9 +8,9 @@ from loguru import logger
 # The log format includes the timestamp, log level, name of the file and line number where the log was generated, and the log message
 DEFAULT_FORMAT: str = (
     "<g>{time:YYYY-MM-DD HH:mm:ss}</g> "  # Timestamp, formatted as year-month-day hour:minute:second, displayed in green
-    "[<lvl>{level}</lvl>] "              # Log level, automatically colored based on the level
-    "<c><u>{name}:{line}</u></c> | "      # Name of the file and line number where the log was generated, displayed in cyan with underline
-    "{message}"                          # Log message
+    "[<lvl>{level}</lvl>] "  # Log level, automatically colored based on the level
+    "<c><u>{name}:{line}</u></c> | "  # Name of the file and line number where the log was generated, displayed in cyan with underline
+    "{message}"  # Log message
 )
 
 # Default log level
@@ -37,10 +37,10 @@ def configure_logger():
     logger.add(
         sys.stdout,
         format=DEFAULT_FORMAT,  # Use the predefined log format
-        level=LOG_LEVEL,        # Set the default log level
-        colorize=True,          # Enable log colorization
-        backtrace=True,         # Enable backtrace in case of exceptions
-        diagnose=True           # Enable diagnostic information in case of exceptions
+        level=LOG_LEVEL,  # Set the default log level
+        colorize=True,  # Enable log colorization
+        backtrace=True,  # Enable backtrace in case of exceptions
+        diagnose=True  # Enable diagnostic information in case of exceptions
     )
 
     # Mark the logger as configured
