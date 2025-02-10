@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# Author: fallingmeteorite
+
 import queue
 import threading
 import time
@@ -5,6 +8,7 @@ from typing import Callable, List, Tuple, Optional
 
 from .common import logger
 from .config import config
+from .function_data import task_function_type
 from .manager import task_status_manager
 from .scheduler import io_async_task, io_liner_task, cpu_liner_task, cpu_async_task, timer_task
 
@@ -17,7 +21,7 @@ class TaskScheduler:
     __slots__ = ['ban_task_names', 'core_task_queue', 'allocator_running', 'allocator_started', 'allocator_thread',
                  'timeout_check_interval', '_timeout_checker']
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.ban_task_names: List[str] = []
         self.core_task_queue: Optional[queue.Queue] = queue.Queue()
         self.allocator_running: bool = True
@@ -28,17 +32,37 @@ class TaskScheduler:
         if self._timeout_checker is not None:
             self._start_timeout_checker()
 
-    def add_task(self, delay: int or None, daily_time: str or None, async_function: bool, function_type: str,
+    def add_task(self,
+                 delay: int or None,
+                 daily_time: str or None,
+                 async_function: bool,
+                 function_type: str,
                  timeout_processing: bool,
                  task_name: str, task_id: str,
-                 func: Callable, *args, **kwargs):
+                 func: Callable, *args, **kwargs) -> bool:
         # Check if the task name is in the ban list
         if task_name in self.ban_task_names:
-            logger.warning(f"Task name '{task_name}' is banned, cannot add task.")
-            return None
-        self.core_task_queue.put(
-            (delay, daily_time, async_function, function_type, timeout_processing, task_name, task_id, func, args,
-             kwargs))
+            logger.warning(f"Task name '{task_name}' is banned, cannot add task, task ID: {task_id}")
+            return False
+
+        if function_type is None:
+            function_type = task_function_type.read_from_dict(task_name)
+            if function_type is None:
+                logger.error(
+                    f"Task name '{task_name}' has no function type, and no records are found in the cache file, tasks cannot be added!")
+                return False
+
+        self.core_task_queue.put((delay,
+                                  daily_time,
+                                  async_function,
+                                  function_type,
+                                  timeout_processing,
+                                  task_name,
+                                  task_id,
+                                  func,
+                                  args,
+                                  kwargs))
+
         task_status_manager.add_task_status(task_id, task_name, "queuing", None, None, None, timeout_processing)
 
         if not self.allocator_started:
@@ -46,31 +70,54 @@ class TaskScheduler:
             self.allocator_thread = threading.Thread(target=self._allocator, daemon=True)
             self.allocator_thread.start()
 
-    def _allocator(self):
+        return True
+
+    def _allocator(self) -> None:
         while self.allocator_running:
             if not self.core_task_queue.empty():
                 delay, daily_time, async_function, function_type, timeout_processing, task_name, task_id, func, args, kwargs = self.core_task_queue.get()
                 state = False
+
                 if async_function:
+
                     if function_type == "io":
-                        state = io_async_task.add_task(timeout_processing, task_name, task_id, func, *args, **kwargs)
+                        state = io_async_task.add_task(timeout_processing, task_name, task_id, func,
+                                                       *args, **kwargs)
                     if function_type == "cpu":
-                        state = cpu_async_task.add_task(timeout_processing, task_name, task_id, func, *args, **kwargs)
+                        state = cpu_async_task.add_task(timeout_processing, task_name, task_id, func,
+                                                        *args, **kwargs)
 
                 if not async_function:
+
                     if function_type == "io":
-                        state = io_liner_task.add_task(timeout_processing, task_name, task_id, func, *args, **kwargs)
+                        state = io_liner_task.add_task(timeout_processing, task_name, task_id, func,
+                                                       *args, **kwargs)
                     if function_type == "cpu":
-                        state = cpu_liner_task.add_task(timeout_processing, task_name, task_id, func, *args, **kwargs)
+                        state = cpu_liner_task.add_task(timeout_processing, task_name, task_id, func,
+                                                        *args, **kwargs)
 
                 if function_type == "timer":
-                    state = timer_task.add_task(delay, daily_time, timeout_processing, task_name, task_id, func, *args,
-                                        **kwargs)
+
+                    if not async_function:
+                        state = timer_task.add_task(delay, daily_time,
+                                                    timeout_processing, task_name, task_id, func,
+                                                    *args,
+                                                    **kwargs)
+                    else:
+                        logger.error("The timer function cannot be asynchronous code!")
+                        state = True
 
                 if not state:
-                    self.core_task_queue.put(
-                        (delay, daily_time, async_function, function_type, timeout_processing, task_name, task_id, func,
-                         args, kwargs))
+                    self.core_task_queue.put((delay,
+                                              daily_time,
+                                              async_function,
+                                              function_type,
+                                              timeout_processing,
+                                              task_name,
+                                              task_id,
+                                              func,
+                                              args,
+                                              kwargs))
 
             else:
                 time.sleep(0.1)
@@ -80,6 +127,8 @@ class TaskScheduler:
         for item in self.core_task_queue.queue:
             if is_banana(item, task_name):
                 self.core_task_queue.queue.remove(item)
+
+        logger.warning("This type of name task has been removed")
 
     def add_ban_task_name(self, task_name: str) -> None:
         """
@@ -117,20 +166,20 @@ class TaskScheduler:
                     # Stop task
                     io_async_task.force_stop_task(task_id)
                     io_liner_task.force_stop_task(task_id)
-                    timer_task.force_stop_task(task_id)
                     cpu_liner_task.force_stop_task(task_id)
                     cpu_async_task.force_stop_task(task_id)
+                    timer_task.force_stop_task(task_id)
 
         self._start_timeout_checker()  # Restart the timer
 
-    def _start_timeout_checker(self):
+    def _start_timeout_checker(self) -> None:
         """
         Start a timer that will periodically check for timeout tasks.
         """
         self._timeout_checker = threading.Timer(self.timeout_check_interval, self._check_timeouts)
         self._timeout_checker.start()
 
-    def _stop_timeout_checker(self):
+    def _stop_timeout_checker(self) -> None:
         """
         Stop the timeout checker timer if it is running.
         """
