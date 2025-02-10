@@ -11,19 +11,29 @@ specifically with event loops for asynchronous code
 
 This task scheduling is suitable for:
 
-1.Network Requests: Handling multiple HTTP requests concurrently, where each request can be scheduled and executed asynchronously.
+1.Network Requests: Handling multiple HTTP requests concurrently, where each request can be scheduled and executed
+asynchronously.
 
-2.File I/O Operations: Reading from or writing to multiple files concurrently, especially when dealing with large files or when the I/O operations are slow.
+2.File I/O Operations: Reading from or writing to multiple files concurrently, especially when dealing with large files
+or when the I/O operations are slow.
 
-3.Database Queries: Executing multiple database queries concurrently, especially when the queries involve waiting for database responses.
+3.Database Queries: Executing multiple database queries concurrently, especially when the queries involve waiting for
+database responses.
 
-4.Web Scraping: Running multiple web scraping tasks concurrently, where each task involves fetching and processing web pages.
+4.Web Scraping: Running multiple web scraping tasks concurrently, where each task involves fetching and processing web
+pages.
 
-5.Real-time Data Processing: Processing real-time data streams, where tasks need to be executed as soon as data is available.
+5.Real-time Data Processing: Processing real-time data streams, where tasks need to be executed as soon as data is
+available.
 
-6.Background Tasks: Running background tasks that perform periodic operations, such as data aggregation, cleanup, or monitoring.
+6.Background Tasks: Running background tasks that perform periodic operations, such as data aggregation, cleanup, or
+monitoring.
 
+7.CPU-intensive task execution.
 
+8.Threads in new processes can be well managed.
+
+9.With analysis function, it can analyze which scheduler the execution function conforms.
 
 ## Feature description
 
@@ -33,8 +43,7 @@ This task scheduling is suitable for:
 
 3.When a task fails to run, it can be added to the disabled list and will not be executed thereafter
 
-4.You can directly obtain the current task status through the interface, such as executing, completed, error, and
-timeout
+4.You can directly obtain the current task status through the interface, such as executing: "completed, error, timeout"
 
 5.Automatically hibernate when there are no tasks
 
@@ -45,549 +54,727 @@ so use `await asyncio.sleep` for asynchronous tasks
 ## Installation
 
 ```
-pip install task_scheduling
+pip install --upgrade task_scheduling
 ```
 
 # Function introduction
 
-### add_task(timeout_processing: bool, task_name: str, func: Callable, *args, **kwargs) -> None:
+### Function: task_creation(delay: int or None, daily_time: str or None, function_type: str, timeout_processing: bool, task_name: str, func: Callable, *args, **kwargs) -> str or None:
 
-```
+The core function is used to create a task and submit it to the scheduler. Currently the scheduler has
+`cpu_asyncio_task, cpu_liner_task, io_asyncio_task, io_liner_task, timer_task`
 
-import asyncio
-
-from task_scheduling import add_task, shutdown, interruptible_sleep
-
-
-def line_task(input_info):
-    while True:
-        interruptible_sleep(5)
-        print(input_info)
-
-
-async def asyncio_task(input_info):
-    while True:
-        await asyncio.sleep(5)
-        print(input_info)
-
-
-input_info = "test"
-
-task_id1 = add_task(True,
-                    # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
-                    "task1",
-                    # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
-                    line_task,  # The function to be executed, parameters should not be passed here
-                    input_info  # Pass the parameters required by the function, no restrictions
-                    )
-
-task_id2 = add_task(True,
-                    # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
-                    "task2",
-                    # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
-                    asyncio_task,  # The function to be executed, parameters should not be passed here
-                    input_info  # Pass the parameters required by the function, no restrictions
-                    )
-
-print(task_id1, task_id2)
-# cf478b6e-5e02-49b8-9031-4adc6ff915c2, cf478b6e-5e02-49b8-9031-4adc6ff915c2
-
-try:
-    while True:
-        pass
-except KeyboardInterrupt:
-    shutdown(True)
-```
-
-### ban_task_name(task_name: str) -> bool:
-
-```
-
-import asyncio
-
-from task_scheduling import io_async_task, add_task, shutdown, io_liner_task, interruptible_sleep
-
-
-def line_task(input_info):
-    while True:
-        interruptible_sleep(5)
-        print(input_info)
-
-
-async def asyncio_task(input_info):
-    while True:
-        await asyncio.sleep(5)
-        print(input_info)
-
-
-input_info = "test"
-
-add_task(True,
-         "task1",
-         line_task,
-         input_info
-         )
-
-io_liner_task.ban_task_name("task1")
-# | Io linear task | task1 | is banned from execution
-
-add_task(True,
-         "task1",
-         line_task,
-         input_info
-         )
-
-# | Io linear task | eff3daf0-96f4-4d04-abd8-36bdfae16aa9 | is banned and will be deleted
-
-add_task(True,
-         "task2",
-         asyncio_task,
-         input_info
-         )
-
-io_async_task.ban_task_name("task2")
-# | Io asyncio task | task2 | has been banned from execution
-
-add_task(True,
-         "task2",
-         asyncio_task,
-         input_info
-         )
-# Io asyncio task | bafe8026-68d7-4753-9a55-bde5608c3dcb | is banned and will be deleted
-
-try:
-    while True:
-        pass
-except KeyboardInterrupt:
-    shutdown(True)
-
-# Prohibits the continuation of a certain type of task
-# Both asyntask and linetask contain this function, and the usage method is the same
-
-```
-
-### allow_task_name(task_name: str) -> bool:
-
-```
-import asyncio
-
-from task_scheduling import io_async_task, add_task, shutdown, io_liner_task, interruptible_sleep
-
-
-def line_task(input_info):
-    while True:
-        interruptible_sleep(5)
-        print(input_info)
-
-
-async def asyncio_task(input_info):
-    while True:
-        await asyncio.sleep(5)
-        print(input_info)
-
-
-input_info = "test"
-
-add_task(True,
-         "task1",
-         line_task,
-         input_info
-         )
-
-io_liner_task.ban_task_name("task1")
-# | Io linear task | task1 | is banned from execution
-
-add_task(True,
-         "task1",
-         line_task,
-         input_info
-         )
-
-# | Io linear task | fa0fe12f-ad7f-4016-a76a-25285e12e21e | is banned and will be deleted
-
-io_liner_task.allow_task_name("task1")
-
-# | Io linear task | task1 | is allowed for execution
-
-add_task(True,
-         "task1",
-         line_task,
-         input_info
-         )
-
-add_task(True,
-         "task2",
-         asyncio_task,
-         input_info
-         )
-
-io_async_task.ban_task_name("task2")
-# | Io asyncio task | task2 | has been banned from execution
-
-add_task(True,
-         "task2",
-         asyncio_task,
-         input_info
-         )
-# | Io asyncio task | 9747ac36-8582-4b44-80d9-1cb4d0dcd86a | is banned and will be deleted
-
-io_async_task.allow_task_name("task2")
-
-# | Io asyncio task | task2 | is allowed for execution
-
-add_task(True,
-         "task2",
-         asyncio_task,
-         input_info
-         )
-
-try:
-    while True:
-        pass
-except KeyboardInterrupt:
-    shutdown(True)
-             
-# Removal of the ban on such tasks
-# Both asyntask and linetask contain this function, and the usage method is the same
-```
-
-### cancel_all_queued_tasks_by_name(task_name: str) -> None:
-
-```
-import asyncio
-
-from task_scheduling import io_liner_task, add_task, shutdown, io_async_task, interruptible_sleep
-
-
-def line_task(input_info):
-    while True:
-        interruptible_sleep(5)
-        print(input_info)
-
-
-async def asyncio_task(input_info):
-    while True:
-        await asyncio.sleep(5)
-        print(input_info)
-
-
-input_info = "test"
-
-add_task(True,
-         "task1",
-         line_task,
-         input_info
-         )
-add_task(True,
-         "task1",
-         line_task,
-         input_info
-         )
-
-add_task(True,
-         "task1",
-         line_task,
-         input_info
-         )
-
-add_task(True,
-         "task2",
-         asyncio_task,
-         input_info
-         )
-add_task(True,
-         "task2",
-         asyncio_task,
-         input_info
-         )
-add_task(True,
-         "task2",
-         asyncio_task,
-         input_info
-         )
-
-io_liner_task.cancel_all_queued_tasks_by_name("task1")
-io_async_task.cancel_all_queued_tasks_by_name("task2")
-# | Io linear task | task1 | is waiting to be executed in the queue, has been deleted
-
-try:
-    while True:
-        pass
-except KeyboardInterrupt:
-    shutdown(True)
-
-# This code will delete all tasks with ID task1 in the queue
-# Both asyntask and linetask contain this function, and the usage method is the same             
-            
-```
-
-### force_stop_task(task_id: str) -> bool:
+(The task is of the "io" type) Io-intensive tasks are all run in the threads of a process
 
 ```
 
 import asyncio
 import time
 
-from task_scheduling import io_async_task, add_task, shutdown, io_liner_task, interruptible_sleep
+from task_scheduling.utils import interruptible_sleep
 
 
 def line_task(input_info):
     while True:
-        interruptible_sleep(5)
+        interruptible_sleep(1)
         print(input_info)
 
 
 async def asyncio_task(input_info):
     while True:
-        await asyncio.sleep(5)
+        await asyncio.sleep(1)
         print(input_info)
 
 
 input_info = "test"
 
-task_id1 = add_task(True,
-                    "task1",
-                    line_task,
-                    input_info
-                    )
+if __name__ == "__main__":
+    from task_scheduling.task_creation import task_creation, shutdown
 
-task_id2 = add_task(True,
-                    "task1",
-                    asyncio_task,
-                    input_info
-                    )
+    task_id1 = task_creation(None,
+                             # This is how long the delay is executed (in seconds)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the daily_time is not required
+                             None,
+                             # This is to be performed at what point (24-hour clock)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
+                             'io',
+                             # Running function type, there are "io, cpu, timer"
+                             True,
+                             # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
+                             "task1",
+                             # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
+                             line_task,
+                             # The function to be executed, parameters should not be passed here
+                             input_info
+                             # Pass the parameters required by the function, no restrictions
+                             )
 
-time.sleep(3.0)
-io_liner_task.force_stop_task(task_id1)
-io_async_task.force_stop_task(task_id2)
+    task_id2 = task_creation(None,
+                             # This is how long the delay is executed (in seconds)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the daily_time is not required
+                             None,
+                             # This is to be performed at what point (24-hour clock)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
+                             'io',
+                             # Running function type, there are "io, cpu, timer"
+                             True,
+                             # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
+                             "task2",
+                             # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
+                             asyncio_task,
+                             # The function to be executed, parameters should not be passed here
+                             input_info
+                             # Pass the parameters required by the function, no restrictions
+                             )
 
-# | Io linear task | fb30d17e-0b15-4a88-b8c6-cbbc8163b909 | has been forcibly cancelled
-# | Io asyncio task | daa36e09-2959-44ec-98b6-8f1948535687 | has been forcibly cancelled
-try:
-    while True:
-        pass
-except KeyboardInterrupt:
+    print(task_id1, task_id2)
+    # cf478b6e-5e02-49b8-9031-4adc6ff915c2, cf478b6e-5e02-49b8-9031-4adc6ff915c2
+
+    try:
+        while True:
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        shutdown(True)
+
+```
+
+(The task is of the "timer" type) Timer tasks are all run in the threads of a process, and are committed to the thread
+pool when the specified time is reached
+
+```
+
+import time
+
+
+def line_task(input_info):
+    print(input_info)
+
+
+input_info = "test"
+
+if __name__ == "__main__":
+    from task_scheduling.task_creation import task_creation, shutdown
+
+    task_id1 = task_creation(10,
+                             # This is how long the delay is executed (in seconds)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the daily_time is not required
+                             None,  # 14:00
+                             # This is to be performed at what point (24-hour clock)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
+                             'timer',
+                             # Running function type, there are "io, cpu, timer"
+                             True,
+                             # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
+                             "task1",
+                             # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
+                             line_task,
+                             # The function to be executed, parameters should not be passed here
+                             input_info
+                             # Pass the parameters required by the function, no restrictions
+                             )
+
+    task_id2 = task_creation(None,
+                             # This is how long the delay is executed (in seconds)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the daily_time is not required
+                             "13:03",  # 13.03
+                             # This is to be performed at what point (24-hour clock)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
+                             'timer',
+                             # Running function type, there are "io, cpu, timer"
+                             True,
+                             # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
+                             "task2",
+                             # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
+                             line_task,
+                             # The function to be executed, parameters should not be passed here
+                             input_info
+                             # Pass the parameters required by the function, no restrictions
+                             )
+
+    print(task_id1, task_id2)
+    # cf478b6e-5e02-49b8-9031-4adc6ff915c2, cf478b6e-5e02-49b8-9031-4adc6ff915c2
+
+    try:
+        while True:
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        shutdown(True)
+
+```
+
+(The task is of the "cpu" type)Each task is separate in a process. WARNING!! The `shutdown` function should be used
+before the kill signal is given
+
+This task manager will end the process when there are no threads in the process, so that the process will be recycled
+
+Threads can be created in this process, and the library is given a task manager that will configure the file
+`thread_management=True` after it is enabled, `task_manager` will be passed to the executor function, The threads that
+will be created in this function will be managed through it, and here is an example
+
+`thread_management=False`
+
+```
+import time
+
+from task_scheduling.stopit import skip_on_demand
+
+
+def line_task(input_info, task_manager):
+    with skip_on_demand() as skip_ctx:
+        task_id = 1001001
+        # Create your own thread and give a unique ID to the incoming task_manager
+        task_manager.add(skip_ctx, task_id)
+
+
+input_info = "test"
+
+if __name__ == "__main__":
+    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.scheduler import cpu_liner_task
+
+    task_id1 = task_creation(None,
+                             # This is how long the delay is executed (in seconds)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the daily_time is not required
+                             None,
+                             # This is to be performed at what point (24-hour clock)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
+                             'cpu',
+                             # Running function type, there are "io, cpu, timer"
+                             True,
+                             # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
+                             "task1",
+                             # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
+                             line_task,
+                             # The function to be executed, parameters should not be passed here
+                             input_info
+                             # Pass the parameters required by the function, no restrictions
+                             )
+
+    task_id = 1001001
+    time.sleep(2.0)
+    cpu_liner_task.force_stop_task(task_id) # Fill in the ID you created here
+    time.sleep(2.0)
     shutdown(True)
-    
-# This code will forcibly terminate the running task, note! Using this function during file reading or writing may cause file corruption
-# Both asyntask and linetask contain this function, and the usage method is the same     
-   
+    try:
+        while True:
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        pass
+
+
+```
+
+`thread_management=True`
+
+```
+import time
+
+from task_scheduling.stopit import skip_on_demand
+
+
+def line_task(task_manager, input_info):
+    with skip_on_demand() as skip_ctx:
+        task_id = 1001001
+        # Create your own thread and give a unique ID to the incoming task_manager
+        task_manager.add(skip_ctx, task_id)
+
+
+input_info = "test"
+
+if __name__ == "__main__":
+    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.scheduler import cpu_liner_task
+
+    task_id1 = task_creation(None,
+                             # This is how long the delay is executed (in seconds)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the daily_time is not required
+                             None,
+                             # This is to be performed at what point (24-hour clock)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
+                             'cpu',
+                             # Running function type, there are "io, cpu, timer"
+                             True,
+                             # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
+                             "task1",
+                             # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
+                             line_task,
+                             # The function to be executed, parameters should not be passed here
+                             input_info
+                             # Pass the parameters required by the function, no restrictions
+                             )
+
+    task_id = 1001001
+    time.sleep(2.0)
+    cpu_liner_task.force_stop_task(task_id)
+    time.sleep(2.0)
+    shutdown(True)
+    try:
+        while True:
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        pass
+
+```
+
+### FunctionRunner(self, func: Callable, task_name: str, *args, **kwargs) -> None:
+
+A task that detects what type of function is executed. The detected parameters are stored in a file and read directly at
+the next time
+
+```
+import time
+
+import numpy as np
+
+
+def example_cpu_intensive_function(size, iterations):
+    start_time = time.time()
+    for _ in range(iterations):
+        # Create two random matrices
+        matrix_a = np.random.rand(size, size)
+        matrix_b = np.random.rand(size, size)
+        # Perform matrix multiplication
+        np.dot(matrix_a, matrix_b)
+    end_time = time.time()
+    print(
+        f"It took {end_time - start_time:.2f} seconds to calculate {iterations} times {size} times {size} matrix multiplication")
+
+
+async def example_io_intensive_function():
+    for i in range(5):
+        with open(f"temp_file_{i}.txt", "w") as f:
+            f.write("Hello, World!" * 1000000)
+        time.sleep(1)
+
+
+if __name__ == "__main__":
+    from task_scheduling.utils import FunctionRunner
+
+    cpu_runner = FunctionRunner(example_cpu_intensive_function, "CPU_Task", 10000, 2)
+    cpu_runner.run()
+
+    io_runner = FunctionRunner(example_io_intensive_function, "IO_Task")
+    io_runner.run()
+
+```
+
+### task_function_type.append_to_dict(task_name: str, function_type: str) -> None:
+
+### task_function_type.read_from_dict(task_name: str) -> Optional[str]:
+
+Add a function type and a view type. Files are stored in:`task_scheduling/function_data/task_type.pkl`
+
+```
+if __name__ == "__main__":
+    from task_scheduling.function_data import task_function_type
+
+    task_function_type.append_to_dict("CPU_Task", "test")
+
+    print(task_function_type.read_from_dict("CPU_Task"))
+    print(task_function_type.read_from_dict("CPU_Task"))
 ```
 
 ### get_task_result(task_id: str) -> Optional[Any]:
 
+Get the data returned by the task.
+
 ```
+
 import asyncio
 import time
 
-from task_scheduling import add_task, io_async_task, shutdown, io_liner_task, interruptible_sleep
-
 
 def line_task(input_info):
-    interruptible_sleep(5)
+    time.sleep(4)
     return input_info
 
 
 async def asyncio_task(input_info):
-    await asyncio.sleep(5)
+    await asyncio.sleep(4)
     return input_info
 
 
 input_info = "test"
 
-task_id1 = add_task(True,
-                    "sleep",
-                    line_task,
-                    input_info)
+if __name__ == "__main__":
+    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.scheduler import io_liner_task
 
-task_id2 = add_task(True,
-                    "sleep",
-                    asyncio_task,
-                    input_info)
+    task_id1 = task_creation(None,
+                             # This is how long the delay is executed (in seconds)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the daily_time is not required
+                             None,
+                             # This is to be performed at what point (24-hour clock)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
+                             'io',
+                             # Running function type, there are "io, cpu, timer"
+                             True,
+                             # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
+                             "task1",
+                             # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
+                             line_task,
+                             # The function to be executed, parameters should not be passed here
+                             input_info
+                             # Pass the parameters required by the function, no restrictions
+                             )
 
-while True:
-    result = io_liner_task.get_task_result(task_id1)
-    if result is not None:
-        print(f"Task result: {result}")
-        break
-    time.sleep(0.5)
-# Task result: test
-while True:
-    result = io_async_task.get_task_result(task_id2)
-    if result is not None:
-        print(f"Task result: {result}")
-        break
-    time.sleep(0.5)
-
-# Task result: test
-try:
     while True:
-        pass
-except KeyboardInterrupt:
+        result = io_liner_task.get_task_result(task_id1)
+
+        if result is not None:
+            print(result)
+            # test
+            break
+        else:
+            time.sleep(0.1)
+
     shutdown(True)
-    
-# Both asyntask and linetask contain this function, and the usage method is the same
 
 ```
 
-### get_all_queue_info(queue_type: str, show_id: bool) -> str:
+### get_tasks_info() -> str:
+
+Get information on all tasks. It is convenient to manage all tasks and move on to the next step
 
 ```
 import asyncio
 import time
 
-from task_scheduling import get_all_queue_info, add_task, shutdown, interruptible_sleep
-
 
 def line_task(input_info):
-    interruptible_sleep(5)
+    time.sleep(4)
     return input_info
 
 
 async def asyncio_task(input_info):
-    await asyncio.sleep(5)
+    await asyncio.sleep(4)
     return input_info
 
 
 input_info = "test"
 
-add_task(True,
-         "task1",
-         line_task,
-         input_info
-         )
+if __name__ == "__main__":
+    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.queue_info_display import get_tasks_info
 
-add_task(True,
-         "task1",
-         asyncio_task,
-         input_info
-         )
+    task_id1 = task_creation(5,
+                             # This is how long the delay is executed (in seconds)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the daily_time is not required
+                             None,
+                             # This is to be performed at what point (24-hour clock)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
+                             'timer',
+                             # Running function type, there are "io, cpu, timer"
+                             True,
+                             # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
+                             "task1",
+                             # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
+                             line_task,
+                             # The function to be executed, parameters should not be passed here
+                             input_info
+                             # Pass the parameters required by the function, no restrictions
+                             )
 
-time.sleep(1.0)
-# line queue size: 0, Running tasks count: 1
-# Name: task1, ID: 736364d9-1e3a-4746-8c6b-be07178a876b, Process Status: running, Elapsed Time: 1.00 seconds
-
-
-# asyncio queue size: 0, Running tasks count: 1
-# Name: task1, ID: 24964b35-c7a7-4206-9e89-df0ed8676caf, Process Status: running, Elapsed Time: 1.00 seconds
-try:
-    while True:
-        print(get_all_queue_info("line", True))
-        print(get_all_queue_info("asyncio", True))
-        time.sleep(1.0)
-except KeyboardInterrupt:
-    shutdown(True)
-# Both asyntask and linetask contain this function, and the usage method is the same
+    try:
+        while True:
+            print(get_tasks_info())
+            # tasks queue size: 1, running tasks count: 0, failed tasks count: 0
+            # name: task1, id: 79185539-01e5-4576-8f10-70bb4f75374f, status: waiting, elapsed time: nan seconds
+            time.sleep(2.0)
+    except KeyboardInterrupt:
+        shutdown(True)
 
 ```
 
-### get_task_status(self, task_id: str) -> Optional[Dict]:
+### task_status_manager.get_task_status(self, task_id: str) -> Optional[Dict[str, Optional[Union[str, float, bool]]]]:
+
+Get information about a single task. This will return a dictionary for easy user access
 
 ```
 import asyncio
 import time
 
-from task_scheduling import add_task, io_async_task, io_liner_task, shutdown, interruptible_sleep
-
 
 def line_task(input_info):
-    interruptible_sleep(5)
-    return input_info
+    while True:
+        time.sleep(1)
+        print(input_info)
 
 
 async def asyncio_task(input_info):
-    await asyncio.sleep(5)
-    return input_info
+    while True:
+        await asyncio.sleep(1)
+        print(input_info)
 
 
 input_info = "test"
 
-task_id1 = add_task(True,
-                    "task1",
-                    line_task,
-                    input_info
-                    )
+if __name__ == "__main__":
+    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.scheduler_management import task_status_manager
 
-task_id2 = add_task(True,
-                    "task1",
-                    asyncio_task,
-                    input_info
-                    )
-time.sleep(1.0)
+    task_id1 = task_creation(None,
+                             # This is how long the delay is executed (in seconds)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the daily_time is not required
+                             None,
+                             # This is to be performed at what point (24-hour clock)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
+                             'io',
+                             # Running function type, there are "io, cpu, timer"
+                             True,
+                             # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
+                             "task1",
+                             # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
+                             line_task,
+                             # The function to be executed, parameters should not be passed here
+                             input_info
+                             # Pass the parameters required by the function, no restrictions
+                             )
 
-print(io_liner_task.get_task_status(task_id1))
-# {'task_name': 'task1', 'start_time': 1737857113.8179326, 'status': 'running'}
-print(io_async_task.get_task_status(task_id2))
-# {'task_name': 'task1', 'start_time': 1737857113.8179326, 'status': 'running'}
+    print(task_status_manager.get_task_status(task_id1))
+    # {'task_name': 'task1', 'status': 'waiting', 'start_time': None, 'end_time': None, 'error_info': None, 'is_timeout_enabled': True}
+    try:
+        while True:
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        shutdown(True)
 
-try:
+```
+
+### task_scheduler.add_ban_task_name(task_name: str) -> None:
+
+### task_scheduler.remove_ban_task_name(task_name: str) -> None:
+
+Add and remove disabled task names. After you add a disabled task name, the task cannot be added but is blocked
+
+```
+import asyncio
+import time
+
+
+def line_task(input_info):
     while True:
-        pass
-except KeyboardInterrupt:
-    shutdown(True)
-    
-# Returns a task status dictionary
+        time.sleep(1)
+        print(input_info)
+
+
+async def asyncio_task(input_info):
+    while True:
+        await asyncio.sleep(1)
+        print(input_info)
+
+
+input_info = "test"
+
+if __name__ == "__main__":
+    from task_scheduling.task_creation import task_creation, shutdown, task_scheduler
+
+    task_id1 = task_creation(None,
+                             # This is how long the delay is executed (in seconds)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the daily_time is not required
+                             None,
+                             # This is to be performed at what point (24-hour clock)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
+                             'io',
+                             # Running function type, there are "io, cpu, timer"
+                             True,
+                             # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
+                             "task1",
+                             # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
+                             line_task,
+                             # The function to be executed, parameters should not be passed here
+                             input_info
+                             # Pass the parameters required by the function, no restrictions
+                             )
+
+    task_scheduler.add_ban_task_name("task1")
+
+    task_id2 = task_creation(None,
+                             # This is how long the delay is executed (in seconds)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the daily_time is not required
+                             None,
+                             # This is to be performed at what point (24-hour clock)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
+                             'io',
+                             # Running function type, there are "io, cpu, timer"
+                             True,
+                             # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
+                             "task1",
+                             # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
+                             line_task,
+                             # The function to be executed, parameters should not be passed here
+                             input_info
+                             # Pass the parameters required by the function, no restrictions
+                             )
+
+    task_scheduler.remove_ban_task_name("task1")
+
+    # Start running io linear task, task ID: 19a643f3-d8fd-462f-8f36-0eca7a447741
+    # Task name 'task1' has been added to the ban list.
+    # Task name 'task1' is banned, cannot add task, task ID: a4bc60b1-95d1-423d-8911-10f520ee88f5
+    # Task name 'task1' has been removed from the ban list.
+    try:
+        while True:
+            time.sleep(2.0)
+    except KeyboardInterrupt:
+        shutdown(True)
+
+```
+
+### task_scheduler.cancel_the_queue_task_by_name(self, task_name: str) -> None:
+
+Cancel a task that is being queued. If the task has already started, the cleanup function does not take effect
+
+```
+import asyncio
+import time
+
+
+def line_task(input_info):
+    while True:
+        time.sleep(1)
+        print(input_info)
+
+
+async def asyncio_task(input_info):
+    while True:
+        await asyncio.sleep(1)
+        print(input_info)
+
+
+input_info = "test"
+
+if __name__ == "__main__":
+    from task_scheduling.task_creation import task_creation, shutdown, task_scheduler
+
+    task_id1 = task_creation(None,
+                             # This is how long the delay is executed (in seconds)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the daily_time is not required
+                             None,
+                             # This is to be performed at what point (24-hour clock)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
+                             'io',
+                             # Running function type, there are "io, cpu, timer"
+                             True,
+                             # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
+                             "task1",
+                             # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
+                             line_task,
+                             # The function to be executed, parameters should not be passed here
+                             input_info
+                             # Pass the parameters required by the function, no restrictions
+                             )
+
+    task_scheduler.cancel_the_queue_task_by_name("task1")
+
+    # This type of name task has been removed
+
+    try:
+        while True:
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        shutdown(True)
+
+```
+
+### force_stop_task(task_id: str) -> bool:
+
+All 4 schedulers have this function for terminating a running task. Warning: If the function is executing a
+process-blocking function such as `time.sleep`, it will have to wait for the execution to finish before terminating the
+function
+
+```
+import asyncio
+import time
+
+
+def line_task(input_info):
+    while True:
+        time.sleep(1)
+        print(input_info)
+
+
+async def asyncio_task(input_info):
+    while True:
+        await asyncio.sleep(1)
+        print(input_info)
+
+
+input_info = "test"
+
+if __name__ == "__main__":
+    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.scheduler import io_liner_task
+
+    task_id1 = task_creation(None,
+                             # This is how long the delay is executed (in seconds)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the daily_time is not required
+                             None,
+                             # This is to be performed at what point (24-hour clock)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
+                             'io',
+                             # Running function type, there are "io, cpu, timer"
+                             True,
+                             # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
+                             "task1",
+                             # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
+                             line_task,
+                             # The function to be executed, parameters should not be passed here
+                             input_info
+                             # Pass the parameters required by the function, no restrictions
+                             )
+
+    time.sleep(2.0)
+    io_liner_task.force_stop_task(task_id1)
+
+    # | Io linear task | 79a85db4-c75f-4acd-a2b1-d375617e5af4 | was cancelled
+
+    try:
+        while True:
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        shutdown(True)
+
 ```
 
 ### shutdown(force_cleanup: bool) -> None:
 
+Once the task has been submitted, it is necessary to call this function to clean it up when exiting. Forced cleanup will
+interrupt all running tasks, but not if set to False
+
 ```
-from task_scheduling import shutdown
-
-# When you want to close the software, call this function to close the task scheduling
-
-# Safely shut down and wait for the running task to end
-shutdown(False)
-
-#Forced shutdown may result in errors and file corruption
-shutdown(True)
+  from task_scheduling.task_creation import shutdown
 ```
-
-### interruptible_sleep(seconds: float or int) -> None:
-```
-from task_scheduling import interruptible_sleep
-
-interruptible_sleep(5)
-# Sleep for 5 seconds
-```
-
-# Profile settings
 
 ### update_config(key: str, value: Any) -> bool:
 
+Update the parameters in the configuration file, note that this change will not work after a restart
+
 ```
 from task_scheduling import update_config
-
-print(config["line_task_max"])
-# 10
-
-update_config("line_task_max", 18)
-
-# Configuration file updated and reloaded successfully: line_task_max = 18
-
-print(config["line_task_max"])
-
-# 18
-
-
-# The updated configuration is not written to the file, and the modified data is stored in memory
 ```
 
-The configuration file is stored at:
+# Profiles
 
-`task_scheduling/config/config.yaml`
+The maximum number of CPU-optimized asynchronous tasks of the same type can run
 
-The maximum number of linear tasks that can run at the same time
+`cpu_asyncio_task: 4`
 
-`line_task_max: 10`
+The maximum number of tasks of the same type in an IO intensive asynchronous task
 
-The maximum number of queues for a asyncio task
+`io_asyncio_task: 4`
 
-`maximum_queue_async: 30`
+The maximum number of CPU-oriented linear tasks of the same type can run
 
-The maximum number of queues for a linear task
+`cpu_liner_task: 4`
 
-`maximum_queue_line: 30`
+The maximum number of tasks of the same type in an I-O intensive linear task
+
+`io_liner_task: 4`
+
+The timer performs the most tasks
+
+`timer_task: 30`
 
 When there are no tasks for many seconds, close the task scheduler(seconds)
 
@@ -595,19 +782,21 @@ When there are no tasks for many seconds, close the task scheduler(seconds)
 
 When a task runs for a long time without finishing, it is forced to end(seconds)
 
-`watch_dog_time: 200`
+`watch_dog_time: 80`
 
 The maximum number of records that can be stored in a task status
 
-`maximum_task_info_storage: 60`
-
-The maximum number of tasks that run in a single event loop
-
-`maximum_event_loop_tasks: 3`
+`maximum_task_info_storage: 20`
 
 How many seconds to check whether the task status is correct,recommended a longer interval(seconds)
 
 `status_check_interval: 800`
+
+Whether to enable thread management in the process
+
+`thread_management: False`
+
+### If you have a better idea, feel free to submit a PR
 
 # Reference libraries:
 
