@@ -38,35 +38,38 @@ async def _execute_task_async(task: Tuple[bool, str, str, Callable, Tuple, Dict]
     return_results = None
 
     try:
-        task_status_queue.put(("running", task_id, task_name, time.time(), None, None, None))
-        logger.info(f"Start running cpu asyncio task, task ID: {task_id}")
-
         with skip_on_demand() as skip_ctx:
             task_manager.add(skip_ctx, task_id)
 
+            task_status_queue.put(("running", task_id, None, time.time(), None, None, None))
+            logger.info(f"Start running cpu asyncio task, task ID: {task_id}")
+
             if timeout_processing:
-                return_results = await asyncio.wait_for(func(*args, **kwargs), timeout=config["watch_dog_time"])
+                return_results = await asyncio.wait_for(func(*args, **kwargs),
+                                                        timeout=config["watch_dog_time"])
             else:
                 return_results = await func(*args, **kwargs)
 
     except StopException:
         logger.warning(f"Cpu asyncio task | {task_id} | cancelled, forced termination")
-        task_status_queue.put(("cancelled", task_id, task_name, None, None, None, None))
+        task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
         return_results = "error happened"
 
     except asyncio.TimeoutError:
+        task_manager.remove(task_id)
         logger.warning(f"Cpu asyncio task | {task_id} | timed out, forced termination")
-        task_status_queue.put(("timeout", task_id, task_name, None, None, None, None))
+        task_status_queue.put(("timeout", task_id, None, None, None, None, None))
         return_results = "error happened"
 
     except Exception as e:
         logger.error(f"Cpu asyncio task | {task_id} | execution failed: {e}")
-        task_status_queue.put(("failed", task_id, task_name, None, None, e, None))
+        task_status_queue.put(("failed", task_id, None, None, None, e, None))
         return_results = "error happened"
 
     finally:
         if not return_results == "error happened":
-            task_status_queue.put(("completed", task_id, task_name, None, time.time(), None, None))
+            task_status_queue.put(("completed", task_id, None, None, time.time(), None, None))
+        task_manager.remove(task_id)
         return return_results
 
 
@@ -88,9 +91,12 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
     Returns:
         Any: Result of the task execution or error message.
     """
+
     async def run_task():
         try:
             return await _execute_task_async(task, task_status_queue)
+        except KeyboardInterrupt:
+            pass
         except OSError:
             pass
 
@@ -104,7 +110,6 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
     except Exception as e:
         logger.error(f"Cpu asyncio task | {task_id} | execution failed: {e}")
         pass
-
     loop.close()
     return result
 
@@ -156,11 +161,10 @@ class CpuAsyncTask:
         """
         Handle task status updates from the task status queue.
         """
-        while not self.scheduler_stop_event.is_set():
+        while not self.scheduler_stop_event.is_set() or not self.task_status_queue.empty():
             try:
                 if not self.task_status_queue.empty():
-                    task = self.task_status_queue.get(timeout=1)
-
+                    task = self.task_status_queue.get(timeout=1.0)
                     if isinstance(task, tuple):
                         status, task_id, task_name, start_time, end_time, error, timeout_processing = task
                         task_status_manager.add_task_status(task_id, task_name, status, start_time, end_time, error,
@@ -169,6 +173,8 @@ class CpuAsyncTask:
                         self.task_status_queue.put(task)
             except queue.Empty:
                 continue
+            except EOFError:
+                pass
 
     def add_task(self,
                  timeout_processing: bool,
@@ -205,7 +211,7 @@ class CpuAsyncTask:
                     self._join_scheduler_thread()
 
                 # Reduce the granularity of the lock
-                self.task_status_queue.put(("waiting", task_id, task_name, None, None, None, timeout_processing))
+                self.task_status_queue.put(("waiting", task_id, None, None, None, None, None))
 
                 self.task_queue.put((timeout_processing, task_name, task_id, func, args, kwargs))
 
@@ -235,6 +241,7 @@ class CpuAsyncTask:
     def stop_scheduler(self,
                        force_cleanup: bool,
                        system_operations: bool = False) -> None:
+
         """
         Stop the scheduler thread.
 
@@ -251,12 +258,13 @@ class CpuAsyncTask:
 
             if force_cleanup:
                 logger.warning("Force stopping scheduler and cleaning up tasks")
-                self.executor.shutdown(wait=False, cancel_futures=True)
+                self.executor.shutdown(wait=False)
+                self.stop_all_running_task()
                 # Wait for all running tasks to complete
                 self.scheduler_stop_event.set()
             else:
                 # Ensure the executor is properly shut down
-                self.executor.shutdown(wait=True, cancel_futures=True)
+                self.executor.shutdown(wait=True)
                 # Wait for all running tasks to complete
                 self.scheduler_stop_event.set()
 
@@ -269,9 +277,7 @@ class CpuAsyncTask:
 
             # Wait for the scheduler thread to finish
             self._join_scheduler_thread()
-
-            # Drain the task status queue after the stop event is set
-            self._drain_task_status_queue()
+            self.status_thread.join()
 
             # Ensure the manager is properly shut down
             self.manager.shutdown()
@@ -283,18 +289,12 @@ class CpuAsyncTask:
             self.idle_timer = None
             self.task_results = {}
 
-    def _drain_task_status_queue(self) -> None:
-        """
-        Drain the task status queue after the stop event is set.
-        """
-        while not self.task_status_queue.empty():
-            try:
-                status, task_id, task_name, start_time, end_time, error, timeout_processing = self.task_status_queue.get(
-                    timeout=1)
-                task_status_manager.add_task_status(task_id, task_name, status, start_time, end_time, error,
-                                                    timeout_processing)
-            except queue.Empty:
-                break
+            logger.info(
+                "Scheduler and event loop have stopped, all resources have been released and parameters reset")
+
+    def stop_all_running_task(self):
+        for task_id in self.running_tasks.keys():
+            self.task_status_queue.put(task_id)
 
     def _scheduler(self) -> None:
         """
@@ -322,9 +322,6 @@ class CpuAsyncTask:
 
                     future.add_done_callback(partial(self._task_done, task_id))
 
-            # Ensure the executor is properly shut down
-            executor.shutdown(wait=True)
-
     def _task_done(self,
                    task_id: str,
                    future: Future) -> None:
@@ -345,7 +342,14 @@ class CpuAsyncTask:
                         self.task_results[task_id] = result
         except Exception as e:
             logger.error(f"Cpu asyncio task | {task_id} | execution failed in callback: {e}")
-            self.task_status_queue.put(("failed", task_id, None, None, time.time(), e, None))
+            self.task_status_queue.put(("failed", task_id, None, None, None, e, None))
+        except KeyboardInterrupt:
+            # Prevent problems caused by exit errors
+            logger.warning(f"Cpu asyncio task | {task_id} | cancelled, forced termination")
+            try:
+                self.task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
+            except FileNotFoundError:
+                pass
         finally:
             # Make sure the Future object is deleted
             with self.lock:
