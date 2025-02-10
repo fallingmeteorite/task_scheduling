@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# Author: fallingmeteorite
+
 import time
 
 from .config import config
