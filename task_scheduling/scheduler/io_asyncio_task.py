@@ -42,7 +42,7 @@ class IoAsyncTask:
         self.scheduler_stop_event = threading.Event()  # Scheduler thread stop event
         self.scheduler_threads: Dict[str, threading.Thread] = {}  # Scheduler threads for each task name
 
-        self.event_loops: Dict[str, asyncio.AbstractEventLoop] = {}  # Event loops for each task name
+        self.event_loops: Dict[str, Any] = {}  # Event loops for each task name
 
         self.idle_timers: Dict[str, threading.Timer] = {}  # Idle timers for each task name
         self.idle_timeout = config["max_idle_time"]  # Idle timeout, default is 60 seconds
@@ -82,7 +82,7 @@ class IoAsyncTask:
                     logger.warning(f"Io asyncio task | {task_id} | not added, queue is full")
                     return False
 
-                task_status_manager.add_task_status(task_id, task_name, "waiting", None, None, None, timeout_processing)
+                task_status_manager.add_task_status(task_id, None, "waiting", None, None, None, None)
 
                 self.task_queues[task_name].put((timeout_processing, task_name, task_id, func, args, kwargs))
 
@@ -124,31 +124,20 @@ class IoAsyncTask:
 
     # Stop the scheduler
     def _stop_scheduler(self,
-                        task_name: str,
-                        force_cleanup: bool,
-                        system_operations: bool = False) -> None:
+                        task_name: str) -> None:
         """
         Stop the scheduler and event loop for a specific task name.
 
         Args:
             task_name (str): Task name.
-            force_cleanup (bool): Force the end of a running task.
-            system_operations (bool): System execution metrics.
         """
         with self.scheduler_lock:
             # Check if all tasks are completed
             if not self.task_queues[task_name].empty() or len(self.running_tasks) != 0:
-                if system_operations:
-                    logger.warning(f"Io asyncio task was detected to be running, and the task stopped terminating")
-                    return None
+                logger.warning(f"Io asyncio task was detected to be running, and the task stopped terminating")
+                return None
 
-            if force_cleanup:
-                logger.warning("Force stopping scheduler and cleaning up tasks")
-                # Forcibly cancel all running tasks
-                task_manager.cancel_all_tasks()
-                self.scheduler_stop_event.set()
-            else:
-                self.scheduler_stop_event.set()
+            self.scheduler_stop_event.set()
 
             with self.condition:
                 self.scheduler_started = False
@@ -258,7 +247,7 @@ class IoAsyncTask:
             # Execute the task after the lock is released
             timeout_processing, task_name, task_id, func, args, kwargs = task
             future = asyncio.run_coroutine_threadsafe(self._execute_task(task), self.event_loops[task_name])
-            task_manager.add(future, None, None, task_id)
+            task_manager.add(future, None, task_id)
             with self.condition:
                 self.running_tasks[task_id] = [future, task_name]
                 self.task_counters[task_name] += 1
@@ -286,35 +275,33 @@ class IoAsyncTask:
         return_results = None
         try:
             # Modify the task status
-            task_status_manager.add_task_status(task_id, task_name, "running", time.time(), None, None,
-                                                timeout_processing)
+            task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None, None)
 
             logger.info(f"Start running io asyncio task | {task_id} | ")
 
             # If the task needs timeout processing, set the timeout time
+
             if timeout_processing:
-                return_results = await asyncio.wait_for(func(*args, **kwargs), timeout=config["watch_dog_time"])
+                return_results = await asyncio.wait_for(func(*args, **kwargs),
+                                                        timeout=config["watch_dog_time"])
             else:
                 return_results = await func(*args, **kwargs)
 
             # Update task status to "completed"
-            task_status_manager.add_task_status(task_id, task_name, "completed", None, time.time(), None,
-                                                timeout_processing)
+            task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None)
 
         except asyncio.TimeoutError:
             logger.warning(f"Io asyncio task | {task_id} | timed out, forced termination")
-            task_status_manager.add_task_status(task_id, task_name, "timeout", None, None, None,
-                                                timeout_processing)
+            task_status_manager.add_task_status(task_id, None, "timeout", None, None, None, None)
             return_results = "error happened"
         except asyncio.CancelledError:
             logger.warning(f"Io asyncio task | {task_id} | was cancelled")
-            task_status_manager.add_task_status(task_id, task_name, "cancelled", None, None, None,
-                                                timeout_processing)
+            task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None,
+                                                None)
             return_results = "error happened"
         except Exception as e:
             logger.error(f"Io asyncio task | {task_id} | execution failed: {e}")
-            task_status_manager.add_task_status(task_id, task_name, "failed", None, None, e,
-                                                timeout_processing)
+            task_status_manager.add_task_status(task_id, None, "failed", None, None, e, None)
             return_results = "error happened"
         finally:
             if return_results == "error happened":
@@ -356,7 +343,7 @@ class IoAsyncTask:
             if task_name in self.idle_timers and self.idle_timers[task_name] is not None:
                 self.idle_timers[task_name].cancel()
             self.idle_timers[task_name] = threading.Timer(self.idle_timeout, self._stop_scheduler,
-                                                          args=(task_name, False, True,))
+                                                          args=(task_name,))
             self.idle_timers[task_name].start()
 
     def _cancel_idle_timer(self,
