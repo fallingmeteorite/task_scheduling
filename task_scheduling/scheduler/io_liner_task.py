@@ -36,34 +36,30 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
 
     return_results = None
     try:
-        task_status_manager.add_task_status(task_id, task_name, "running", time.time(), None, None,
-                                            timeout_processing)
-        logger.info(f"Start running io linear task, task ID: {task_id}")
+        with skip_on_demand() as skip_ctx:
+            task_manager.add(None, skip_ctx, task_id)
 
-        if timeout_processing:
-            with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
-                with skip_on_demand() as skip_ctx:
-                    task_manager.add(None, skip_ctx, None, task_id)
+            task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None, None)
+            logger.info(f"Start running io linear task, task ID: {task_id}")
+            if timeout_processing:
+                with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
+
                     return_results = func(*args, **kwargs)
-        else:
-            with skip_on_demand() as skip_ctx:
-                task_manager.add(None, skip_ctx, None, task_id)
+            else:
+
                 return_results = func(*args, **kwargs)
 
         task_manager.remove(task_id)
     except TimeoutException:
         logger.warning(f"Io linear task | {task_id} | timed out, forced termination")
-        task_status_manager.add_task_status(task_id, task_name, "timeout", None, None, None,
-                                            timeout_processing)
+        task_status_manager.add_task_status(task_id, None, "timeout", None, None, None, None)
         return_results = "error happened"
     except StopException:
         logger.warning(f"Io linear task | {task_id} | was cancelled")
-        task_status_manager.add_task_status(task_id, task_name, "cancelled", None, None, None,
-                                            timeout_processing)
+        task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None)
     except Exception as e:
         logger.error(f"Io linear task | {task_id} | execution failed: {e}")
-        task_status_manager.add_task_status(task_id, task_name, "failed", None, None, e,
-                                            timeout_processing)
+        task_status_manager.add_task_status(task_id, None, "failed", None, None, e, None)
         return_results = "error happened"
     finally:
         if task_manager.check(task_id):
@@ -141,8 +137,7 @@ class IoLinerTask:
                     self._join_scheduler_thread()
 
                 # Reduce the granularity of the lock
-                task_status_manager.add_task_status(task_id, task_name, "waiting", None, None, None,
-                                                    timeout_processing)
+                task_status_manager.add_task_status(task_id, None, "waiting", None, None, None, None)
 
                 self.task_queue.put((timeout_processing, task_name, task_id, func, args, kwargs))
 
