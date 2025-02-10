@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# Author: fallingmeteorite
+
 import ctypes
 import threading
 from contextlib import contextmanager
