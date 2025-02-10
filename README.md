@@ -211,6 +211,8 @@ Threads can be created in this process, and the library is given a task manager 
 `thread_management=True` after it is enabled, `task_manager` will be passed to the executor function, The threads that
 will be created in this function will be managed through it, and here is an example
 
+Warning!!! the method is still experimental
+
 `thread_management=False`
 
 ```
@@ -755,6 +757,8 @@ from task_scheduling import update_config
 ```
 
 # Profiles
+
+Files are stored in:`task_scheduling/config/config.yaml`
 
 The maximum number of CPU-optimized asynchronous tasks of the same type can run
 
