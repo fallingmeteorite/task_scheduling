@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# Author: fallingmeteorite
+
 import queue
 import sys
 import threading
