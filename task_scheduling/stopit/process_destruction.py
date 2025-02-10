@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+# Author: fallingmeteorite
 import queue
 import threading
 from typing import Dict, Any
@@ -11,6 +13,7 @@ class ProcessTaskManager:
         self.is_operation_in_progress = False
         self.task_queue = task_queue
         self.start_monitor_thread()  # Start the monitor thread
+        self.start: bool = True
 
     def add(self, skip_obj: Any, task_id: str) -> None:
         """
@@ -40,6 +43,9 @@ class ProcessTaskManager:
 
         if task_id in self.tasks:
             del self.tasks[task_id]
+            if not self.tasks:  # Check if the tasks dictionary is empty
+                logger.info("No tasks remaining, stopping the monitor thread")
+                self.start = False  # If tasks dictionary is empty, stop the loop
         else:
             logger.warning(f"No task found with task_id '{task_id}', operation invalid")
 
@@ -58,16 +64,14 @@ class ProcessTaskManager:
 
         :param task_id: Task ID.
         """
-        if self.check(task_id):
-            self.is_operation_in_progress = True
-            try:
-                self.tasks[task_id]['skip'].skip()
-            except Exception as error:
-                logger.error(error)
-            finally:
-                self.is_operation_in_progress = False
-        else:
-            logger.warning(f"No task found with task_id '{task_id}', operation invalid")
+        self.is_operation_in_progress = True
+        try:
+            self.tasks[task_id]['skip'].skip()
+        except Exception as error:
+            logger.error(error)
+        finally:
+            self.is_operation_in_progress = False
+            del self.tasks[task_id]
 
     def start_monitor_thread(self) -> None:
         """
@@ -78,21 +82,25 @@ class ProcessTaskManager:
     def _monitor_task_queue(self) -> None:
         while True:
             try:
-                if not self.task_queue.empty():
-                    task_id = self.task_queue.get(timeout=1)
-                    if isinstance(task_id, tuple):
-                        continue
+                task_id = self.task_queue.get(timeout=1.0)
 
-                    if task_id in self.tasks:
-                        self.is_operation_in_progress = True
-                        try:
-                            self.skip_task(task_id)
-                            break
-                        except Exception as error:
-                            logger.error(f"Error terminating task '{task_id}': {error}")
-                        finally:
-                            self.is_operation_in_progress = False
-                    else:
-                        logger.warning(f"No task found with task_id '{task_id}', operation invalid")
-            except queue.Empty:
-                continue
+                if isinstance(task_id, tuple):
+                    self.task_queue.put(task_id)
+                    continue
+
+                if task_id in self.tasks:
+                    self.is_operation_in_progress = True
+                    try:
+                        self.skip_task(task_id)
+                    except Exception as error:
+                        logger.error(f"Error terminating task '{task_id}': {error}")
+                    finally:
+                        self.is_operation_in_progress = False
+                        if not self.tasks:  # Check if the tasks dictionary is empty
+                            logger.info("No tasks remaining, stopping the monitor thread")
+                            break  # Stop the loop if tasks dictionary is empty
+            except Exception:
+                pass
+            finally:
+                if not self.start:
+                    break
