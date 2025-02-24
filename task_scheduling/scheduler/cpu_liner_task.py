@@ -272,6 +272,9 @@ class CpuLinerTask:
         for task_id in self._running_tasks.keys():
             self._task_status_queue.put(task_id)
 
+        while not self._task_status_queue.qsize() == 0:
+            time.sleep(0.1)
+
     def _scheduler(self) -> None:
         """
         Scheduler function, fetch tasks from the task queue and submit them to the process pool for execution.
@@ -361,15 +364,17 @@ class CpuLinerTask:
             self._scheduler_thread.join()
 
     def force_stop_task(self,
-                        task_id: str) -> bool:
+                        task_id: str,
+                        built_in_task: bool) -> bool:
         """
         Force stop a task by its task ID.
 
         :param task_id: Task ID.
+        :param built_in_task: Built-in task metrics are used for skip detection.
 
         :return: bool: Whether the task was successfully force stopped.
         """
-        if self._running_tasks.get(task_id) is None:
+        if self._running_tasks.get(task_id) is None and built_in_task:
             logger.warning(f"Cpu linear task | {task_id} | does not exist or is already completed")
             return False
 

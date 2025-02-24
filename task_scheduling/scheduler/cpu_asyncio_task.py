@@ -126,7 +126,6 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
     try:
         result = loop.run_until_complete(run_task())
     except Exception as e:
-        logger.error(f"Cpu asyncio task | {task_id} | execution failed: {e}")
         pass
     loop.close()
     return result
@@ -309,6 +308,9 @@ class CpuAsyncTask:
     def stop_all_running_task(self):
         for task_id in self._running_tasks.keys():
             self._task_status_queue.put(task_id)
+
+        while not self._task_status_queue.qsize() == 0:
+            time.sleep(0.1)
 
     def _scheduler(self) -> None:
         """
