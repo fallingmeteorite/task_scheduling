@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+import os
 import queue
+import signal
+import sys
 import threading
 import time
 from concurrent.futures import ProcessPoolExecutor, Future
@@ -12,6 +15,12 @@ from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
 from ..stopit import skip_on_demand, ProcessTaskManager, StopException, ThreadingTimeout, TimeoutException
+from ..utils import worker_initializer
+
+
+def signal_handler(signum, frame):
+    logger.warning(f"Worker {os.getpid()} received signal {signum}, exiting...")
+    sys.exit(1)
 
 
 def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
@@ -32,6 +41,10 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
     Returns:
         Any: Result of the task execution or error message.
     """
+    # Before task execution, cancel signal handling (restore default behavior)
+    signal.signal(signal.SIGINT, signal.SIG_DFL)  # Restore default for Ctrl+C
+    signal.signal(signal.SIGTERM, signal.SIG_DFL)  # Restore default for SIGTERM
+
     timeout_processing, task_name, task_id, func, args, kwargs = task
     task_manager = ProcessTaskManager(task_status_queue)
     return_results = None
@@ -74,6 +87,10 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
             except BrokenPipeError:
                 pass
         task_manager.remove(task_id)
+
+        signal.signal(signal.SIGINT, signal_handler)  # Ctrl+C
+        signal.signal(signal.SIGTERM, signal_handler)  # Stop signal
+
         return return_results
 
 
@@ -160,11 +177,9 @@ class CpuLinerTask:
         try:
             with self._scheduler_lock:
                 if self._task_queue.qsize() >= config["cpu_liner_task"]:
-                    logger.warning(f"Cpu linear task | {task_id} | not added, queue is full")
                     return False
 
                 if task_name in [details[1] for details in self._running_tasks.values()]:
-                    logger.warning(f"Cpu linear task | {task_id} | not added, task name already running")
                     return False
 
                 if self._scheduler_stop_event.is_set() and not self._scheduler_started:
@@ -261,7 +276,8 @@ class CpuLinerTask:
         """
         Scheduler function, fetch tasks from the task queue and submit them to the process pool for execution.
         """
-        with ProcessPoolExecutor(max_workers=int(config["io_liner_task"])) as executor:
+        with ProcessPoolExecutor(max_workers=int(config["io_liner_task"]),
+                                 initializer=worker_initializer) as executor:
             self._executor = executor
             while not self._scheduler_stop_event.is_set():
                 with self._condition:
@@ -335,7 +351,7 @@ class CpuLinerTask:
         Clear the task queue.
         """
         while not self._task_queue.empty():
-            self._task_queue.get(timeout=1)
+            self._task_queue.get(timeout=1.0)
 
     def _join_scheduler_thread(self) -> None:
         """

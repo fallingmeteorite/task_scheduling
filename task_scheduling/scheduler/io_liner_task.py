@@ -124,11 +124,9 @@ class IoLinerTask:
             with self._scheduler_lock:
 
                 if self._task_queue.qsize() >= config["io_liner_task"]:
-                    logger.warning(f"Io linear task | {task_id} | not added, queue is full")
                     return False
 
                 if task_name in [details[1] for details in self._running_tasks.values()]:
-                    logger.warning(f"Io linear task | {task_id} | not added, task name already running")
                     return False
 
                 if self._scheduler_stop_event.is_set() and not self._scheduler_started:
@@ -291,7 +289,7 @@ class IoLinerTask:
         Clear the task queue.
         """
         while not self._task_queue.empty():
-            self._task_queue.get(timeout=1)
+            self._task_queue.get(timeout=1.0)
 
     def _join_scheduler_thread(self) -> None:
         """

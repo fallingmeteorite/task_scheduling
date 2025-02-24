@@ -19,7 +19,7 @@ def is_banana(item: Tuple, task_name: str) -> bool:
 
 class TaskScheduler:
     __slots__ = ['ban_task_names', 'core_task_queue', 'allocator_running', 'allocator_started', 'allocator_thread',
-                 'timeout_check_interval', '_timeout_checker']
+                 'timeout_check_interval', '_timeout_checker', '_task_event']
 
     def __init__(self) -> None:
         self.ban_task_names: List[str] = []
@@ -29,6 +29,7 @@ class TaskScheduler:
         self.allocator_thread: Optional[threading.Thread] = None
         self.timeout_check_interval: int = config["status_check_interval"]
         self._timeout_checker: Optional[threading.Timer] = None
+        self._task_event = threading.Event()  # Add an event
         if self._timeout_checker is not None:
             self._start_timeout_checker()
 
@@ -62,6 +63,7 @@ class TaskScheduler:
                                   func,
                                   args,
                                   kwargs))
+        self._task_event.set()  # Wake up the allocator thread
 
         task_status_manager.add_task_status(task_id, task_name, "queuing", None, None, None, timeout_processing)
 
@@ -119,8 +121,12 @@ class TaskScheduler:
                                               args,
                                               kwargs))
 
-            else:
                 time.sleep(0.1)
+
+            else:
+                self._task_event.clear()
+                if self.core_task_queue.empty():
+                    self._task_event.wait()  # Wait for the event to trigger
 
     def cancel_the_queue_task_by_name(self, task_name: str) -> None:
 
@@ -196,7 +202,7 @@ class TaskScheduler:
         # Stop the task allocator
         self.allocator_running = False
         if self.allocator_thread and self.allocator_thread.is_alive():
-            self.allocator_thread.join()
+            self.allocator_thread.join(timeout=0.1)
         logger.info("Allocator thread has been stopped.")
 
         # Stop the timeout checker

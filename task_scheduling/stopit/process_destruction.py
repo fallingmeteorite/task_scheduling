@@ -8,6 +8,13 @@ from ..common import logger
 
 
 class ProcessTaskManager:
+    __slots__ = ['_tasks',
+                 '_is_operation_in_progress',
+                 '_task_queue',
+                 '_start'
+
+                 ]
+
     def __init__(self, task_queue: queue.Queue) -> None:
         self._tasks: Dict[str, Dict[str, Any]] = {}
         self._is_operation_in_progress = False

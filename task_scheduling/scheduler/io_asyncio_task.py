@@ -79,7 +79,6 @@ class IoAsyncTask:
                     self._task_queues[task_name] = queue.Queue()
 
                 if self._task_queues[task_name].qsize() >= config["io_asyncio_task"]:
-                    logger.warning(f"Io asyncio task | {task_id} | not added, queue is full")
                     return False
 
                 task_status_manager.add_task_status(task_id, None, "waiting", None, None, None, None)
@@ -367,7 +366,7 @@ class IoAsyncTask:
             task_name (str): Task name.
         """
         while not self._task_queues[task_name].empty():
-            self._task_queues[task_name].get(timeout=1)
+            self._task_queues[task_name].get(timeout=1.0)
 
     def _join_scheduler_thread(self,
                                task_name: str) -> None:
@@ -445,6 +444,6 @@ class IoAsyncTask:
                 self._event_loops[task_name].call_soon_threadsafe(self._event_loops[task_name].stop)
                 # Wait for the event loop thread to finish
                 if task_name in self._scheduler_threads and self._scheduler_threads[task_name].is_alive():
-                    self._scheduler_threads[task_name].join(timeout=1)  # Wait up to 1 second
+                    self._scheduler_threads[task_name].join(timeout=1.0)  # Wait up to 1 second
             except Exception as e:
                 logger.error(f"Io asyncio task | stopping event loop | error occurred: {e}")

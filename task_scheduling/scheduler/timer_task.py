@@ -334,7 +334,7 @@ class TimerTask:
         Clear the task queue.
         """
         while not self._task_queue.empty():
-            self._task_queue.get(timeout=1)
+            self._task_queue.get(timeout=1.0)
 
     def _join_scheduler_thread(self) -> None:
         """
