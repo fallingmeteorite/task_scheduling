@@ -197,17 +197,13 @@ class TaskScheduler:
         """
         Clean up all resources in the task scheduler, stop running tasks, and empty the task queue.
         """
-        logger.info("Starting shutdown process for TaskScheduler.")
-
         # Stop the task allocator
         self.allocator_running = False
         if self.allocator_thread and self.allocator_thread.is_alive():
             self.allocator_thread.join(timeout=0.1)
-        logger.info("Allocator thread has been stopped.")
 
         # Stop the timeout checker
         self._stop_timeout_checker()
-        logger.info("Timeout checker has been stopped.")
 
         # Clear the core task queue
         with self.core_task_queue.mutex:

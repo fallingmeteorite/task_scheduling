@@ -68,6 +68,7 @@ def shutdown(force_cleanup: bool) -> None:
         Only checks if the scheduler is running and forces a shutdown if necessary.
         """
 
+    logger.info("Starting shutdown TaskScheduler.")
     task_scheduler.shutdown()
 
     # Shutdown scheduler if running

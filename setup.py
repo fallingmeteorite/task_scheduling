@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="task_scheduling",
-    version="2.0.5",
+    version="2.0.7",
     description="It is mainly used for task scheduling",
     author="fallingmeteorite",
     author_email="2327667836@qq.com",

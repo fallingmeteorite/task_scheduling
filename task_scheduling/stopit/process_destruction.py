@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+import os
 import queue
 import threading
 import time
@@ -44,7 +45,7 @@ class ProcessTaskManager:
             if task_id in self._tasks:
                 del self._tasks[task_id]
                 if not self._tasks:  # Check if the tasks dictionary is empty
-                    logger.info("No tasks remaining, stopping the monitor thread")
+                    logger.info(f"Worker {os.getpid()} no tasks remaining, stopping the monitor thread")
                     self._start = False  # If tasks dictionary is empty, stop the loop
 
     def check(self, task_id: str) -> bool:
@@ -93,14 +94,11 @@ class ProcessTaskManager:
 
                     with self._operation_lock:  # Lock for thread-safe dictionary access
                         if not self._tasks:  # Check if the tasks dictionary is empty
-                            logger.info("No tasks remaining, stopping the monitor thread")
+                            logger.info(f"Worker {os.getpid()} no tasks remaining, stopping the monitor thread")
                             break  # Stop the loop if tasks dictionary is empty
             except queue.Empty:
                 pass  # Ignore empty queue exceptions
             except Exception as error:
                 logger.error(f"Error in monitor thread: {error}")
             finally:
-                if not self._tasks:
-                    break
-                else:
-                    time.sleep(0.1)
+                time.sleep(0.1)

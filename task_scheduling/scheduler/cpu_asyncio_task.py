@@ -1,10 +1,7 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
 import asyncio
-import os
 import queue
-import signal
-import sys
 import threading
 import time
 from concurrent.futures import ProcessPoolExecutor, Future
@@ -16,16 +13,11 @@ from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
 from ..stopit import ProcessTaskManager, skip_on_demand, StopException
-from ..utils import worker_initializer
-
-
-def signal_handler(signum, frame):
-    logger.warning(f"Worker {os.getpid()} received signal {signum}, exiting...")
-    sys.exit(1)
+from ..utils import worker_initializer_asyncio
 
 
 async def _execute_task_async(task: Tuple[bool, str, str, Callable, Tuple, Dict],
-                              task_status_queue: queue.Queue) -> Any:
+                              task_status_queue: queue.Queue, task_manager: Any) -> Any:
     """
     Execute a task asynchronously and handle its status.
 
@@ -42,13 +34,7 @@ async def _execute_task_async(task: Tuple[bool, str, str, Callable, Tuple, Dict]
     Returns:
         Any: Result of the task execution or error message.
     """
-
-    # Before task execution, cancel signal handling (restore default behavior)
-    signal.signal(signal.SIGINT, signal.SIG_DFL)  # Restore default for Ctrl+C
-    signal.signal(signal.SIGTERM, signal.SIG_DFL)  # Restore default for SIGTERM
-
     timeout_processing, task_name, task_id, func, args, kwargs = task
-    task_manager = ProcessTaskManager(task_status_queue)
     return_results = None
 
     try:
@@ -70,7 +56,6 @@ async def _execute_task_async(task: Tuple[bool, str, str, Callable, Tuple, Dict]
         return_results = "error happened"
 
     except asyncio.TimeoutError:
-        task_manager.remove(task_id)
         logger.warning(f"Cpu asyncio task | {task_id} | timed out, forced termination")
         task_status_queue.put(("timeout", task_id, None, None, None, None, None))
         return_results = "error happened"
@@ -83,11 +68,6 @@ async def _execute_task_async(task: Tuple[bool, str, str, Callable, Tuple, Dict]
     finally:
         if not return_results == "error happened":
             task_status_queue.put(("completed", task_id, None, None, time.time(), None, None))
-        task_manager.remove(task_id)
-
-        signal.signal(signal.SIGINT, signal_handler)  # Ctrl+C
-        signal.signal(signal.SIGTERM, signal_handler)  # Stop signal
-
         return return_results
 
 
@@ -109,25 +89,14 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
     Returns:
         Any: Result of the task execution or error message.
     """
-
-    async def run_task():
-        try:
-            return await _execute_task_async(task, task_status_queue)
-        except KeyboardInterrupt:
-            pass
-        except OSError:
-            pass
-
     _, _, task_id, _, _, _ = task
-    result = None
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
+    task_manager = ProcessTaskManager(task_status_queue)
     try:
-        result = loop.run_until_complete(run_task())
-    except Exception as e:
-        pass
-    loop.close()
+        result = asyncio.run(_execute_task_async(task, task_status_queue, task_manager))
+    except Exception as error:
+        result = error
+    finally:
+        task_manager.remove(task_id)
     return result
 
 
@@ -190,6 +159,8 @@ class CpuAsyncTask:
                         self._task_status_queue.put(task)
             except Exception:
                 continue
+            finally:
+                time.sleep(0.1)
 
     def add_task(self,
                  timeout_processing: bool,
@@ -271,15 +242,17 @@ class CpuAsyncTask:
 
             if force_cleanup:
                 logger.warning("Force stopping scheduler and cleaning up tasks")
-                self._executor.shutdown(wait=False)
                 self.stop_all_running_task()
-                # Wait for all running tasks to complete
-                self._scheduler_stop_event.set()
+                # Ensure the executor is properly shut down
+                if self._executor:
+                    self._executor.shutdown(wait=False, cancel_futures=True)
             else:
                 # Ensure the executor is properly shut down
-                self._executor.shutdown(wait=True)
-                # Wait for all running tasks to complete
-                self._scheduler_stop_event.set()
+                if self._executor:
+                    self._executor.shutdown(wait=True, cancel_futures=True)
+
+            # Wait for all running tasks to complete
+            self._scheduler_stop_event.set()
 
             # Clear the task queue
             self._clear_task_queue()
@@ -317,7 +290,7 @@ class CpuAsyncTask:
         Scheduler function, fetch tasks from the task queue and submit them to the process pool for execution.
         """
         with ProcessPoolExecutor(max_workers=int(config["cpu_asyncio_task"]),
-                                 initializer=worker_initializer) as executor:
+                                 initializer=worker_initializer_asyncio) as executor:
             self._executor = executor
             while not self._scheduler_stop_event.is_set():
                 with self._condition:
@@ -365,6 +338,7 @@ class CpuAsyncTask:
         except Exception as e:
             logger.error(f"Cpu asyncio task | {task_id} | execution failed in callback: {e}")
             self._task_status_queue.put(("failed", task_id, None, None, None, e, None))
+
         finally:
             # Make sure the Future object is deleted
             with self._lock:

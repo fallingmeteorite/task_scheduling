@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
-import os
 import queue
-import signal
-import sys
 import threading
 import time
 from concurrent.futures import ProcessPoolExecutor, Future
@@ -15,12 +12,7 @@ from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
 from ..stopit import skip_on_demand, ProcessTaskManager, StopException, ThreadingTimeout, TimeoutException
-from ..utils import worker_initializer
-
-
-def signal_handler(signum, frame):
-    logger.warning(f"Worker {os.getpid()} received signal {signum}, exiting...")
-    sys.exit(1)
+from ..utils import worker_initializer_liner
 
 
 def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
@@ -41,9 +33,6 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
     Returns:
         Any: Result of the task execution or error message.
     """
-    # Before task execution, cancel signal handling (restore default behavior)
-    signal.signal(signal.SIGINT, signal.SIG_DFL)  # Restore default for Ctrl+C
-    signal.signal(signal.SIGTERM, signal.SIG_DFL)  # Restore default for SIGTERM
 
     timeout_processing, task_name, task_id, func, args, kwargs = task
     task_manager = ProcessTaskManager(task_status_queue)
@@ -65,12 +54,11 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
             else:
                 return_results = func(*args, **kwargs)
 
-    except StopException:
+    except (StopException, KeyboardInterrupt):
         logger.info(f"Cpu linear task | {task_id} | cancelled, forced termination")
         task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
         return_results = "error happened"
-    except KeyboardInterrupt:
-        pass
+
     except TimeoutException:
         logger.warning(f"Cpu linear task | {task_id} | timed out, forced termination")
         task_status_queue.put(("timeout", task_id, None, None, None, None, None))
@@ -80,6 +68,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
         logger.error(f"Cpu linear task | {task_id} | execution failed: {e}")
         task_status_queue.put(("failed", task_id, None, None, None, e, None))
         return_results = "error happened"
+
     finally:
         if return_results != "error happened":
             try:
@@ -87,9 +76,6 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
             except BrokenPipeError:
                 pass
         task_manager.remove(task_id)
-
-        signal.signal(signal.SIGINT, signal_handler)  # Ctrl+C
-        signal.signal(signal.SIGTERM, signal_handler)  # Stop signal
 
         return return_results
 
@@ -231,18 +217,17 @@ class CpuLinerTask:
 
             if force_cleanup:
                 logger.warning("Force stopping scheduler and cleaning up tasks")
+                self.stop_all_running_task()
                 # Ensure the executor is properly shut down
                 if self._executor:
-                    self._executor.shutdown(wait=False)
-                self.stop_all_running_task()
-                # Wait for all running tasks to complete
-                self._scheduler_stop_event.set()
+                    self._executor.shutdown(wait=False, cancel_futures=True)
             else:
                 # Ensure the executor is properly shut down
                 if self._executor:
-                    self._executor.shutdown(wait=True)
-                # Wait for all running tasks to complete
-                self._scheduler_stop_event.set()
+                    self._executor.shutdown(wait=True, cancel_futures=True)
+
+            # Wait for all running tasks to complete
+            self._scheduler_stop_event.set()
 
             # Clear the task queue
             self._clear_task_queue()
@@ -280,7 +265,7 @@ class CpuLinerTask:
         Scheduler function, fetch tasks from the task queue and submit them to the process pool for execution.
         """
         with ProcessPoolExecutor(max_workers=int(config["io_liner_task"]),
-                                 initializer=worker_initializer) as executor:
+                                 initializer=worker_initializer_liner) as executor:
             self._executor = executor
             while not self._scheduler_stop_event.is_set():
                 with self._condition:
@@ -377,6 +362,8 @@ class CpuLinerTask:
         if self._running_tasks.get(task_id) is None and built_in_task:
             logger.warning(f"Cpu linear task | {task_id} | does not exist or is already completed")
             return False
+
+        self._task_status_queue.put(task_id)
 
         self._task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
         with self._lock:
