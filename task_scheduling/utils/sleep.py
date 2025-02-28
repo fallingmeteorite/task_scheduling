@@ -22,6 +22,6 @@ def interruptible_sleep(seconds: float or int) -> None:
     _thread.start()
 
     while not _event.is_set():
-        _event.wait(0.01)
+        _event.wait(0.1)
 
     _thread.join(timeout=0)

@@ -47,9 +47,11 @@ monitoring.
 
 5.Automatically hibernate when there are no tasks
 
-!!! WARNING: If the task is running in a series of blocked tasks such as `time.sleep`, the task cannot be forcibly
-terminated, It is recommended to use `interruptible_sleep` instead for long waits
-so use `await asyncio.sleep` for asynchronous tasks
+!!! WARNING: If an I-dense task is running in a series of blocking tasks such as time.sleep, the task cannot be forced
+terminated, it is recommended to use `interruptible_sleep` instead of `time.sleep` for long waits
+So, use `await asyncio.sleep` for asynchronous tasks
+
+CPU-intensive tasks do not need to be processed at all, and can be forced to end even if `time.sleep` is running
 
 ## Installation
 
@@ -64,7 +66,7 @@ pip install --upgrade task_scheduling
 The core function is used to create a task and submit it to the scheduler. Currently the scheduler has
 `cpu_asyncio_task, cpu_liner_task, io_asyncio_task, io_liner_task, timer_task`
 
-(The task is of the "io" type) Io-intensive tasks are all run in the threads of a process
+(The task is of the "io" type) I/O intensive tasks run in the threads of the main process.
 
 ```
 
@@ -202,30 +204,25 @@ if __name__ == "__main__":
 
 ```
 
-(The task is of the "cpu" type)Each task is separate in a process. WARNING!! The `shutdown` function should be used
-before the kill signal is given
+(The task is of the "cpu" type)Each task is separate in a process.
 
-This task manager will end the process when there are no threads in the process, so that the process will be recycled
+This `task_manager` will end the process when there are no threads in the process, so that the process will be recycled
 
-Threads can be created in this process, and the library is given a task manager that will configure the file
-`thread_management=True` after it is enabled, `task_manager` will be passed to the executor function, The threads that
-will be created in this function will be managed through it, and here is an example
+Threaded tasks can be created in this process, and the library provides `task_manager`
+that will pass the configuration file `thread_management=True` to the main function
+where a new threaded task is created and managed through the task manager, as shown in an example below
 
-Warning!!! the method is still experimental
+!!! WARNING: The method is still experimental and there is no guarantee that there will be no unknown problems
 
 `thread_management=False`
 
 ```
 import time
 
-from task_scheduling.stopit import skip_on_demand
-
-
-def line_task(input_info, task_manager):
-    with skip_on_demand() as skip_ctx:
-        task_id = 1001001
-        # Create your own thread and give a unique ID to the incoming task_manager
-        task_manager.add(skip_ctx, task_id)
+def line_task(input_info):
+    while True:
+        interruptible_sleep(1)
+        print(input_info)
 
 
 input_info = "test"
@@ -252,16 +249,11 @@ if __name__ == "__main__":
                              # Pass the parameters required by the function, no restrictions
                              )
 
-    task_id = 1001001
-    time.sleep(2.0)
-    cpu_liner_task.force_stop_task(task_id) # Fill in the ID you created here
-    time.sleep(2.0)
-    shutdown(True)
     try:
         while True:
             time.sleep(0.1)
     except KeyboardInterrupt:
-        pass
+        shutdown(True)
 
 
 ```
@@ -275,6 +267,7 @@ from task_scheduling.stopit import skip_on_demand
 
 
 def line_task(task_manager, input_info):
+
     with skip_on_demand() as skip_ctx:
         task_id = 1001001
         # Create your own thread and give a unique ID to the incoming task_manager
@@ -308,13 +301,11 @@ if __name__ == "__main__":
     task_id = 1001001
     time.sleep(2.0)
     cpu_liner_task.force_stop_task(task_id)
-    time.sleep(2.0)
-    shutdown(True)
     try:
         while True:
             time.sleep(0.1)
     except KeyboardInterrupt:
-        pass
+        shutdown(True)
 
 ```
 

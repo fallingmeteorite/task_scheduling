@@ -83,7 +83,7 @@ class ProcessTaskManager:
     def _monitor_task_queue(self) -> None:
         while self._start:
             try:
-                task_id = self._task_queue.get(timeout=1.0)
+                task_id = self._task_queue.get(timeout=0.1)
 
                 if isinstance(task_id, tuple):
                     self._task_queue.put(task_id)
@@ -101,4 +101,4 @@ class ProcessTaskManager:
             except Exception as error:
                 logger.error(f"Error in monitor thread: {error}")
             finally:
-                time.sleep(0.1)
+                time.sleep(0.4)

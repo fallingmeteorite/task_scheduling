@@ -31,7 +31,6 @@ class _MonitorContextManager:
     def _monitor(self) -> None:
         while not self._stop_event.is_set():
             if self._condition_func():
-                print(self._error_message)
                 sys.exit(0)
             time.sleep(1)  # Check every 1 second
 

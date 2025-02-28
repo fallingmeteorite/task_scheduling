@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+# Author: fallingmeteorite
 import asyncio
 import os
 import signal

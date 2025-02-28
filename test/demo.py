@@ -187,13 +187,11 @@ if __name__ == "__main__":
                              )
     print(task_id1, task_id2)
     # cf478b6e-5e02-49b8-9031-4adc6ff915c2, cf478b6e-5e02-49b8-9031-4adc6ff915c2
-    time.sleep(2.0)
-    shutdown(True)
     try:
         while True:
             time.sleep(0.1)
     except KeyboardInterrupt:
-        pass
+        shutdown(True)
 
 """
 

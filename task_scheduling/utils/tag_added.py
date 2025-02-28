@@ -68,6 +68,7 @@ class FunctionRunner:
 
                 # Log detailed monitoring information
                 logger.debug(f"CPU: {cpu_usage}% | DiskIO: {disk_io_bytes} bytes | NetIO: {net_io_bytes} bytes")
+                time.sleep(0.1)
 
         except psutil.NoSuchProcess:
             pass

@@ -210,7 +210,7 @@ class IoLinerTask:
         """
         Scheduler function, fetch tasks from the task queue and submit them to the thread pool for execution.
         """
-        with ThreadPoolExecutor(max_workers=int(config["io_liner_task"])) as executor:
+        with ThreadPoolExecutor(max_workers=int(config["io_liner_task"]), initializer=None) as executor:
             while not self._scheduler_stop_event.is_set():
                 with self._condition:
                     while self._task_queue.empty() and not self._scheduler_stop_event.is_set():
