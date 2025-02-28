@@ -264,7 +264,7 @@ class CpuLinerTask:
         """
         Scheduler function, fetch tasks from the task queue and submit them to the process pool for execution.
         """
-        with ProcessPoolExecutor(max_workers=int(config["io_liner_task"]),
+        with ProcessPoolExecutor(max_workers=int(config["cpu_liner_task"]),
                                  initializer=worker_initializer_liner) as executor:
             self._executor = executor
             while not self._scheduler_stop_event.is_set():
