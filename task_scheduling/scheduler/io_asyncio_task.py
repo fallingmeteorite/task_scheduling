@@ -218,6 +218,9 @@ class IoAsyncTask:
             self._idle_timers.clear()
             self._task_counters.clear()
 
+            # logger.info(
+            #     "Scheduler and event loop have stopped, all resources have been released and parameters reset")
+
     # Task scheduler
     def _scheduler(self,
                    task_name: str) -> None:

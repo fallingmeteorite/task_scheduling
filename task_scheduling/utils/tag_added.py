@@ -118,9 +118,7 @@ class FunctionRunner:
 
         # Log task classification result
         logger.info(
-            f"Task Classification Result:\n"
-            f"Name: {self._task_name}\n"
-            f"Type: {task_type}"
+            f"Task Classification Result-> Name: |{self._task_name}| Type: |{task_type}|"
         )
 
         # Store task type in dictionary

@@ -275,8 +275,8 @@ class CpuAsyncTask:
             self._idle_timer = None
             self._task_results = {}
 
-            logger.info(
-                "Scheduler and event loop have stopped, all resources have been released and parameters reset")
+            # logger.info(
+            #     "Scheduler and event loop have stopped, all resources have been released and parameters reset")
 
     def stop_all_running_task(self):
         for task_id in self._running_tasks.keys():

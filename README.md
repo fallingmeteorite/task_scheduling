@@ -47,13 +47,13 @@ monitoring.
 
 5.Automatically hibernate when there are no tasks
 
-!!! WARNING: If an I-dense task is running in a series of blocking tasks such as time.sleep, the task cannot be forced
+## Installation
+
+!!! WARNING: If I/O-intensive task is running in a series of blocking tasks such as time.sleep, the task cannot be forced
 terminated, it is recommended to use `interruptible_sleep` instead of `time.sleep` for long waits
 So, use `await asyncio.sleep` for asynchronous tasks
 
 CPU-intensive tasks do not need to be processed at all, and can be forced to end even if `time.sleep` is running
-
-## Installation
 
 ```
 pip install --upgrade task_scheduling
@@ -313,6 +313,8 @@ if __name__ == "__main__":
 
 A task that detects what type of function is executed. The detected parameters are stored in a file and read directly at
 the next time
+
+!!! WARNING: If you use this function, the CPU usage may increase slightly
 
 ```
 import time
