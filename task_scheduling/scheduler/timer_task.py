@@ -44,11 +44,11 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
         if timeout_processing:
             with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
                 with skip_on_demand() as skip_ctx:
-                    _task_manager.add(None, skip_ctx, None, task_id)
+                    _task_manager.add(None, skip_ctx, task_id)
                     return_results = func(*args, **kwargs)
         else:
             with skip_on_demand() as skip_ctx:
-                _task_manager.add(None, skip_ctx, None, task_id)
+                _task_manager.add(None, skip_ctx, task_id)
                 return_results = func(*args, **kwargs)
         _task_manager.remove(task_id)
     except TimeoutException:
@@ -223,7 +223,7 @@ class TimerTask:
             self._idle_timer = None
             self._task_results = {}
 
-            #logger.info(
+            # logger.info(
             #     "Scheduler and event loop have stopped, all resources have been released and parameters reset")
 
     # Scheduler function

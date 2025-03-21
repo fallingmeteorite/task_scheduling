@@ -150,14 +150,14 @@ class CpuAsyncTask:
         while not self._scheduler_stop_event.is_set() or not self._task_status_queue.empty():
             try:
                 if not self._task_status_queue.empty():
-                    task = self._task_status_queue.get(timeout=1.0)
+                    task = self._task_status_queue.get(timeout=0.1)
                     if isinstance(task, tuple):
                         status, task_id, task_name, start_time, end_time, error, timeout_processing = task
                         task_status_manager.add_task_status(task_id, task_name, status, start_time, end_time, error,
                                                             timeout_processing)
                     else:
                         self._task_status_queue.put(task)
-            except Exception:
+            except:
                 continue
             finally:
                 time.sleep(0.1)

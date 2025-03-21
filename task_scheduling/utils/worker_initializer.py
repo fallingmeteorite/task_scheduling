@@ -18,6 +18,7 @@ def worker_initializer_liner():
         sys.exit(0)
 
     signal.signal(signal.SIGINT, signal_handler)  # Ctrl+C
+    signal.signal(signal.SIGTERM, signal_handler)  # termination signal
 
 
 def worker_initializer_asyncio():
@@ -42,6 +43,7 @@ def worker_initializer_asyncio():
         sys.exit(0)
 
     signal.signal(signal.SIGINT, signal_handler)  # Ctrl+C
+    signal.signal(signal.SIGTERM, signal_handler)  # termination signal
 
 
 async def shutdown(loop):

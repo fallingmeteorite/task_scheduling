@@ -101,4 +101,4 @@ class ProcessTaskManager:
             except Exception as error:
                 logger.error(f"Error in monitor thread: {error}")
             finally:
-                time.sleep(0.4)
+                time.sleep(0.1)

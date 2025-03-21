@@ -43,7 +43,6 @@ class ThreadingTimeout(BaseTimeout):
 
     def __init__(self, seconds, swallow_exc=True):
         super(ThreadingTimeout, self).__init__(seconds, swallow_exc)
-        self._seconds = None
         self._state = None
         self._target_tid = threading.current_thread().ident
         self._timer = None  # PEP8
