@@ -54,6 +54,5 @@ def format_tasks_info(tasks_dict) -> str:
 
     return output
 
-
 def get_tasks_info() -> str:
     return format_tasks_info(task_status_manager._task_status_dict)

@@ -49,7 +49,8 @@ monitoring.
 
 ## Installation
 
-!!! WARNING: If I/O-intensive task is running in a series of blocking tasks such as time.sleep, the task cannot be forced
+!!! WARNING: If I/O-intensive task is running in a series of blocking tasks such as time.sleep, the task cannot be
+forced
 terminated, it is recommended to use `interruptible_sleep` instead of `time.sleep` for long waits
 So, use `await asyncio.sleep` for asynchronous tasks
 
@@ -528,6 +529,66 @@ if __name__ == "__main__":
 
     print(task_status_manager.get_task_status(task_id1))
     # {'task_name': 'task1', 'status': 'waiting', 'start_time': None, 'end_time': None, 'error_info': None, 'is_timeout_enabled': True}
+    try:
+        while True:
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        shutdown(True)
+
+```
+
+### get_task_count(self, task_name) -> int
+
+### get_all_task_count(self) -> Dict[str, int]:
+
+Gets the total presence of a task
+
+```
+import asyncio
+import time
+
+
+def line_task(input_info):
+    while True:
+        time.sleep(1)
+        print(input_info)
+
+
+async def asyncio_task(input_info):
+    while True:
+        await asyncio.sleep(1)
+        print(input_info)
+
+
+input_info = "test"
+
+if __name__ == "__main__":
+    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.scheduler_management import task_status_manager
+
+    task_id1 = task_creation(None,
+                             # This is how long the delay is executed (in seconds)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the daily_time is not required
+                             None,
+                             # This is to be performed at what point (24-hour clock)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
+                             'io',
+                             # Running function type, there are "io, cpu, timer"
+                             True,
+                             # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
+                             "task1",
+                             # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
+                             line_task,
+                             # The function to be executed, parameters should not be passed here
+                             input_info
+                             # Pass the parameters required by the function, no restrictions
+                             )
+
+    print(task_status_manager.get_task_count("task1"))
+    # 1
+    print(task_status_manager.get_all_task_count())
+    # OrderedDict({'task1': 1})
+
     try:
         while True:
             time.sleep(0.1)

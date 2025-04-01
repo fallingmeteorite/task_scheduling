@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
-from collections import OrderedDict
+from collections import OrderedDict, Counter
 from typing import Dict, Optional, Union
 
 from ..config import config
@@ -96,3 +96,44 @@ class TaskStatusManager:
             Dict[str, Dict[str, Optional[Union[str, float, bool]]]]: A copy of the dictionary containing all task status information.
         """
         return self._task_status_dict.copy()
+
+    def get_task_count(self, task_name) -> int:
+        """
+        Args:
+            task_name(str): Task name.
+
+        Returns:
+            int: The total number of tasks that exist
+
+        """
+        # initialize
+        task_count = 0
+
+        # Copy the dictionary to prevent the dictionary from being occupied
+        _task_status_dict = self._task_status_dict.copy()
+
+        for info in _task_status_dict.values():
+            if info["task_name"] == task_name:
+                task_count += 1
+
+        return task_count
+
+    def get_all_task_count(self) -> Dict[str, int]:
+
+        """
+
+        Returns:
+            Dict[str, int]: The total amount of existence per task
+
+        """
+        # Copy the dictionary to prevent the dictionary from being occupied
+        _task_status_dict = self._task_status_dict.copy()
+
+        # Extract all task_name values
+        values = []
+        for inner_dict in _task_status_dict.values():
+            value = inner_dict["task_name"]
+            values.append(value)
+
+        # Count occurrences and return as ordered dictionary
+        return OrderedDict(Counter(values).most_common())

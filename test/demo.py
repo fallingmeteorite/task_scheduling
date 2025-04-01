@@ -387,6 +387,59 @@ if __name__ == "__main__":
                              # Pass the parameters required by the function, no restrictions
                              )
 
+    print(task_status_manager.get_task_count("task1"))
+    # 1
+    print(task_status_manager.get_all_task_count())
+    # OrderedDict({'task1': 1})
+
+    try:
+        while True:
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        shutdown(True)
+"""
+
+"""
+import asyncio
+import time
+
+
+def line_task(input_info):
+    while True:
+        time.sleep(1)
+        print(input_info)
+
+
+async def asyncio_task(input_info):
+    while True:
+        await asyncio.sleep(1)
+        print(input_info)
+
+
+input_info = "test"
+
+if __name__ == "__main__":
+    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.scheduler_management import task_status_manager
+
+    task_id1 = task_creation(None,
+                             # This is how long the delay is executed (in seconds)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the daily_time is not required
+                             None,
+                             # This is to be performed at what point (24-hour clock)
+                             # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
+                             'io',
+                             # Running function type, there are "io, cpu, timer"
+                             True,
+                             # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
+                             "task1",
+                             # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
+                             line_task,
+                             # The function to be executed, parameters should not be passed here
+                             input_info
+                             # Pass the parameters required by the function, no restrictions
+                             )
+
     print(task_status_manager.get_task_status(task_id1))
     try:
         while True:
