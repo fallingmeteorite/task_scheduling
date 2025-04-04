@@ -85,10 +85,6 @@ class ProcessTaskManager:
             try:
                 task_id = self._task_queue.get(timeout=0.1)
 
-                if isinstance(task_id, tuple):
-                    self._task_queue.put(task_id)
-                    continue
-
                 if self.check(task_id):  # Check if the task_id exists in the dictionary
                     self.skip_task(task_id)  # Skip the task if it exists
 
@@ -96,6 +92,9 @@ class ProcessTaskManager:
                         if not self._tasks:  # Check if the tasks dictionary is empty
                             logger.info(f"Worker {os.getpid()} no tasks remaining, stopping the monitor thread")
                             break  # Stop the loop if tasks dictionary is empty
+
+                else:
+                    self._task_queue.put(task_id)
             except queue.Empty:
                 pass  # Ignore empty queue exceptions
             except Exception as error:

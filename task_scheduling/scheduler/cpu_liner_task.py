@@ -16,7 +16,8 @@ from ..utils import worker_initializer_liner
 
 
 def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
-                  task_status_queue: queue.Queue) -> Any:
+                  task_status_queue: queue.Queue,
+                  task_signal_transmission: queue.Queue) -> Any:
     """
     Execute a task and handle its status.
 
@@ -29,13 +30,14 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
             - args (Tuple): Arguments to pass to the function.
             - kwargs (Dict): Keyword arguments to pass to the function.
         task_status_queue (queue.Queue): Queue to update task status.
+        task_signal_transmission (queue.Queue): Queue to transmission signal.
 
     Returns:
         Any: Result of the task execution or error message.
     """
 
     timeout_processing, task_name, task_id, func, args, kwargs = task
-    task_manager = ProcessTaskManager(task_status_queue)
+    task_manager = ProcessTaskManager(task_signal_transmission)
     return_results = None
 
     try:
@@ -55,7 +57,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
                 return_results = func(*args, **kwargs)
 
     except (StopException, KeyboardInterrupt):
-        logger.info(f"Cpu linear task | {task_id} | cancelled, forced termination")
+        logger.warning(f"Cpu linear task | {task_id} | cancelled, forced termination")
         task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
         return_results = "error happened"
 
@@ -90,7 +92,7 @@ class CpuLinerTask:
         '_scheduler_started', '_scheduler_stop_event', '_scheduler_thread',
         '_idle_timer', '_idle_timeout', '_idle_timer_lock',
         '_task_results',
-        '_manager', '_task_status_queue',
+        '_manager', '_task_status_queue', '_task_signal_transmission',
         '_executor', '_status_thread'
     ]
 
@@ -117,6 +119,7 @@ class CpuLinerTask:
 
         self._manager = Manager()
         self._task_status_queue = self._manager.Queue()  # Queue for task status updates
+        self._task_signal_transmission = self._manager.Queue()  # Queue for task status updates
 
         self._executor: Optional[ProcessPoolExecutor] = None
 
@@ -131,14 +134,12 @@ class CpuLinerTask:
             try:
                 if not self._task_status_queue.empty():
                     task = self._task_status_queue.get(timeout=0.1)
-                    if isinstance(task, tuple):
-                        status, task_id, task_name, start_time, end_time, error, timeout_processing = task
-                        task_status_manager.add_task_status(task_id, task_name, status, start_time, end_time, error,
-                                                            timeout_processing)
-                    else:
-                        self._task_status_queue.put(task)
-            except:
-                continue
+                    status, task_id, task_name, start_time, end_time, error, timeout_processing = task
+                    task_status_manager.add_task_status(task_id, task_name, status, start_time, end_time, error,
+                                                        timeout_processing)
+
+            except queue.Empty:
+                pass  # Ignore empty queue exceptions
             finally:
                 time.sleep(0.1)
 
@@ -284,7 +285,8 @@ class CpuLinerTask:
 
                 timeout_processing, task_name, task_id, func, args, kwargs = task
                 with self._lock:
-                    future = executor.submit(_execute_task, task, self._task_status_queue)
+                    future = executor.submit(_execute_task, task, self._task_status_queue,
+                                             self._task_signal_transmission)
                     self._running_tasks[task_id] = [future, task_name]
                     future.add_done_callback(partial(self._task_done, task_id))
 
@@ -352,20 +354,20 @@ class CpuLinerTask:
 
     def force_stop_task(self,
                         task_id: str,
-                        built_in_task: bool) -> bool:
+                        main_task: bool) -> bool:
         """
         Force stop a task by its task ID.
 
         :param task_id: Task ID.
-        :param built_in_task: Built-in task metrics are used for skip detection.
+        :param main_task: If the task is terminated as the main task, the flag is True.
 
         :return: bool: Whether the task was successfully force stopped.
         """
-        if self._running_tasks.get(task_id) is None and built_in_task:
+        if self._running_tasks.get(task_id) is None and main_task:
             logger.warning(f"Cpu linear task | {task_id} | does not exist or is already completed")
             return False
 
-        self._task_status_queue.put(task_id)
+        self._task_signal_transmission.put(task_id)
 
         self._task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
         with self._lock:

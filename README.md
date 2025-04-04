@@ -736,9 +736,9 @@ if __name__ == "__main__":
 ### force_stop_task(task_id: str) -> bool:
 
 All 4 schedulers have this function for terminating a running task. Warning: If the function is executing a
-process-blocking function such as `time.sleep`, it will have to wait for the execution to finish before terminating the
-function
+process-blocking function such as `time.sleep`, it will have to wait for the execution to finish before terminating the function
 
+Warn!!! `cpu_liner_task.force_stop_task()` is different and requires the addition of additional parameters
 ```
 import asyncio
 import time
@@ -782,6 +782,13 @@ if __name__ == "__main__":
 
     time.sleep(2.0)
     io_liner_task.force_stop_task(task_id1)
+    
+    
+    "
+    cpu_liner_task.force_stop_task(task_id1, True)
+    If the task is terminated as the main task, the flag is True.
+    Only the terminating function of this scheduler requires additional parameters
+    "
 
     # | Io linear task | 79a85db4-c75f-4acd-a2b1-d375617e5af4 | was cancelled
 

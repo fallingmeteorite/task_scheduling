@@ -668,6 +668,11 @@ if __name__ == "__main__":
 
     time.sleep(2.0)
     io_liner_task.force_stop_task(task_id1)
+    "
+    cpu_liner_task.force_stop_task(task_id1, True)
+    If the task is terminated as the main task, the flag is True.
+    Only the terminating function of this scheduler requires additional parameters
+    "
 
     # | Io linear task | 79a85db4-c75f-4acd-a2b1-d375617e5af4 | was cancelled
 
