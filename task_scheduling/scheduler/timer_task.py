@@ -352,11 +352,14 @@ class TimerTask:
 
         :return: bool: Whether the task was successfully force stopped.
         """
-        if not _task_manager.check(task_id):
+        if self._running_tasks.get(task_id, None):
             logger.warning(f"Timer task | {task_id} | does not exist or is already completed")
             return False
-
-        _task_manager.skip_task(task_id)
+        future = self._running_tasks[task_id][0]
+        if not future.running():
+            future.cancel()
+        else:
+            _task_manager.skip_task(task_id)
 
         task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None)
         with self._lock:
