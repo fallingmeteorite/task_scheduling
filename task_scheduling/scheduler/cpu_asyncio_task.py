@@ -399,7 +399,11 @@ class CpuAsyncTask:
             logger.warning(f"Cpu asyncio task | {task_id} | does not exist or is already completed")
             return False
 
-        self._task_signal_transmission.put(task_id)
+        future = self._running_tasks[task_id][0]
+        if not future.running():
+            future.cancel()
+        else:
+            self._task_signal_transmission.put(task_id)
 
         self._task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
 
