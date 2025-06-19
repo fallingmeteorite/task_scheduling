@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Status Monitor</title>
+    <style>
+        :root {
+            --primary: #4a4a4a;
+            --secondary: #757575;
+            --light: #f5f5f5;
+            --dark: #212121;
+            --white: #ffffff;
+            --black: #000000;
+            --success: #4CAF50;
+            --warning: #FFC107;
+            --error: #F44336;
+            --info: #2196F3;
+            --bg-color: #f5f5f5;
+            --text-color: #212121;
+            --card-bg: #ffffff;
+            --border-color: #e0e0e0;
+        }
+
+        .dark-theme {
+            --primary: #e0e0e0;
+            --secondary: #9e9e9e;
+            --light: #424242;
+            --dark: #f5f5f5;
+            --white: #212121;
+            --black: #f5f5f5;
+            --success: #81C784;
+            --warning: #FFD54F;
+            --error: #E57373;
+            --info: #64B5F6;
+            --bg-color: #121212;
+            --text-color: #f5f5f5;
+            --card-bg: #1e1e1e;
+            --border-color: #424242;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', sans-serif;
+            line-height: 1.5;
+            color: var(--text-color);
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: var(--bg-color);
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        h1 {
+            color: var(--text-color);
+            font-weight: 600;
+            margin-bottom: 24px;
+            font-size: 1.8rem;
+        }
+
+        .summary-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .summary-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 1px solid var(--border-color);
+        }
+
+        .summary-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .summary-label {
+            font-size: 0.9rem;
+            color: var(--secondary);
+            margin-bottom: 8px;
+        }
+
+        .summary-value {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .queue .summary-value {
+            color: var(--secondary);
+        }
+
+        .running .summary-value {
+            color: var(--info);
+        }
+
+        .failed .summary-value {
+            color: var(--error);
+        }
+
+        .completed .summary-value {
+            color: var(--success);
+        }
+
+        .task-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-bottom: 24px;
+        }
+
+        .task-table th {
+            text-align: left;
+            padding: 12px 16px;
+            background-color: var(--card-bg);
+            color: var(--secondary);
+            font-weight: 500;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .task-row {
+            background: var(--card-bg);
+            transition: background-color 0.2s;
+        }
+
+        .task-row:not(:last-child) {
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .task-row:hover {
+            background-color: var(--light);
+        }
+
+        .task-cell {
+            padding: 16px;
+            vertical-align: middle;
+        }
+
+        .task-info {
+            min-width: 200px;
+        }
+
+        .task-name {
+            font-weight: 500;
+            color: var(--text-color);
+            margin-bottom: 4px;
+        }
+
+        .task-id {
+            color: var(--secondary);
+            font-size: 0.8rem;
+        }
+
+        .task-type {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background-color: var(--light);
+            color: var(--text-color);
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .task-status {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-waiting, .status-queuing {
+            background-color: rgba(255, 235, 59, 0.2);
+            color: #ffc107;
+        }
+
+        .status-running {
+            background-color: rgba(33, 150, 243, 0.2);
+            color: var(--info);
+        }
+
+        .status-failed {
+            background-color: rgba(244, 67, 54, 0.2);
+            color: var(--error);
+        }
+
+        .status-success {
+            background-color: rgba(76, 175, 80, 0.2);
+            color: var(--success);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+
+        .waiting .status-indicator {
+            background-color: #ffc107;
+        }
+
+        .running .status-indicator {
+            background-color: var(--info);
+        }
+
+        .failed .status-indicator {
+            background-color: var(--error);
+        }
+
+        .success .status-indicator {
+            background-color: var(--success);
+        }
+
+        .error-info {
+            color: var(--error);
+            font-size: 0.85rem;
+            padding: 8px 16px;
+            background-color: rgba(244, 67, 54, 0.1);
+            border-radius: 4px;
+            margin-top: 4px;
+        }
+
+        .timestamp {
+            text-align: right;
+            font-size: 0.8rem;
+            color: var(--secondary);
+            margin-top: 24px;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 5px;
+            display: flex;
+            cursor: pointer;
+            z-index: 100;
+        }
+
+        .theme-toggle span {
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            transition: all 0.3s;
+        }
+
+        .theme-toggle .light {
+            background-color: var(--light);
+            color: var(--dark);
+        }
+
+        .theme-toggle .dark {
+            background-color: var(--dark);
+            color: var(--light);
+        }
+
+        .active-theme {
+            background-color: var(--primary) !important;
+            color: var(--card-bg) !important;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            color: var(--secondary);
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-state-title {
+            font-size: 1.2rem;
+            color: var(--secondary);
+            margin-bottom: 8px;
+        }
+
+        .empty-state-description {
+            font-size: 0.9rem;
+            color: var(--secondary);
+            opacity: 0.8;
+        }
+    </style>
+    <meta http-equiv="refresh" content="5">
+</head>
+<body class="light-theme">
+<div class="theme-toggle" id="themeToggle">
+    <span class="light active-theme">Light</span>
+    <span class="dark">Dark</span>
+</div>
+
+<h1>Task Status Monitor</h1>
+
+<div class="summary-container">
+    <div class="summary-card queue">
+        <div class="summary-label">Queued Tasks</div>
+        <div class="summary-value" id="queue-count">0</div>
+    </div>
+    <div class="summary-card running">
+        <div class="summary-label">Running Tasks</div>
+        <div class="summary-value" id="running-count">0</div>
+    </div>
+    <div class="summary-card failed">
+        <div class="summary-label">Failed Tasks</div>
+        <div class="summary-value" id="failed-count">0</div>
+    </div>
+    <div class="summary-card completed">
+        <div class="summary-label">Completed Tasks</div>
+        <div class="summary-value" id="completed-count">0</div>
+    </div>
+</div>
+
+<table class="task-table">
+    <thead>
+    <tr>
+        <th>Task</th>
+        <th>Type</th>
+        <th>Status</th>
+        <th>Duration</th>
+    </tr>
+    </thead>
+    <tbody id="tasks">
+        <!-- Tasks will be inserted here dynamically -->
+    </tbody>
+</table>
+
+<div class="timestamp" id="timestamp"></div>
+
+<script>
+    // Theme toggle functionality
+    const themeToggle = document.getElementById('themeToggle');
+    const lightThemeBtn = themeToggle.querySelector('.light');
+    const darkThemeBtn = themeToggle.querySelector('.dark');
+    const body = document.body;
+
+    // Check for saved theme preference or use preferred color scheme
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+        enableDarkTheme();
+    }
+
+    themeToggle.addEventListener('click', (e) => {
+        if (e.target.classList.contains('light')) {
+            enableLightTheme();
+        } else if (e.target.classList.contains('dark')) {
+            enableDarkTheme();
+        }
+    });
+
+    function enableDarkTheme() {
+        body.classList.remove('light-theme');
+        body.classList.add('dark-theme');
+        lightThemeBtn.classList.remove('active-theme');
+        darkThemeBtn.classList.add('active-theme');
+        localStorage.setItem('theme', 'dark');
+    }
+
+    function enableLightTheme() {
+        body.classList.remove('dark-theme');
+        body.classList.add('light-theme');
+        darkThemeBtn.classList.remove('active-theme');
+        lightThemeBtn.classList.add('active-theme');
+        localStorage.setItem('theme', 'light');
+    }
+
+    function formatDuration(seconds) {
+        if (!seconds) return '-';
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
+
+        return [h > 0 ? h : null, m, s]
+            .filter(x => x !== null)
+            .map(x => x.toString().padStart(2, '0'))
+            .join(':');
+    }
+
+    function showNoTasksState() {
+        document.getElementById('tasks').innerHTML = `
+            <tr>
+                <td colspan="4" class="task-cell">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">☁️</div>
+                        <div class="empty-state-title">No tasks available</div>
+                        <div class="empty-state-description">The system is currently idle with no tasks to display</div>
+                    </div>
+                </td>
+            </tr>
+        `;
+        // Reset counters to 0
+        document.getElementById('queue-count').textContent = 0;
+        document.getElementById('running-count').textContent = 0;
+        document.getElementById('failed-count').textContent = 0;
+        document.getElementById('completed-count').textContent = 0;
+    }
+
+    function updatePage(data) {
+        // Check for "nan" or invalid data
+        if (data === "nan" || !data || typeof data !== 'object') {
+            showNoTasksState();
+            document.getElementById('timestamp').textContent = `Last updated: ${new Date().toLocaleString()}`;
+            return;
+        }
+
+        // Update summary counts if data is valid
+        document.getElementById('queue-count').textContent = data.queue_size || 0;
+        document.getElementById('running-count').textContent = data.running_count || 0;
+        document.getElementById('failed-count').textContent = data.failed_count || 0;
+        document.getElementById('completed-count').textContent = data.completed_count || 0;
+
+        // Update tasks
+        const tasksContainer = document.getElementById('tasks');
+
+        if (data.tasks && data.tasks.length > 0) {
+            let tasksHtml = '';
+            data.tasks.forEach(task => {
+                tasksHtml += `
+                    <tr class="task-row" data-task-id="${task.id}">
+                        <td class="task-cell task-info">
+                            <div class="task-name">${task.name || 'Unnamed Task'}</div>
+                            <div class="task-id">ID: ${task.id}</div>
+                        </td>
+                        <td class="task-cell">
+                            <span class="task-type">${task.type || 'N/A'}</span>
+                        </td>
+                        <td class="task-cell">
+                            <span class="task-status status-${task.status.toLowerCase()}">
+                                <span class="status-indicator"></span>
+                                ${task.status}
+                            </span>
+                        </td>
+                        <td class="task-cell">
+                            ${formatDuration(task.duration)}
+                        </td>
+                    </tr>
+                    ${task.error_info ? `
+                    <tr class="task-row">
+                        <td colspan="4" class="task-cell">
+                            <div class="error-info">
+                                <strong>Error:</strong> ${task.error_info}
+                            </div>
+                        </td>
+                    </tr>
+                    ` : ''}
+                `;
+            });
+            tasksContainer.innerHTML = tasksHtml;
+        } else {
+            showNoTasksState();
+        }
+
+        // Update timestamp
+        document.getElementById('timestamp').textContent = `Last updated: ${new Date().toLocaleString()}`;
+    }
+
+    // Load initial data
+    function fetchData() {
+        fetch('/tasks')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.text().then(text => {
+                    // Check if response is "nan" before trying to parse as JSON
+                    if (text.trim().toLowerCase() === 'nan') {
+                        return "nan";
+                    }
+                    try {
+                        return JSON.parse(text);
+                    } catch (e) {
+                        return "nan";
+                    }
+                });
+            })
+            .then(data => updatePage(data))
+            .catch(error => {
+                console.error('Error fetching task data:', error);
+                showNoTasksState();
+                document.getElementById('timestamp').textContent = `Last update failed: ${new Date().toLocaleString()}`;
+            });
+    }
+
+    // Initial load
+    fetchData();
+
+    // Auto-refresh every 2 seconds (same as meta refresh)
+    setInterval(fetchData, 2000);
+</script>
+</body>
+</html>
