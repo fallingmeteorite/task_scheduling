@@ -136,7 +136,7 @@ class CpuLinerTask:
                     task = self._task_status_queue.get(timeout=0.1)
                     status, task_id, task_name, start_time, end_time, error, timeout_processing = task
                     task_status_manager.add_task_status(task_id, task_name, status, start_time, end_time, error,
-                                                        timeout_processing)
+                                                        timeout_processing, "cpu_liner_task")
 
             except queue.Empty:
                 pass  # Ignore empty queue exceptions
