@@ -394,11 +394,16 @@ class IoAsyncTask:
             bool: Whether the task was successfully force stopped.
         """
         # Read operation, no need to hold a lock
-        if not _task_manager.check(task_id):
+        if self._running_tasks.get(task_id, None):
             logger.warning(f"Io asyncio task | {task_id} | does not exist or is already completed")
             return False
 
-        _task_manager.cancel_task(task_id)
+        future = self._running_tasks[task_id][0]
+        if not future.running():
+            future.cancel()
+        else:
+            _task_manager.skip_task(task_id)
+
         with self._condition:
             if task_id in self._task_results:
                 del self._task_results[task_id]
