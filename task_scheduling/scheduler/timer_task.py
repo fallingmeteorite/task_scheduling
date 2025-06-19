@@ -38,7 +38,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
     return_results = None
     try:
         task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None,
-                                            None)
+                                            None, None)
 
         logger.info(f"Start running timer task, task ID: {task_id}")
         if timeout_processing:
@@ -54,17 +54,17 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
     except TimeoutException:
         logger.warning(f"Timer task | {task_id} | timed out, forced termination")
         task_status_manager.add_task_status(task_id, None, "timeout", None, None, None,
-                                            None)
+                                            None, None)
         return_results = "error happened"
     except StopException:
         logger.warning(f"Timer task | {task_id} | cancelled, forced termination")
         task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None,
-                                            None)
+                                            None, None)
         return_results = "error happened"
     except Exception as e:
         logger.error(f"Timer task | {task_id} | execution failed: {e}")
         task_status_manager.add_task_status(task_id, None, "failed", None, None, e,
-                                            None)
+                                            None, None)
         return_results = "error happened"
     finally:
         if _task_manager.check(task_id):
@@ -154,7 +154,7 @@ class TimerTask:
 
                 # Reduce the granularity of the lock
                 task_status_manager.add_task_status(task_id, None, "waiting", None, None, None,
-                                                    None)
+                                                    None, "timer_task")
 
                 self._task_queue.put((execution_time, timeout_processing, task_name, task_id, func, args, kwargs))
 
@@ -282,7 +282,7 @@ class TimerTask:
         try:
             result = future.result()  # Get task result, exceptions will be raised here
             if result != "error happened":
-                task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None)
+                task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None, None)
         finally:
             # Ensure the Future object is deleted
             with self._lock:
@@ -361,7 +361,7 @@ class TimerTask:
         else:
             _task_manager.skip_task(task_id)
 
-        task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None)
+        task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None, None)
         with self._lock:
             if task_id in self._task_results:
                 del self._task_results[task_id]
