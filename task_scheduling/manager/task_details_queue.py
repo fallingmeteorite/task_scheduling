@@ -19,7 +19,8 @@ class TaskStatusManager:
     def add_task_status(self, task_id: str, task_name: str, status: Optional[str] = None,
                         start_time: Optional[float] = None,
                         end_time: Optional[float] = None, error_info: Optional[str] = None,
-                        is_timeout_enabled: Optional[bool] = None) -> None:
+                        is_timeout_enabled: Optional[bool] = None,
+                        task_type: str = None) -> None:
         """
         Add or update task status information in the dictionary.
 
@@ -31,6 +32,7 @@ class TaskStatusManager:
             end_time (Optional[float]): The end time of the task in seconds. If not provided, it is not updated.
             error_info (Optional[str]): Error information. If not provided, it is not updated.
             is_timeout_enabled (Optional[bool]): Boolean indicating if timeout processing is enabled. If not provided, it is not updated.
+            task_type (Optional[str]): Task type. If not provided, it is not updated.
         """
         if task_id not in self._task_status_dict:
             self._task_status_dict[task_id] = {
@@ -39,7 +41,8 @@ class TaskStatusManager:
                 'start_time': None,
                 'end_time': None,
                 'error_info': None,
-                'is_timeout_enabled': None
+                'is_timeout_enabled': None,
+                'task_type': None
             }
 
         task_status = self._task_status_dict[task_id]
@@ -56,6 +59,8 @@ class TaskStatusManager:
             task_status['error_info'] = error_info
         if is_timeout_enabled is not None:
             task_status['is_timeout_enabled'] = is_timeout_enabled
+        if task_type is not None:
+            task_status['task_type'] = task_type
 
         self._task_status_dict[task_id] = task_status
         if len(self._task_status_dict) > self._max_storage:
