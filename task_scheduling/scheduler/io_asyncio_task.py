@@ -81,7 +81,7 @@ class IoAsyncTask:
                 if self._task_queues[task_name].qsize() >= config["io_asyncio_task"]:
                     return False
 
-                task_status_manager.add_task_status(task_id, None, "waiting", None, None, None, None)
+                task_status_manager.add_task_status(task_id, None, "waiting", None, None, None, None, "io_asyncio_task")
 
                 self._task_queues[task_name].put((timeout_processing, task_name, task_id, func, args, kwargs))
 
@@ -277,7 +277,7 @@ class IoAsyncTask:
         return_results = None
         try:
             # Modify the task status
-            task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None, None)
+            task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None, None, None)
 
             logger.info(f"Start running io asyncio task | {task_id} | ")
 
@@ -289,20 +289,20 @@ class IoAsyncTask:
                 return_results = await func(*args, **kwargs)
 
             # Update task status to "completed"
-            task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None)
+            task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None, None)
 
         except asyncio.TimeoutError:
             logger.warning(f"Io asyncio task | {task_id} | timed out, forced termination")
-            task_status_manager.add_task_status(task_id, None, "timeout", None, None, None, None)
+            task_status_manager.add_task_status(task_id, None, "timeout", None, None, None, None, None)
             return_results = "error happened"
         except asyncio.CancelledError:
             logger.warning(f"Io asyncio task | {task_id} | was cancelled")
             task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None,
-                                                None)
+                                                None, None)
             return_results = "error happened"
         except Exception as e:
             logger.error(f"Io asyncio task | {task_id} | execution failed: {e}")
-            task_status_manager.add_task_status(task_id, None, "failed", None, None, e, None)
+            task_status_manager.add_task_status(task_id, None, "failed", None, None, e, None, None)
             return_results = "error happened"
         finally:
             if return_results == "error happened":
