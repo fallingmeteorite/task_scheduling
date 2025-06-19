@@ -46,7 +46,6 @@ class TaskStatusManager:
 
         if status is not None:
             task_status['status'] = status
-
         if task_name is not None:
             task_status['task_name'] = task_name
         if start_time is not None:
