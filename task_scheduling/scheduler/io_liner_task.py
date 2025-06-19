@@ -39,7 +39,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
         with skip_on_demand() as skip_ctx:
             _task_manager.add(None, skip_ctx, task_id)
 
-            task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None, None)
+            task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None, None, None)
             logger.info(f"Start running io linear task, task ID: {task_id}")
             if timeout_processing:
                 with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
@@ -50,14 +50,14 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
         _task_manager.remove(task_id)
     except TimeoutException:
         logger.warning(f"Io linear task | {task_id} | timed out, forced termination")
-        task_status_manager.add_task_status(task_id, None, "timeout", None, None, None, None)
+        task_status_manager.add_task_status(task_id, None, "timeout", None, None, None, None, None)
         return_results = "error happened"
     except StopException:
         logger.warning(f"Io linear task | {task_id} | was cancelled")
-        task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None)
+        task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None, None)
     except Exception as e:
         logger.error(f"Io linear task | {task_id} | execution failed: {e}")
-        task_status_manager.add_task_status(task_id, None, "failed", None, None, e, None)
+        task_status_manager.add_task_status(task_id, None, "failed", None, None, e, None, None)
         return_results = "error happened"
     finally:
         if _task_manager.check(task_id):
@@ -133,7 +133,7 @@ class IoLinerTask:
                     self._join_scheduler_thread()
 
                 # Reduce the granularity of the lock
-                task_status_manager.add_task_status(task_id, None, "waiting", None, None, None, None)
+                task_status_manager.add_task_status(task_id, None, "waiting", None, None, None, None, "io_liner_task")
 
                 self._task_queue.put((timeout_processing, task_name, task_id, func, args, kwargs))
 
@@ -249,10 +249,10 @@ class IoLinerTask:
                 if result is not None:
                     with self._lock:
                         self._task_results[task_id] = result
-                task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None)
+                task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None, None)
         except Exception as e:
             logger.error(f"Io linear task | {task_id} | execution failed in callback: {e}")
-            task_status_manager.add_task_status(task_id, None, "failed", None, None, e, None)
+            task_status_manager.add_task_status(task_id, None, "failed", None, None, e, None, None)
         finally:
             # Ensure the Future object is deleted
             with self._lock:
@@ -317,7 +317,7 @@ class IoLinerTask:
         else:
             _task_manager.skip_task(task_id)
 
-        task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None)
+        task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None, None)
         with self._lock:
             if task_id in self._task_results:
                 del self._task_results[task_id]
