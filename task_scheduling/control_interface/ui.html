@@ -107,14 +107,27 @@
             color: var(--success);
         }
 
+        .task-table-container {
+            width: 100%;
+            overflow-x: auto;
+            margin-bottom: 24px;
+            max-height: 60vh;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
         .task-table {
             width: 100%;
             border-collapse: separate;
             border-spacing: 0;
-            margin-bottom: 24px;
+            table-layout: fixed;
         }
 
         .task-table th {
+            position: sticky;
+            top: 0;
             text-align: left;
             padding: 12px 16px;
             background-color: var(--card-bg);
@@ -124,6 +137,13 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
             border-bottom: 1px solid var(--border-color);
+            z-index: 10;
+        }
+
+        .task-table td {
+            padding: 16px;
+            vertical-align: middle;
+            word-wrap: break-word;
         }
 
         .task-row {
@@ -139,11 +159,6 @@
             background-color: var(--light);
         }
 
-        .task-cell {
-            padding: 16px;
-            vertical-align: middle;
-        }
-
         .task-info {
             min-width: 200px;
         }
@@ -152,11 +167,13 @@
             font-weight: 500;
             color: var(--text-color);
             margin-bottom: 4px;
+            word-break: break-word;
         }
 
         .task-id {
             color: var(--secondary);
             font-size: 0.8rem;
+            word-break: break-all;
         }
 
         .task-type {
@@ -167,6 +184,7 @@
             color: var(--text-color);
             font-size: 0.8rem;
             font-weight: 500;
+            white-space: nowrap;
         }
 
         .task-status {
@@ -176,6 +194,7 @@
             border-radius: 12px;
             font-size: 0.8rem;
             font-weight: 500;
+            white-space: nowrap;
         }
 
         .status-waiting, .status-queuing {
@@ -229,6 +248,7 @@
             background-color: rgba(244, 67, 54, 0.1);
             border-radius: 4px;
             margin-top: 4px;
+            word-break: break-word;
         }
 
         .timestamp {
@@ -296,6 +316,27 @@
             color: var(--secondary);
             opacity: 0.8;
         }
+
+        /* Column widths */
+        .task-table th:nth-child(1),
+        .task-table td:nth-child(1) {
+            width: 35%;
+        }
+
+        .task-table th:nth-child(2),
+        .task-table td:nth-child(2) {
+            width: 15%;
+        }
+
+        .task-table th:nth-child(3),
+        .task-table td:nth-child(3) {
+            width: 20%;
+        }
+
+        .task-table th:nth-child(4),
+        .task-table td:nth-child(4) {
+            width: 15%;
+        }
     </style>
     <meta http-equiv="refresh" content="5">
 </head>
@@ -326,19 +367,21 @@
     </div>
 </div>
 
-<table class="task-table">
-    <thead>
-    <tr>
-        <th>Task</th>
-        <th>Type</th>
-        <th>Status</th>
-        <th>Duration</th>
-    </tr>
-    </thead>
-    <tbody id="tasks">
-        <!-- Tasks will be inserted here dynamically -->
-    </tbody>
-</table>
+<div class="task-table-container">
+    <table class="task-table">
+        <thead>
+        <tr>
+            <th>Task</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Duration</th>
+        </tr>
+        </thead>
+        <tbody id="tasks">
+            <!-- Tasks will be inserted here dynamically -->
+        </tbody>
+    </table>
+</div>
 
 <div class="timestamp" id="timestamp"></div>
 
@@ -396,7 +439,7 @@
     function showNoTasksState() {
         document.getElementById('tasks').innerHTML = `
             <tr>
-                <td colspan="4" class="task-cell">
+                <td colspan="4">
                     <div class="empty-state">
                         <div class="empty-state-icon">☁️</div>
                         <div class="empty-state-title">No tasks available</div>
@@ -434,26 +477,26 @@
             data.tasks.forEach(task => {
                 tasksHtml += `
                     <tr class="task-row" data-task-id="${task.id}">
-                        <td class="task-cell task-info">
+                        <td class="task-info">
                             <div class="task-name">${task.name || 'Unnamed Task'}</div>
                             <div class="task-id">ID: ${task.id}</div>
                         </td>
-                        <td class="task-cell">
+                        <td>
                             <span class="task-type">${task.type || 'N/A'}</span>
                         </td>
-                        <td class="task-cell">
+                        <td>
                             <span class="task-status status-${task.status.toLowerCase()}">
                                 <span class="status-indicator"></span>
                                 ${task.status}
                             </span>
                         </td>
-                        <td class="task-cell">
+                        <td>
                             ${formatDuration(task.duration)}
                         </td>
                     </tr>
                     ${task.error_info ? `
                     <tr class="task-row">
-                        <td colspan="4" class="task-cell">
+                        <td colspan="4">
                             <div class="error-info">
                                 <strong>Error:</strong> ${task.error_info}
                             </div>

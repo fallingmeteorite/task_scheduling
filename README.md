@@ -50,15 +50,16 @@ monitoring.
 ## Installation
 
 !!! WARNING: If I/O-intensive task is running in a series of blocking tasks such as time.sleep, the task cannot be
-forced
-terminated, it is recommended to use `interruptible_sleep` instead of `time.sleep` for long waits
+forced terminated, it is recommended to use `interruptible_sleep` instead of `time.sleep` for long waits
 So, use `await asyncio.sleep` for asynchronous tasks
-
-CPU-intensive tasks do not need to be processed at all, and can be forced to end even if `time.sleep` is running
 
 ```
 pip install --upgrade task_scheduling
 ```
+
+# Interface UI
+
+Task status UI available at http://localhost:8000
 
 # Function introduction
 
@@ -451,7 +452,7 @@ input_info = "test"
 
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation, shutdown
-    from task_scheduling.queue_info_display import get_tasks_info
+    from task_scheduling.control_interface import get_tasks_info
 
     task_id1 = task_creation(5,
                              # This is how long the delay is executed (in seconds)

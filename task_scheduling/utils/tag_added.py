@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
-# Author: fallingmeteorite
 import asyncio
 import multiprocessing
 import time
-from typing import Callable
+from typing import Callable, Tuple, Dict
 
 import psutil
-
 from ..common import logger
 from ..function_data import task_function_type
 from ..utils import is_async_function
@@ -23,103 +21,127 @@ class FunctionRunner:
         self._start_time = None
         self._end_time = None
 
-        # Data containers for monitoring
-        self._cpu_usage_history = []  # CPU usage percentage per second
-        self._disk_io_history = []  # Disk IO bytes per second
-        self._net_io_history = []  # Network IO bytes per second
+        # Use more efficient data structures for monitoring
+        self._cpu_usage = 0.0
+        self._disk_io_bytes = 0
+        self._net_io_bytes = 0
+        self._samples = 0
 
     def run(self) -> None:
-        self._process = multiprocessing.Process(target=self._run_function)
+        """Start task execution and monitoring"""
+        self._process = multiprocessing.Process(
+            target=self._run_function,
+            name=f"TaskRunner-{self._task_name}"
+        )
         self._process.start()
         self._process_info = psutil.Process(self._process.pid)
-        self._start_time = time.time()
+        self._start_time = time.monotonic()
         self._monitor_process()
 
     def _run_function(self) -> None:
-        # Determine if function is async and run accordingly
-        if is_async_function(self._func):
-            asyncio.run(self._func(*self._args, **self._kwargs))
-        else:
-            self._func(*self._args, **self._kwargs)
+        """Execute the target function"""
+        try:
+            if is_async_function(self._func):
+                asyncio.run(self._func(*self._args, **self._kwargs))
+            else:
+                self._func(*self._args, **self._kwargs)
+        except Exception as e:
+            logger.error(f"Task {self._task_name} failed: {str(e)}")
 
     def _monitor_process(self) -> None:
+        """Monitor process resource usage"""
         try:
+            # Get initial IO counters
             last_disk_io = self._process_info.io_counters()
             last_net_io = psutil.net_io_counters()
 
+            # Set monitoring interval (seconds)
+            MONITOR_INTERVAL = 0.5
+
             while self._process.is_alive():
-                # Monitor CPU usage
-                cpu_usage = self._process_info.cpu_percent(interval=1)
-                self._cpu_usage_history.append(cpu_usage)
+                start_monitor = time.monotonic()
 
-                # Calculate disk IO increment
+                # Get CPU usage (blocking for interval seconds)
+                cpu_usage = self._process_info.cpu_percent(interval=MONITOR_INTERVAL)
+                self._cpu_usage += cpu_usage
+
+                # Calculate disk and network IO increments
                 current_disk_io = self._process_info.io_counters()
-                disk_io_bytes = (current_disk_io.read_bytes - last_disk_io.read_bytes) + \
-                                (current_disk_io.write_bytes - last_disk_io.write_bytes)
-                self._disk_io_history.append(disk_io_bytes)
-                last_disk_io = current_disk_io
-
-                # Calculate network IO increment
                 current_net_io = psutil.net_io_counters()
-                net_io_bytes = (current_net_io.bytes_sent - last_net_io.bytes_sent) + \
-                               (current_net_io.bytes_recv - last_net_io.bytes_recv)
-                self._net_io_history.append(net_io_bytes)
+
+                disk_io = (current_disk_io.read_bytes - last_disk_io.read_bytes) + \
+                          (current_disk_io.write_bytes - last_disk_io.write_bytes)
+                net_io = (current_net_io.bytes_sent - last_net_io.bytes_sent) + \
+                         (current_net_io.bytes_recv - last_net_io.bytes_recv)
+
+                self._disk_io_bytes += disk_io
+                self._net_io_bytes += net_io
+                self._samples += 1
+
+                last_disk_io = current_disk_io
                 last_net_io = current_net_io
 
-                # Log detailed monitoring information
-                logger.debug(f"CPU: {cpu_usage}% | DiskIO: {disk_io_bytes} bytes | NetIO: {net_io_bytes} bytes")
-                time.sleep(0.1)
+                # Dynamically adjust monitoring interval to avoid overhead
+                elapsed = time.monotonic() - start_monitor
+                if elapsed < MONITOR_INTERVAL:
+                    time.sleep(MONITOR_INTERVAL - elapsed)
 
-        except psutil.NoSuchProcess:
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
             pass
         finally:
-            self._end_time = time.time()
-            self._process.join()
-            self._analyze_task_type()
+            self._end_time = time.monotonic()
+            if self._process.is_alive():
+                self._process.terminate()
+                self._process.join()
+            self._classify_task()
 
-    def _analyze_task_type(self) -> None:
-        """Analyze resource usage to classify task type"""
-        if not self._cpu_usage_history:
+    def _classify_task(self) -> None:
+        """Classify task type based on resource usage"""
+        if self._samples == 0:
+            logger.warning(f"No monitoring data collected for task: {self._task_name}")
             return
 
         total_duration = self._end_time - self._start_time
+        if total_duration < 0.1:  # Ignore very short tasks
+            return
 
-        # Calculate CPU time integral (units: percentage·seconds)
-        cpu_time_integral = sum(self._cpu_usage_history)  # Sampled every second
+        # Calculate average CPU usage (% of total CPU)
+        avg_cpu_usage = self._cpu_usage / self._samples
 
-        # Calculate IO time integral (units: MB·seconds)
-        io_time_integral = sum(
-            (disk + net) / (1024 * 1024)  # Convert to MB
-            for disk, net in zip(self._disk_io_history, self._net_io_history)
-        )
+        # Calculate total IO (MB)
+        total_io_mb = (self._disk_io_bytes + self._net_io_bytes) / (1024 * 1024)
 
-        # Set resource density thresholds (based on experience)
-        CPU_DENSITY_THRESHOLD = 30 * total_duration  # 30% CPU usage for the total duration
-        IO_DENSITY_THRESHOLD = 10 * total_duration  # 10MB/s IO for the total duration
+        # Calculate IO rate (MB/s)
+        io_rate = total_io_mb / total_duration if total_duration > 0 else 0
+
+        # Classification thresholds (adjustable based on needs)
+        CPU_INTENSIVE_THRESHOLD = 50  # Average CPU usage > 50%
+        IO_INTENSIVE_THRESHOLD = 5  # IO rate > 5MB/s
 
         # Classification logic
-        is_cpu_dominant = cpu_time_integral > CPU_DENSITY_THRESHOLD
-        is_io_dominant = io_time_integral > IO_DENSITY_THRESHOLD
+        is_cpu_intensive = avg_cpu_usage > CPU_INTENSIVE_THRESHOLD
+        is_io_intensive = io_rate > IO_INTENSIVE_THRESHOLD
 
-        if is_cpu_dominant and is_io_dominant:
-            # Mixed type task, classified by the dominant feature
-            task_type = "CPU-intensive" if (cpu_time_integral / CPU_DENSITY_THRESHOLD) > \
-                                           (io_time_integral / IO_DENSITY_THRESHOLD) \
-                else "I/O-intensive"
-        elif is_cpu_dominant:
+        if is_cpu_intensive and is_io_intensive:
+            # Mixed-type task, classify by dominant factor
+            cpu_ratio = avg_cpu_usage / CPU_INTENSIVE_THRESHOLD
+            io_ratio = io_rate / IO_INTENSIVE_THRESHOLD
+            task_type = "CPU-intensive" if cpu_ratio > io_ratio else "I/O-intensive"
+        elif is_cpu_intensive:
             task_type = "CPU-intensive"
-        elif is_io_dominant:
+        elif is_io_intensive:
             task_type = "I/O-intensive"
         else:
-            # Low resource type task, classified by the maximum relative value
-            cpu_ratio = cpu_time_integral / CPU_DENSITY_THRESHOLD
-            io_ratio = io_time_integral / IO_DENSITY_THRESHOLD
-            task_type = "CPU-intensive" if cpu_ratio > io_ratio else "I/O-intensive"
+            # Lightweight task, classify by relative ratio
+            task_type = "CPU-light" if avg_cpu_usage > io_rate else "I/O-light"
 
-        # Log task classification result
         logger.info(
-            f"Task Classification Result-> Name: |{self._task_name}| Type: |{task_type}|"
+            f"Task Classification -> Name: {self._task_name} | "
+            f"Type: {task_type} | "
+            f"Avg CPU: {avg_cpu_usage:.1f}% | "
+            f"IO Rate: {io_rate:.2f}MB/s | "
+            f"Duration: {total_duration:.2f}s"
         )
 
-        # Store task type in dictionary
+        # Store task type
         task_function_type.append_to_dict(self._task_name, task_type)
