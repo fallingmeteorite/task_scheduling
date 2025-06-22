@@ -40,7 +40,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
             _task_manager.add(None, skip_ctx, task_id)
 
             task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None, None, None)
-            logger.info(f"Start running io linear task, task ID: {task_id}")
+            logger.debug(f"Start running io linear task, task ID: {task_id}")
             if timeout_processing:
                 with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
                     return_results = func(*args, **kwargs)
@@ -49,14 +49,14 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
 
         _task_manager.remove(task_id)
     except TimeoutException:
-        logger.warning(f"Io linear task | {task_id} | timed out, forced termination")
+        logger.debug(f"Io linear task | {task_id} | timed out, forced termination")
         task_status_manager.add_task_status(task_id, None, "timeout", None, None, None, None, None)
         return_results = "error happened"
     except StopException:
-        logger.warning(f"Io linear task | {task_id} | was cancelled")
+        logger.debug(f"Io linear task | {task_id} | was cancelled")
         task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None, None)
     except Exception as e:
-        logger.error(f"Io linear task | {task_id} | execution failed: {e}")
+        logger.debug(f"Io linear task | {task_id} | execution failed: {e}")
         task_status_manager.add_task_status(task_id, None, "failed", None, None, e, None, None)
         return_results = "error happened"
     finally:
@@ -147,7 +147,7 @@ class IoLinerTask:
 
                 return True
         except Exception as e:
-            logger.error(f"Io linear task | {task_id} | error adding task: {e}")
+            logger.debug(f"Io linear task | {task_id} | error adding task: {e}")
             return False
 
     # Start the scheduler
@@ -174,11 +174,11 @@ class IoLinerTask:
             # Check if all tasks are completed
             if not self._task_queue.empty() or not len(self._running_tasks) == 0:
                 if system_operations:
-                    logger.warning(f"Io liner task was detected to be running, and the task stopped terminating")
+                    logger.debug(f"Io liner task was detected to be running, and the task stopped terminating")
                     return None
 
             if force_cleanup:
-                logger.warning("Force stopping scheduler and cleaning up tasks")
+                logger.debug("Force stopping scheduler and cleaning up tasks")
                 # Force stop all running tasks
                 _task_manager.skip_all_tasks()
                 self._scheduler_stop_event.set()
@@ -202,7 +202,7 @@ class IoLinerTask:
             self._idle_timer = None
             self._task_results = {}
 
-            # logger.info(
+            # logger.debug(
             #     "Scheduler and event loop have stopped, all resources have been released and parameters reset")
 
     # Task scheduler
@@ -251,7 +251,7 @@ class IoLinerTask:
                         self._task_results[task_id] = result
                 task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None, None)
         except Exception as e:
-            logger.error(f"Io linear task | {task_id} | execution failed in callback: {e}")
+            logger.debug(f"Io linear task | {task_id} | execution failed in callback: {e}")
             task_status_manager.add_task_status(task_id, None, "failed", None, None, e, None, None)
         finally:
             # Ensure the Future object is deleted
@@ -308,7 +308,7 @@ class IoLinerTask:
         :return: bool: Whether the task was successfully force stopped.
         """
         if self._running_tasks.get(task_id, None):
-            logger.warning(f"Io linear task | {task_id} | does not exist or is already completed")
+            logger.debug(f"Io linear task | {task_id} | does not exist or is already completed")
             return False
 
         future = self._running_tasks[task_id][0]
