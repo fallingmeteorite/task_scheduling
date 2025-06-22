@@ -58,25 +58,10 @@ pip install --upgrade task_scheduling
 ```
 
 # Interface UI
-Use the function in code
-```
-
-from task_scheduling.control_interface import start_task_status_ui
-
-start_task_status_ui()
-
-```
 
 Task status UI available at http://localhost:8000
 
 # Function introduction
-
-## Tips
-1.Detailed information requires changing the log level to `debug`.
-
-2.This scheduler does not support terminating blocking tasks due to various factors, so it only supports terminating tasks by injecting exceptions.
-
-3.Most of the API calls for this task scheduling can be added to the scheduler for execution as tasks.
 
 ### Function: task_creation(delay: int or None, daily_time: str or None, function_type: str, timeout_processing: bool, task_name: str, func: Callable, *args, **kwargs) -> str or None:
 
