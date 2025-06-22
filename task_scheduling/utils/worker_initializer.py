@@ -14,7 +14,7 @@ def worker_initializer_liner():
     """
 
     def signal_handler(signum, frame):
-        logger.warning(f"Worker {os.getpid()} received signal, exiting...")
+        logger.debug(f"Worker {os.getpid()} received signal, exiting...")
         sys.exit(0)
 
     signal.signal(signal.SIGINT, signal_handler)  # Ctrl+C
@@ -27,7 +27,7 @@ def worker_initializer_asyncio():
     """
 
     def signal_handler(signum, frame):
-        logger.warning(f"Worker {os.getpid()} received signal, exiting...")
+        logger.debug(f"Worker {os.getpid()} received signal, exiting...")
         loop = None
         try:
             loop = asyncio.get_event_loop()
