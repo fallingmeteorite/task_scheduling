@@ -1,5 +1,5 @@
 import os
-import time
+from ..common import logger
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
@@ -75,7 +75,7 @@ def parse_task_info(tasks_info_str):
     }
 
 
-class TaskStatusHandler(BaseHTTPRequestHandler):
+class SilentTaskStatusHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed_path = urlparse(self.path)
 
@@ -106,6 +106,10 @@ class TaskStatusHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
+    def log_message(self, format, *args):
+        """Override to disable logging"""
+        pass
+
 
 class TaskStatusServer:
     def __init__(self, port=8000):
@@ -117,8 +121,8 @@ class TaskStatusServer:
         """Start the web UI in a daemon thread"""
 
         def run_server():
-            self.server = HTTPServer(('', self.port), TaskStatusHandler)
-            print(f"Task status UI available at http://localhost:{self.port}")
+            self.server = HTTPServer(('', self.port), SilentTaskStatusHandler)
+            logger.info(f"Task status UI available at http://localhost:{self.port}")
             self.server.serve_forever()
 
         self.thread = threading.Thread(target=run_server)
