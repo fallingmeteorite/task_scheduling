@@ -45,7 +45,7 @@ class ProcessTaskManager:
             if task_id in self._tasks:
                 del self._tasks[task_id]
                 if not self._tasks:  # Check if the tasks dictionary is empty
-                    logger.info(f"Worker {os.getpid()} no tasks remaining, stopping the monitor thread")
+                    logger.debug(f"Worker {os.getpid()} no tasks remaining, stopping the monitor thread")
                     self._start = False  # If tasks dictionary is empty, stop the loop
 
     def check(self, task_id: str) -> bool:
@@ -90,7 +90,7 @@ class ProcessTaskManager:
 
                     with self._operation_lock:  # Lock for thread-safe dictionary access
                         if not self._tasks:  # Check if the tasks dictionary is empty
-                            logger.info(f"Worker {os.getpid()} no tasks remaining, stopping the monitor thread")
+                            logger.debug(f"Worker {os.getpid()} no tasks remaining, stopping the monitor thread")
                             break  # Stop the loop if tasks dictionary is empty
 
                 else:
