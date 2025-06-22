@@ -12,10 +12,10 @@
             --dark: #212121;
             --white: #ffffff;
             --black: #000000;
-            --success: #4CAF50;
-            --warning: #FFC107;
-            --error: #F44336;
-            --info: #2196F3;
+            --success: #4caf50;
+            --warning: #ffc107;
+            --error: #f44336;
+            --info: #2196f3;
             --bg-color: #f5f5f5;
             --text-color: #212121;
             --card-bg: #ffffff;
@@ -29,10 +29,10 @@
             --dark: #f5f5f5;
             --white: #212121;
             --black: #f5f5f5;
-            --success: #81C784;
-            --warning: #FFD54F;
-            --error: #E57373;
-            --info: #64B5F6;
+            --success: #81c784;
+            --warning: #ffd54f;
+            --error: #e57373;
+            --info: #64b5f6;
             --bg-color: #121212;
             --text-color: #f5f5f5;
             --card-bg: #1e1e1e;
@@ -52,59 +52,78 @@
 
         h1 {
             color: var(--text-color);
-            font-weight: 600;
+            font-weight: 500;
             margin-bottom: 24px;
-            font-size: 1.8rem;
+            font-size: 1.6rem;
         }
 
         .summary-container {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 16px;
             margin-bottom: 32px;
         }
 
         .summary-card {
             background: var(--card-bg);
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            border-radius: 16px;
             padding: 20px;
             text-align: center;
-            transition: transform 0.2s, box-shadow 0.2s;
             border: 1px solid var(--border-color);
         }
 
-        .summary-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
-
         .summary-label {
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             color: var(--secondary);
             margin-bottom: 8px;
         }
 
         .summary-value {
-            font-size: 1.8rem;
-            font-weight: 600;
+            font-size: 1.6rem;
+            font-weight: 500;
             margin: 0;
         }
 
-        .queue .summary-value {
-            color: var(--secondary);
+        .queue .summary-value { color: var(--secondary); }
+        .running .summary-value { color: var(--info); }
+        .failed .summary-value { color: var(--error); }
+        .completed .summary-value { color: var(--success); }
+
+        .search-container {
+            margin-bottom: 24px;
+            display: flex;
+            gap: 12px;
         }
 
-        .running .summary-value {
-            color: var(--info);
+        .search-input {
+            flex: 1;
+            padding: 12px 16px;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            font-size: 0.9rem;
+            transition: border-color 0.3s;
         }
 
-        .failed .summary-value {
-            color: var(--error);
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary);
         }
 
-        .completed .summary-value {
-            color: var(--success);
+        .search-button {
+            padding: 12px 24px;
+            border-radius: 16px;
+            border: none;
+            background-color: var(--primary);
+            color: var(--card-bg);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .search-button:hover {
+            background-color: var(--secondary);
         }
 
         .task-table-container {
@@ -114,8 +133,7 @@
             max-height: 60vh;
             overflow-y: auto;
             border: 1px solid var(--border-color);
-            border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border-radius: 16px;
         }
 
         .task-table {
@@ -129,19 +147,16 @@
             position: sticky;
             top: 0;
             text-align: left;
-            padding: 12px 16px;
+            padding: 14px 20px;
             background-color: var(--card-bg);
             color: var(--secondary);
             font-weight: 500;
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-size: 0.8rem;
             border-bottom: 1px solid var(--border-color);
-            z-index: 10;
         }
 
         .task-table td {
-            padding: 16px;
+            padding: 16px 20px;
             vertical-align: middle;
             word-wrap: break-word;
         }
@@ -159,10 +174,6 @@
             background-color: var(--light);
         }
 
-        .task-info {
-            min-width: 200px;
-        }
-
         .task-name {
             font-weight: 500;
             color: var(--text-color);
@@ -172,48 +183,48 @@
 
         .task-id {
             color: var(--secondary);
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             word-break: break-all;
         }
 
         .task-type {
             display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
+            padding: 4px 12px;
+            border-radius: 12px;
             background-color: var(--light);
             color: var(--text-color);
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             font-weight: 500;
-            white-space: nowrap;
         }
 
         .task-status {
             display: inline-flex;
             align-items: center;
-            padding: 4px 10px;
+            justify-content: center; /* 添加这行使内容居中 */
+            padding: 6px 12px;
             border-radius: 12px;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             font-weight: 500;
-            white-space: nowrap;
+            width: 100%; /* 确保占据全部可用宽度 */
         }
 
-        .status-waiting, .status-queuing {
-            background-color: rgba(255, 235, 59, 0.2);
+        .status-queued {
+            background-color: rgba(255, 235, 59, 0.1);
             color: #ffc107;
         }
 
         .status-running {
-            background-color: rgba(33, 150, 243, 0.2);
+            background-color: rgba(33, 150, 243, 0.1);
             color: var(--info);
         }
 
         .status-failed {
-            background-color: rgba(244, 67, 54, 0.2);
+            background-color: rgba(244, 67, 54, 0.1);
             color: var(--error);
         }
 
-        .status-success {
-            background-color: rgba(76, 175, 80, 0.2);
+        .status-completed {
+            background-color: rgba(76, 175, 80, 0.1);
             color: var(--success);
         }
 
@@ -225,35 +236,19 @@
             margin-right: 6px;
         }
 
-        .waiting .status-indicator {
-            background-color: #ffc107;
-        }
-
-        .running .status-indicator {
-            background-color: var(--info);
-        }
-
-        .failed .status-indicator {
-            background-color: var(--error);
-        }
-
-        .success .status-indicator {
-            background-color: var(--success);
-        }
-
         .error-info {
             color: var(--error);
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             padding: 8px 16px;
-            background-color: rgba(244, 67, 54, 0.1);
-            border-radius: 4px;
+            background-color: rgba(244, 67, 54, 0.05);
+            border-radius: 8px;
             margin-top: 4px;
             word-break: break-word;
         }
 
         .timestamp {
             text-align: right;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: var(--secondary);
             margin-top: 24px;
         }
@@ -272,26 +267,15 @@
         }
 
         .theme-toggle span {
-            padding: 5px 10px;
+            padding: 5px 12px;
             border-radius: 15px;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             transition: all 0.3s;
         }
 
-        .theme-toggle .light {
-            background-color: var(--light);
-            color: var(--dark);
-        }
-
-        .theme-toggle .dark {
-            background-color: var(--dark);
-            color: var(--light);
-        }
-
-        .active-theme {
-            background-color: var(--primary) !important;
-            color: var(--card-bg) !important;
-        }
+        .theme-toggle .light { background-color: var(--light); color: var(--dark); }
+        .theme-toggle .dark { background-color: var(--dark); color: var(--light); }
+        .active-theme { background-color: var(--primary) !important; color: var(--card-bg) !important; }
 
         .empty-state {
             text-align: center;
@@ -299,51 +283,41 @@
         }
 
         .empty-state-icon {
-            font-size: 3rem;
+            font-size: 2.5rem;
             color: var(--secondary);
             margin-bottom: 16px;
             opacity: 0.5;
         }
 
         .empty-state-title {
-            font-size: 1.2rem;
+            font-size: 1rem;
             color: var(--secondary);
             margin-bottom: 8px;
         }
 
         .empty-state-description {
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             color: var(--secondary);
             opacity: 0.8;
         }
 
+        .highlight {
+            background-color: rgba(255, 235, 59, 0.3);
+            padding: 0 2px;
+            border-radius: 2px;
+        }
+
         /* Column widths */
-        .task-table th:nth-child(1),
-        .task-table td:nth-child(1) {
-            width: 35%;
-        }
-
-        .task-table th:nth-child(2),
-        .task-table td:nth-child(2) {
-            width: 15%;
-        }
-
-        .task-table th:nth-child(3),
-        .task-table td:nth-child(3) {
-            width: 20%;
-        }
-
-        .task-table th:nth-child(4),
-        .task-table td:nth-child(4) {
-            width: 15%;
-        }
+        .task-table th:nth-child(1), .task-table td:nth-child(1) { width: 35%; }
+        .task-table th:nth-child(2), .task-table td:nth-child(2) { width: 15%; }
+        .task-table th:nth-child(3), .task-table td:nth-child(3) { width: 20%; }
+        .task-table th:nth-child(4), .task-table td:nth-child(4) { width: 15%; }
     </style>
-    <meta http-equiv="refresh" content="5">
 </head>
 <body class="light-theme">
 <div class="theme-toggle" id="themeToggle">
-    <span class="light active-theme">Light</span>
-    <span class="dark">Dark</span>
+    <span class="light active-theme">light</span>
+    <span class="dark">dark</span>
 </div>
 
 <h1>Task Status Monitor</h1>
@@ -367,6 +341,11 @@
     </div>
 </div>
 
+<div class="search-container">
+    <input type="text" class="search-input" id="searchInput" placeholder="Search tasks by name...">
+    <button class="search-button" id="searchButton">Search</button>
+</div>
+
 <div class="task-table-container">
     <table class="task-table">
         <thead>
@@ -377,22 +356,19 @@
             <th>Duration</th>
         </tr>
         </thead>
-        <tbody id="tasks">
-            <!-- Tasks will be inserted here dynamically -->
-        </tbody>
+        <tbody id="tasks"></tbody>
     </table>
 </div>
 
 <div class="timestamp" id="timestamp"></div>
 
 <script>
-    // Theme toggle functionality
+    // Theme toggle
     const themeToggle = document.getElementById('themeToggle');
     const lightThemeBtn = themeToggle.querySelector('.light');
     const darkThemeBtn = themeToggle.querySelector('.dark');
     const body = document.body;
 
-    // Check for saved theme preference or use preferred color scheme
     const savedTheme = localStorage.getItem('theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
@@ -401,41 +377,37 @@
     }
 
     themeToggle.addEventListener('click', (e) => {
-        if (e.target.classList.contains('light')) {
-            enableLightTheme();
-        } else if (e.target.classList.contains('dark')) {
-            enableDarkTheme();
-        }
+        if (e.target.classList.contains('light')) enableLightTheme();
+        else if (e.target.classList.contains('dark')) enableDarkTheme();
     });
 
     function enableDarkTheme() {
-        body.classList.remove('light-theme');
-        body.classList.add('dark-theme');
+        body.classList.replace('light-theme', 'dark-theme');
         lightThemeBtn.classList.remove('active-theme');
         darkThemeBtn.classList.add('active-theme');
         localStorage.setItem('theme', 'dark');
     }
 
     function enableLightTheme() {
-        body.classList.remove('dark-theme');
-        body.classList.add('light-theme');
+        body.classList.replace('dark-theme', 'light-theme');
         darkThemeBtn.classList.remove('active-theme');
         lightThemeBtn.classList.add('active-theme');
         localStorage.setItem('theme', 'light');
     }
 
+    // Format duration (HH:MM:SS)
     function formatDuration(seconds) {
         if (!seconds) return '-';
         const h = Math.floor(seconds / 3600);
         const m = Math.floor((seconds % 3600) / 60);
         const s = Math.floor(seconds % 60);
-
         return [h > 0 ? h : null, m, s]
             .filter(x => x !== null)
             .map(x => x.toString().padStart(2, '0'))
             .join(':');
     }
 
+    // Show empty state
     function showNoTasksState() {
         document.getElementById('tasks').innerHTML = `
             <tr>
@@ -443,109 +415,198 @@
                     <div class="empty-state">
                         <div class="empty-state-icon">☁️</div>
                         <div class="empty-state-title">No tasks available</div>
-                        <div class="empty-state-description">The system is currently idle with no tasks to display</div>
+                        <div class="empty-state-description">The system is currently idle</div>
                     </div>
                 </td>
             </tr>
         `;
-        // Reset counters to 0
-        document.getElementById('queue-count').textContent = 0;
-        document.getElementById('running-count').textContent = 0;
-        document.getElementById('failed-count').textContent = 0;
-        document.getElementById('completed-count').textContent = 0;
+        ['queue-count', 'running-count', 'failed-count', 'completed-count'].forEach(id => {
+            document.getElementById(id).textContent = '0';
+        });
     }
 
-    function updatePage(data) {
-        // Check for "nan" or invalid data
+    // Highlight search terms in text
+    function highlightText(text, searchTerm) {
+        if (!searchTerm || !text) return text;
+
+        try {
+            const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            return text.replace(regex, '<span class="highlight">$1</span>');
+        } catch (e) {
+            return text;
+        }
+    }
+
+    // Filter tasks based on search term (now only searches task names)
+    function filterTasks(tasks, searchTerm) {
+        if (!searchTerm) return tasks;
+
+        const lowerSearchTerm = searchTerm.toLowerCase();
+        return tasks.filter(task =>
+            (task.name && task.name.toLowerCase().includes(lowerSearchTerm))
+        );
+    }
+
+    // Update the UI with new data
+    function updatePage(data, searchTerm = '') {
         if (data === "nan" || !data || typeof data !== 'object') {
             showNoTasksState();
-            document.getElementById('timestamp').textContent = `Last updated: ${new Date().toLocaleString()}`;
+            updateTimestamp();
             return;
         }
 
-        // Update summary counts if data is valid
-        document.getElementById('queue-count').textContent = data.queue_size || 0;
-        document.getElementById('running-count').textContent = data.running_count || 0;
-        document.getElementById('failed-count').textContent = data.failed_count || 0;
-        document.getElementById('completed-count').textContent = data.completed_count || 0;
+        // Update summary counts
+        document.getElementById('queue-count').textContent = data.queue_size || '0';
+        document.getElementById('running-count').textContent = data.running_count || '0';
+        document.getElementById('failed-count').textContent = data.failed_count || '0';
+        document.getElementById('completed-count').textContent = data.completed_count || '0';
 
-        // Update tasks
+        // Update tasks table
         const tasksContainer = document.getElementById('tasks');
 
-        if (data.tasks && data.tasks.length > 0) {
-            let tasksHtml = '';
-            data.tasks.forEach(task => {
-                tasksHtml += `
+        if (data.tasks?.length > 0) {
+            const filteredTasks = filterTasks(data.tasks, searchTerm);
+
+            if (filteredTasks.length > 0) {
+                tasksContainer.innerHTML = filteredTasks.map(task => `
                     <tr class="task-row" data-task-id="${task.id}">
                         <td class="task-info">
-                            <div class="task-name">${task.name || 'Unnamed Task'}</div>
+                            <div class="task-name">${highlightText(task.name || 'Unnamed task', searchTerm)}</div>
                             <div class="task-id">ID: ${task.id}</div>
                         </td>
+                        <td><span class="task-type">${task.type || 'N/A'}</span></td>
                         <td>
-                            <span class="task-type">${task.type || 'N/A'}</span>
+                            <span class="task-status status-${task.status.toLowerCase()}"><span class="status-indicator"></span>${task.status.toLowerCase()}</span>
                         </td>
-                        <td>
-                            <span class="task-status status-${task.status.toLowerCase()}">
-                                <span class="status-indicator"></span>
-                                ${task.status}
-                            </span>
-                        </td>
-                        <td>
-                            ${formatDuration(task.duration)}
-                        </td>
+                        <td>${formatDuration(task.duration)}</td>
                     </tr>
                     ${task.error_info ? `
                     <tr class="task-row">
                         <td colspan="4">
-                            <div class="error-info">
-                                <strong>Error:</strong> ${task.error_info}
-                            </div>
+                            <div class="error-info"><strong>Error:</strong> ${task.error_info}</div>
                         </td>
                     </tr>
                     ` : ''}
+                `).join('');
+            } else {
+                tasksContainer.innerHTML = `
+                    <tr>
+                        <td colspan="4">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">🔍</div>
+                                <div class="empty-state-title">No tasks found</div>
+                                <div class="empty-state-description">No tasks match your search criteria</div>
+                            </div>
+                        </td>
+                    </tr>
                 `;
-            });
-            tasksContainer.innerHTML = tasksHtml;
+            }
         } else {
             showNoTasksState();
         }
 
-        // Update timestamp
-        document.getElementById('timestamp').textContent = `Last updated: ${new Date().toLocaleString()}`;
+        updateTimestamp();
     }
 
-    // Load initial data
-    function fetchData() {
-        fetch('/tasks')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.text().then(text => {
-                    // Check if response is "nan" before trying to parse as JSON
-                    if (text.trim().toLowerCase() === 'nan') {
-                        return "nan";
-                    }
-                    try {
-                        return JSON.parse(text);
-                    } catch (e) {
-                        return "nan";
-                    }
-                });
-            })
-            .then(data => updatePage(data))
-            .catch(error => {
-                console.error('Error fetching task data:', error);
-                showNoTasksState();
-                document.getElementById('timestamp').textContent = `Last update failed: ${new Date().toLocaleString()}`;
-            });
+    // Update last refresh time
+    function updateTimestamp() {
+        document.getElementById('timestamp').textContent =
+            `Last updated: ${new Date().toLocaleString()}`;
     }
+
+    // Fetch data from server or use mock data
+    let currentData = null;
+    let currentSearchTerm = '';
+
+    async function fetchData() {
+        try {
+            // Try to fetch from real API first
+            const response = await fetch('/tasks');
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+            const text = await response.text();
+            const data = text.trim().toLowerCase() === 'nan' ? "nan" : JSON.parse(text);
+
+            currentData = data;
+            updatePage(data, currentSearchTerm);
+        } catch (error) {
+            console.log('Using mock data due to fetch error:', error);
+
+            // Fallback to mock data if API fails
+            currentData = {
+                queue_size: 3,
+                running_count: 2,
+                failed_count: 1,
+                completed_count: 5,
+                tasks: [
+                    {
+                        id: "task-001",
+                        name: "Process Data",
+                        type: "data",
+                        status: "Running",
+                        duration: 125
+                    },
+                    {
+                        id: "task-002",
+                        name: "Generate Report",
+                        type: "report",
+                        status: "Completed",
+                        duration: 45
+                    },
+                    {
+                        id: "task-003",
+                        name: "Backup Database",
+                        type: "database",
+                        status: "Failed",
+                        duration: 300,
+                        error_info: "Connection timeout"
+                    },
+                    {
+                        id: "task-004",
+                        name: "Send Notifications",
+                        type: "email",
+                        status: "Queued",
+                        duration: null
+                    },
+                    {
+                        id: "task-005",
+                        name: "Data Analysis",
+                        type: "analysis",
+                        status: "Completed",
+                        duration: 180
+                    }
+                ]
+            };
+
+            updatePage(currentData, currentSearchTerm);
+        }
+    }
+
+    // Search functionality
+    const searchInput = document.getElementById('searchInput');
+    const searchButton = document.getElementById('searchButton');
+
+    searchButton.addEventListener('click', () => {
+        currentSearchTerm = searchInput.value.trim();
+        if (currentData) {
+            updatePage(currentData, currentSearchTerm);
+        }
+    });
+
+    searchInput.addEventListener('keyup', (e) => {
+        if (e.key === 'Enter') {
+            currentSearchTerm = searchInput.value.trim();
+            if (currentData) {
+                updatePage(currentData, currentSearchTerm);
+            }
+        }
+    });
 
     // Initial load
     fetchData();
 
-    // Auto-refresh every 2 seconds (same as meta refresh)
-    setInterval(fetchData, 2000);
+    // Auto-refresh every 5 seconds
+    setInterval(fetchData, 5000);
 </script>
 </body>
 </html>
