@@ -45,7 +45,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
             task_manager.add(skip_ctx, task_id)
 
             task_status_queue.put(("running", task_id, None, time.time(), None, None, None))
-            logger.info(f"Start running cpu linear task, task ID: {task_id}")
+            logger.debug(f"Start running cpu linear task, task ID: {task_id}")
             if timeout_processing:
                 with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
                     # Whether to pass in the task manager to facilitate other thread management
@@ -57,17 +57,17 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
                 return_results = func(*args, **kwargs)
 
     except (StopException, KeyboardInterrupt):
-        logger.warning(f"Cpu linear task | {task_id} | cancelled, forced termination")
+        logger.debug(f"Cpu linear task | {task_id} | cancelled, forced termination")
         task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
         return_results = "error happened"
 
     except TimeoutException:
-        logger.warning(f"Cpu linear task | {task_id} | timed out, forced termination")
+        logger.debug(f"Cpu linear task | {task_id} | timed out, forced termination")
         task_status_queue.put(("timeout", task_id, None, None, None, None, None))
         return_results = "error happened"
 
     except Exception as e:
-        logger.error(f"Cpu linear task | {task_id} | execution failed: {e}")
+        logger.debug(f"Cpu linear task | {task_id} | execution failed: {e}")
         task_status_queue.put(("failed", task_id, None, None, None, e, None))
         return_results = "error happened"
 
@@ -189,7 +189,7 @@ class CpuLinerTask:
 
                 return True
         except Exception as e:
-            logger.error(f"Cpu linear task | {task_id} | error adding task: {e}")
+            logger.debug(f"Cpu linear task | {task_id} | error adding task: {e}")
             return False
 
     def _start_scheduler(self) -> None:
@@ -215,11 +215,11 @@ class CpuLinerTask:
             # Check if there are any running tasks
             if not self._task_queue.empty() or not len(self._running_tasks) == 0:
                 if system_operations:
-                    logger.warning(f"Cpu liner task | detected running tasks | stopping operation terminated")
+                    logger.debug(f"Cpu liner task | detected running tasks | stopping operation terminated")
                     return None
 
             if force_cleanup:
-                logger.warning("Force stopping scheduler and cleaning up tasks")
+                logger.debug("Force stopping scheduler and cleaning up tasks")
                 self.stop_all_running_task()
                 # Ensure the executor is properly shut down
                 if self._executor:
@@ -253,7 +253,7 @@ class CpuLinerTask:
             self._idle_timer = None
             self._task_results = {}
 
-            # logger.info(
+            # logger.debug(
             #     "Scheduler and event loop have stopped, all resources have been released and parameters reset")
 
     def stop_all_running_task(self):
@@ -308,7 +308,7 @@ class CpuLinerTask:
                         self._task_results[task_id] = result
 
         except Exception as e:
-            logger.error(f"Cpu linear task | {task_id} | execution failed in callback: {e}")
+            logger.debug(f"Cpu linear task | {task_id} | execution failed in callback: {e}")
             self._task_status_queue.put(("failed", task_id, None, None, None, e, None))
         finally:
             # Make sure the Future object is deleted
@@ -364,7 +364,7 @@ class CpuLinerTask:
         :return: bool: Whether the task was successfully force stopped.
         """
         if self._running_tasks.get(task_id) is None and main_task:
-            logger.warning(f"Cpu linear task | {task_id} | does not exist or is already completed")
+            logger.debug(f"Cpu linear task | {task_id} | does not exist or is already completed")
             return False
 
         future = self._running_tasks[task_id][0]
