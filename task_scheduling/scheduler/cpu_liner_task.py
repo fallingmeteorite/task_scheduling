@@ -190,7 +190,7 @@ class CpuLinerTask:
                 return True
         except Exception as e:
             logger.debug(f"Cpu linear task | {task_id} | error adding task: {e}")
-            return False
+            return f"Cpu linear task | {task_id} | error adding task: {e}"
 
     def _start_scheduler(self) -> None:
         """
