@@ -148,7 +148,7 @@ class IoLinerTask:
                 return True
         except Exception as e:
             logger.debug(f"Io linear task | {task_id} | error adding task: {e}")
-            return False
+            return f"Io linear task | {task_id} | error adding task: {e}"
 
     # Start the scheduler
     def _start_scheduler(self) -> None:
