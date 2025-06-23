@@ -150,8 +150,7 @@ class TimerTask:
                     execution_time = scheduled_time.timestamp()
                 else:
                     logger.debug(f"Timer task | {task_id} | no scheduling parameters provided")
-                    return False
-
+                    return f"Timer task | {task_id} | no scheduling parameters provided"
                 # Reduce the granularity of the lock
                 task_status_manager.add_task_status(task_id, None, "waiting", None, None, None,
                                                     None, "timer_task")
@@ -169,7 +168,7 @@ class TimerTask:
                 return True
         except Exception as e:
             logger.debug(f"Error adding task | {task_id} |: {e}")
-            return False
+            return f"Error adding task | {task_id} |: {e}"
 
     # Start the scheduler
     def _start_scheduler(self) -> None:
