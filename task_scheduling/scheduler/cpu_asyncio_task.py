@@ -104,7 +104,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
     return return_results
 
 
-class CpuAsyncTask:
+class CpuAsyncioTask:
     """
     Linear task manager class, responsible for managing the scheduling, execution, and monitoring of linear tasks.
     """
@@ -212,7 +212,7 @@ class CpuAsyncTask:
                 return True
         except Exception as e:
             logger.debug(f"Cpu asyncio task | {task_id} | error adding task: {e}")
-            return False
+            return f"Cpu asyncio task | {task_id} | error adding task: {e}"
 
     def _start_scheduler(self) -> None:
         """
