@@ -4,7 +4,7 @@ import uuid
 from typing import Callable
 
 from .common.log_config import logger
-from .scheduler import io_async_task, io_liner_task, cpu_liner_task, cpu_async_task, timer_task
+from .scheduler import io_asyncio_task, io_liner_task, cpu_liner_task, cpu_asyncio_task, timer_task
 from .scheduler_management import TaskScheduler
 from .utils import is_async_function
 
@@ -77,9 +77,9 @@ def shutdown(force_cleanup: bool) -> None:
         timer_task.stop_scheduler(force_cleanup)
 
     # Shutdown scheduler if running
-    if hasattr(cpu_async_task, "_scheduler_started") and cpu_async_task._scheduler_started:
+    if hasattr(cpu_asyncio_task, "_scheduler_started") and cpu_asyncio_task._scheduler_started:
         logger.info("Detected Cpu asyncio task scheduler is running, shutting down...")
-        cpu_async_task.stop_scheduler(force_cleanup)
+        cpu_asyncio_task.stop_scheduler(force_cleanup)
 
     # Shutdown scheduler if running
     if hasattr(cpu_liner_task, "_scheduler_started") and cpu_liner_task._scheduler_started:
@@ -87,9 +87,9 @@ def shutdown(force_cleanup: bool) -> None:
         cpu_liner_task.stop_scheduler(force_cleanup)
 
     # Shutdown scheduler if running
-    if hasattr(io_async_task, "_scheduler_started") and io_async_task._scheduler_started:
+    if hasattr(io_asyncio_task, "_scheduler_started") and io_asyncio_task._scheduler_started:
         logger.info("Detected io asyncio task scheduler is running, shutting down...")
-        io_async_task.stop_all_schedulers(force_cleanup)
+        io_asyncio_task.stop_all_schedulers(force_cleanup)
 
     # Shutdown scheduler if running
     if hasattr(io_liner_task, "_scheduler_started") and io_liner_task._scheduler_started:
