@@ -15,7 +15,7 @@ from ..stopit import ThreadTaskManager
 _task_manager = ThreadTaskManager()
 
 
-class IoAsyncTask:
+class IoAsyncioTask:
     """
     Asynchronous task manager class, responsible for scheduling, executing, and monitoring asynchronous tasks.
     """
@@ -99,8 +99,8 @@ class IoAsyncTask:
 
                 return True
         except Exception as e:
-            logger.debug(f"Error adding task | {task_id} |: {e}")
-            return False
+            logger.debug(f"Io asyncio task | {task_id} | error adding task: {e}")
+            return f"Io asyncio task | {task_id} | error adding task: {e}"
 
     # Start the scheduler
     def _start_scheduler(self,
