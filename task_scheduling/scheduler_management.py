@@ -10,7 +10,7 @@ from .common import logger
 from .config import config
 from .function_data import task_function_type
 from .manager import task_status_manager
-from .scheduler import io_async_task, io_liner_task, cpu_liner_task, cpu_async_task, timer_task
+from .scheduler import io_asyncio_task, io_liner_task, cpu_liner_task, cpu_asyncio_task, timer_task
 
 
 def is_banana(item: Tuple, task_name: str) -> bool:
@@ -65,7 +65,7 @@ class TaskScheduler:
                                   kwargs))
         self._task_event.set()  # Wake up the allocator thread
 
-        task_status_manager.add_task_status(task_id, task_name, "queuing", None, None, None, timeout_processing)
+        task_status_manager.add_task_status(task_id, task_name, "queuing", None, None, None, timeout_processing, "NAN")
 
         if not self.allocator_started:
             self.allocator_started = True
@@ -83,11 +83,11 @@ class TaskScheduler:
                 if async_function:
 
                     if function_type == "io":
-                        state = io_async_task.add_task(timeout_processing, task_name, task_id, func,
-                                                       *args, **kwargs)
+                        state = io_asyncio_task.add_task(timeout_processing, task_name, task_id, func,
+                                                         *args, **kwargs)
                     if function_type == "cpu":
-                        state = cpu_async_task.add_task(timeout_processing, task_name, task_id, func,
-                                                        *args, **kwargs)
+                        state = cpu_asyncio_task.add_task(timeout_processing, task_name, task_id, func,
+                                                          *args, **kwargs)
 
                 if not async_function:
 
@@ -120,6 +120,9 @@ class TaskScheduler:
                                               func,
                                               args,
                                               kwargs))
+                else:
+                    task_status_manager.add_task_status(task_id, task_name, "failed", None, None, state,
+                                                        timeout_processing, "NAN")
 
                 time.sleep(0.1)
 
@@ -170,10 +173,17 @@ class TaskScheduler:
             if task_status['status'] == "running" and task_status['is_timeout_enabled']:
                 if current_time - task_status['start_time'] > config["watch_dog_time"]:
                     # Stop task
-                    io_async_task.force_stop_task(task_id)
-                    io_liner_task.force_stop_task(task_id)
-                    cpu_liner_task.force_stop_task(task_id)
-                    cpu_async_task.force_stop_task(task_id)
+
+                    if task_status['task_type'] == "io_asyncio_task":
+                        io_asyncio_task.force_stop_task(task_id)
+                    if task_status['task_type'] == "cpu_asyncio_task":
+                        cpu_asyncio_task.force_stop_task(task_id)
+
+                    if task_status['task_type'] == "io_liner_task":
+                        io_liner_task.force_stop_task(task_id)
+                    if task_status['task_type'] == "cpu_liner_task":
+                        cpu_liner_task.force_stop_task(task_id)
+
                     timer_task.force_stop_task(task_id)
 
         self._start_timeout_checker()  # Restart the timer
