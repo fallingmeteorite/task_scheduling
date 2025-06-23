@@ -20,6 +20,7 @@
             --text-color: #212121;
             --card-bg: #ffffff;
             --border-color: #e0e0e0;
+            --waiting: #9c27b0;
         }
 
         .dark-theme {
@@ -37,6 +38,7 @@
             --text-color: #f5f5f5;
             --card-bg: #1e1e1e;
             --border-color: #424242;
+            --waiting: #ba68c8;
         }
 
         body {
@@ -58,10 +60,22 @@
         }
 
         .summary-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .total-summary-row {
+            display: grid;
+            grid-template-columns: repeat(1, 1fr);
+            gap: 16px;
+        }
+
+        .status-summary-row {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 16px;
-            margin-bottom: 32px;
         }
 
         .summary-card {
@@ -72,10 +86,18 @@
             border: 1px solid var(--border-color);
         }
 
+        .total-summary-card {
+            padding: 24px 20px;
+        }
+
         .summary-label {
             font-size: 0.85rem;
             color: var(--secondary);
             margin-bottom: 8px;
+        }
+
+        .total-summary-card .summary-label {
+            font-size: 0.95rem;
         }
 
         .summary-value {
@@ -84,10 +106,37 @@
             margin: 0;
         }
 
-        .queue .summary-value { color: var(--secondary); }
-        .running .summary-value { color: var(--info); }
-        .failed .summary-value { color: var(--error); }
-        .completed .summary-value { color: var(--success); }
+        .total-summary-card .summary-value {
+            font-size: 2rem;
+        }
+
+        .total .summary-value {
+            color: var(--primary);
+        }
+
+        .running .summary-value {
+            color: var(--info);
+        }
+
+        .failed .summary-value {
+            color: var(--error);
+        }
+
+        .completed .summary-value {
+            color: var(--success);
+        }
+
+        .queuing .summary-value {
+            color: var(--warning);
+        }
+
+        .waiting .summary-value {
+            color: var(--waiting);
+        }
+
+        .cancelled .summary-value {
+            color: var(--secondary);
+        }
 
         .search-container {
             margin-bottom: 24px;
@@ -200,17 +249,27 @@
         .task-status {
             display: inline-flex;
             align-items: center;
-            justify-content: center; /* 添加这行使内容居中 */
+            justify-content: center;
             padding: 6px 12px;
             border-radius: 12px;
             font-size: 0.75rem;
             font-weight: 500;
-            width: 100%; /* 确保占据全部可用宽度 */
+            width: 100%;
         }
 
         .status-queued {
             background-color: rgba(255, 235, 59, 0.1);
             color: #ffc107;
+        }
+
+        .status-queuing {
+            background-color: rgba(255, 235, 59, 0.1);
+            color: #ffc107;
+        }
+
+        .status-waiting {
+            background-color: rgba(156, 39, 176, 0.1);
+            color: var(--waiting);
         }
 
         .status-running {
@@ -226,6 +285,11 @@
         .status-completed {
             background-color: rgba(76, 175, 80, 0.1);
             color: var(--success);
+        }
+
+        .status-cancelled {
+            background-color: rgba(158, 158, 158, 0.1);
+            color: var(--secondary);
         }
 
         .status-indicator {
@@ -273,9 +337,20 @@
             transition: all 0.3s;
         }
 
-        .theme-toggle .light { background-color: var(--light); color: var(--dark); }
-        .theme-toggle .dark { background-color: var(--dark); color: var(--light); }
-        .active-theme { background-color: var(--primary) !important; color: var(--card-bg) !important; }
+        .theme-toggle .light {
+            background-color: var(--light);
+            color: var(--dark);
+        }
+
+        .theme-toggle .dark {
+            background-color: var(--dark);
+            color: var(--light);
+        }
+
+        .active-theme {
+            background-color: var(--primary) !important;
+            color: var(--card-bg) !important;
+        }
 
         .empty-state {
             text-align: center;
@@ -308,10 +383,21 @@
         }
 
         /* Column widths */
-        .task-table th:nth-child(1), .task-table td:nth-child(1) { width: 35%; }
-        .task-table th:nth-child(2), .task-table td:nth-child(2) { width: 15%; }
-        .task-table th:nth-child(3), .task-table td:nth-child(3) { width: 20%; }
-        .task-table th:nth-child(4), .task-table td:nth-child(4) { width: 15%; }
+        .task-table th:nth-child(1), .task-table td:nth-child(1) {
+            width: 35%;
+        }
+
+        .task-table th:nth-child(2), .task-table td:nth-child(2) {
+            width: 15%;
+        }
+
+        .task-table th:nth-child(3), .task-table td:nth-child(3) {
+            width: 20%;
+        }
+
+        .task-table th:nth-child(4), .task-table td:nth-child(4) {
+            width: 15%;
+        }
     </style>
 </head>
 <body class="light-theme">
@@ -323,21 +409,37 @@
 <h1>Task Status Monitor</h1>
 
 <div class="summary-container">
-    <div class="summary-card queue">
-        <div class="summary-label">Queued Tasks</div>
-        <div class="summary-value" id="queue-count">0</div>
+    <div class="total-summary-row">
+        <div class="summary-card total total-summary-card">
+            <div class="summary-label">Total Tasks</div>
+            <div class="summary-value" id="total-count">0</div>
+        </div>
     </div>
-    <div class="summary-card running">
-        <div class="summary-label">Running Tasks</div>
-        <div class="summary-value" id="running-count">0</div>
-    </div>
-    <div class="summary-card failed">
-        <div class="summary-label">Failed Tasks</div>
-        <div class="summary-value" id="failed-count">0</div>
-    </div>
-    <div class="summary-card completed">
-        <div class="summary-label">Completed Tasks</div>
-        <div class="summary-value" id="completed-count">0</div>
+    <div class="status-summary-row">
+        <div class="summary-card running">
+            <div class="summary-label">Running Tasks</div>
+            <div class="summary-value" id="running-count">0</div>
+        </div>
+        <div class="summary-card failed">
+            <div class="summary-label">Failed Tasks</div>
+            <div class="summary-value" id="failed-count">0</div>
+        </div>
+        <div class="summary-card completed">
+            <div class="summary-label">Completed Tasks</div>
+            <div class="summary-value" id="completed-count">0</div>
+        </div>
+        <div class="summary-card queuing">
+            <div class="summary-label">Queuing Tasks</div>
+            <div class="summary-value" id="queuing-count">0</div>
+        </div>
+        <div class="summary-card waiting">
+            <div class="summary-label">Waiting Tasks</div>
+            <div class="summary-value" id="waiting-count">0</div>
+        </div>
+        <div class="summary-card cancelled">
+            <div class="summary-label">Cancelled Tasks</div>
+            <div class="summary-value" id="cancelled-count">0</div>
+        </div>
     </div>
 </div>
 
@@ -420,7 +522,7 @@
                 </td>
             </tr>
         `;
-        ['queue-count', 'running-count', 'failed-count', 'completed-count'].forEach(id => {
+        ['total-count', 'running-count', 'failed-count', 'completed-count', 'queuing-count', 'waiting-count', 'cancelled-count'].forEach(id => {
             document.getElementById(id).textContent = '0';
         });
     }
@@ -437,7 +539,7 @@
         }
     }
 
-    // Filter tasks based on search term (now only searches task names)
+    // Filter tasks based on search term
     function filterTasks(tasks, searchTerm) {
         if (!searchTerm) return tasks;
 
@@ -455,11 +557,34 @@
             return;
         }
 
+        // Calculate status counts from tasks array
+        let statusCounts = {
+            running: 0,
+            failed: 0,
+            completed: 0,
+            queuing: 0,
+            waiting: 0,
+            cancelled: 0,
+            queued: 0
+        };
+
+        if (data.tasks?.length > 0) {
+            data.tasks.forEach(task => {
+                const status = task.status.toLowerCase();
+                if (statusCounts.hasOwnProperty(status)) {
+                    statusCounts[status]++;
+                }
+            });
+        }
+
         // Update summary counts
-        document.getElementById('queue-count').textContent = data.queue_size || '0';
-        document.getElementById('running-count').textContent = data.running_count || '0';
-        document.getElementById('failed-count').textContent = data.failed_count || '0';
-        document.getElementById('completed-count').textContent = data.completed_count || '0';
+        document.getElementById('total-count').textContent = data.tasks?.length || 0;
+        document.getElementById('running-count').textContent = data.running_count || statusCounts.running;
+        document.getElementById('failed-count').textContent = data.failed_count || statusCounts.failed;
+        document.getElementById('completed-count').textContent = data.completed_count || statusCounts.completed;
+        document.getElementById('queuing-count').textContent = statusCounts.queuing + statusCounts.queued; // Combine queuing and queued
+        document.getElementById('waiting-count').textContent = statusCounts.waiting;
+        document.getElementById('cancelled-count').textContent = statusCounts.cancelled;
 
         // Update tasks table
         const tasksContainer = document.getElementById('tasks');
@@ -534,7 +659,6 @@
 
             // Fallback to mock data if API fails
             currentData = {
-                queue_size: 3,
                 running_count: 2,
                 failed_count: 1,
                 completed_count: 5,
@@ -565,7 +689,7 @@
                         id: "task-004",
                         name: "Send Notifications",
                         type: "email",
-                        status: "Queued",
+                        status: "Waiting",
                         duration: null
                     },
                     {
@@ -574,6 +698,27 @@
                         type: "analysis",
                         status: "Completed",
                         duration: 180
+                    },
+                    {
+                        id: "task-006",
+                        name: "Cleanup Job",
+                        type: "maintenance",
+                        status: "Cancelled",
+                        duration: null
+                    },
+                    {
+                        id: "task-007",
+                        name: "Data Sync",
+                        type: "sync",
+                        status: "Queuing",
+                        duration: null
+                    },
+                    {
+                        id: "task-008",
+                        name: "Image Processing",
+                        type: "media",
+                        status: "Waiting",
+                        duration: null
                     }
                 ]
             };
