@@ -109,7 +109,7 @@ class TaskScheduler:
                         logger.error("The timer function cannot be asynchronous code!")
                         state = True
 
-                if not state:
+                if state == False:
                     self.core_task_queue.put((delay,
                                               daily_time,
                                               async_function,
@@ -120,7 +120,8 @@ class TaskScheduler:
                                               func,
                                               args,
                                               kwargs))
-                else:
+
+                if not state == False and not state == True:
                     task_status_manager.add_task_status(task_id, task_name, "failed", None, None, state,
                                                         timeout_processing, "NAN")
 

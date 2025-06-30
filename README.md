@@ -78,6 +78,15 @@ Task status UI available at http://localhost:8000
 
 3.Most of the API calls for this task scheduling can be added to the scheduler for execution as tasks.
 
+4. The log display level is available 
+```
+from task_scheduling.common import set_log_level
+
+set_log_level("DEBUG") # INFO, DEBUG, ERROR, WARNING
+
+if __name__ == "__main__":
+    ......
+```
 ### Function: task_creation(delay: int or None, daily_time: str or None, function_type: str, timeout_processing: bool, task_name: str, func: Callable, *args, **kwargs) -> str or None:
 
 The core function is used to create a task and submit it to the scheduler. Currently the scheduler has
@@ -109,6 +118,7 @@ input_info = "test"
 
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.variable import *
 
     task_id1 = task_creation(None,
                              # This is how long the delay is executed (in seconds)
@@ -116,7 +126,7 @@ if __name__ == "__main__":
                              None,
                              # This is to be performed at what point (24-hour clock)
                              # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
-                             'io',
+                             scheduler_io,
                              # Running function type, there are "io, cpu, timer"
                              True,
                              # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
@@ -134,7 +144,7 @@ if __name__ == "__main__":
                              None,
                              # This is to be performed at what point (24-hour clock)
                              # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
-                             'io',
+                             scheduler_io,
                              # Running function type, there are "io, cpu, timer"
                              True,
                              # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
@@ -173,6 +183,7 @@ input_info = "test"
 
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.variable import *
 
     task_id1 = task_creation(10,
                              # This is how long the delay is executed (in seconds)
@@ -180,7 +191,7 @@ if __name__ == "__main__":
                              None,  # 14:00
                              # This is to be performed at what point (24-hour clock)
                              # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
-                             'timer',
+                             scheduler_timer,
                              # Running function type, there are "io, cpu, timer"
                              True,
                              # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
@@ -198,7 +209,7 @@ if __name__ == "__main__":
                              "13:03",  # 13.03
                              # This is to be performed at what point (24-hour clock)
                              # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
-                             'timer',
+                             scheduler_timer,
                              # Running function type, there are "io, cpu, timer"
                              True,
                              # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
@@ -247,6 +258,7 @@ input_info = "test"
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation, shutdown
     from task_scheduling.scheduler import cpu_liner_task
+    from task_scheduling.variable import *
 
     task_id1 = task_creation(None,
                              # This is how long the delay is executed (in seconds)
@@ -254,7 +266,7 @@ if __name__ == "__main__":
                              None,
                              # This is to be performed at what point (24-hour clock)
                              # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
-                             'cpu',
+                             scheduler_cpu,
                              # Running function type, there are "io, cpu, timer"
                              True,
                              # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
@@ -296,6 +308,7 @@ input_info = "test"
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation, shutdown
     from task_scheduling.scheduler import cpu_liner_task
+    from task_scheduling.variable import *
 
     task_id1 = task_creation(None,
                              # This is how long the delay is executed (in seconds)
@@ -303,7 +316,7 @@ if __name__ == "__main__":
                              None,
                              # This is to be performed at what point (24-hour clock)
                              # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
-                             'cpu',
+                             scheduler_cpu,
                              # Running function type, there are "io, cpu, timer"
                              True,
                              # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
@@ -418,7 +431,7 @@ if __name__ == "__main__":
                              None,
                              # This is to be performed at what point (24-hour clock)
                              # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
-                             'io',
+                             scheduler_io,
                              # Running function type, there are "io, cpu, timer"
                              True,
                              # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
@@ -468,6 +481,7 @@ input_info = "test"
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation, shutdown
     from task_scheduling.control_interface import get_tasks_info
+    from task_scheduling.variable import *
 
     task_id1 = task_creation(5,
                              # This is how long the delay is executed (in seconds)
@@ -475,7 +489,7 @@ if __name__ == "__main__":
                              None,
                              # This is to be performed at what point (24-hour clock)
                              # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
-                             'timer',
+                             scheduler_timer,
                              # Running function type, there are "io, cpu, timer"
                              True,
                              # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
@@ -524,6 +538,7 @@ input_info = "test"
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation, shutdown
     from task_scheduling.scheduler_management import task_status_manager
+    from task_scheduling.variable import *
 
     task_id1 = task_creation(None,
                              # This is how long the delay is executed (in seconds)
@@ -531,7 +546,7 @@ if __name__ == "__main__":
                              None,
                              # This is to be performed at what point (24-hour clock)
                              # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
-                             'io',
+                             scheduler_io,
                              # Running function type, there are "io, cpu, timer"
                              True,
                              # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
@@ -588,7 +603,7 @@ if __name__ == "__main__":
                              None,
                              # This is to be performed at what point (24-hour clock)
                              # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
-                             'io',
+                             scheduler_io,
                              # Running function type, there are "io, cpu, timer"
                              True,
                              # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
@@ -640,6 +655,7 @@ input_info = "test"
 
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation, shutdown, task_scheduler
+    from task_scheduling.variable import *
 
     task_id1 = task_creation(None,
                              # This is how long the delay is executed (in seconds)
@@ -647,7 +663,7 @@ if __name__ == "__main__":
                              None,
                              # This is to be performed at what point (24-hour clock)
                              # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
-                             'io',
+                             scheduler_io,
                              # Running function type, there are "io, cpu, timer"
                              True,
                              # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
@@ -667,7 +683,7 @@ if __name__ == "__main__":
                              None,
                              # This is to be performed at what point (24-hour clock)
                              # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
-                             'io',
+                             scheduler_io,
                              # Running function type, there are "io, cpu, timer"
                              True,
                              # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
@@ -718,6 +734,7 @@ input_info = "test"
 
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation, shutdown, task_scheduler
+    from task_scheduling.variable import *
 
     task_id1 = task_creation(None,
                              # This is how long the delay is executed (in seconds)
@@ -725,7 +742,7 @@ if __name__ == "__main__":
                              None,
                              # This is to be performed at what point (24-hour clock)
                              # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
-                             'io',
+                             scheduler_io,
                              # Running function type, there are "io, cpu, timer"
                              True,
                              # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
@@ -777,6 +794,7 @@ input_info = "test"
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation, shutdown
     from task_scheduling.scheduler import io_liner_task
+    from task_scheduling.variable import *
 
     task_id1 = task_creation(None,
                              # This is how long the delay is executed (in seconds)
@@ -784,7 +802,7 @@ if __name__ == "__main__":
                              None,
                              # This is to be performed at what point (24-hour clock)
                              # This parameter is required when the function_type is "timer",if this parameter is used, the delay is not required
-                             'io',
+                             scheduler_io,
                              # Running function type, there are "io, cpu, timer"
                              True,
                              # Set to True to enable timeout detection, tasks that do not finish within the runtime will be forcibly terminated
