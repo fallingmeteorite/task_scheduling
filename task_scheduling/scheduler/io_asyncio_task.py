@@ -9,7 +9,7 @@ from typing import Dict, Tuple, Callable, Optional, Any
 from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
-from ..stopit import ThreadTaskManager
+from ..control import ThreadTaskManager
 
 # Create Manager instance
 _task_manager = ThreadTaskManager()
@@ -249,7 +249,7 @@ class IoAsyncioTask:
             # Execute the task after the lock is released
             timeout_processing, task_name, task_id, func, args, kwargs = task
             future = asyncio.run_coroutine_threadsafe(self._execute_task(task), self._event_loops[task_name])
-            _task_manager.add(future, None, task_id)
+            _task_manager.add(future, None, None, task_id)
             with self._condition:
                 self._running_tasks[task_id] = [future, task_name]
                 self._task_counters[task_name] += 1

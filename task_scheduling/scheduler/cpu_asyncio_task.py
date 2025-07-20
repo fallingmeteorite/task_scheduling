@@ -12,7 +12,7 @@ from typing import Callable, Dict, Tuple, Optional, Any
 from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
-from ..stopit import ProcessTaskManager, skip_on_demand, StopException
+from ..control import ProcessTaskManager, skip_on_demand, StopException
 from ..utils import worker_initializer_asyncio
 
 
@@ -37,7 +37,7 @@ async def _execute_task_async(task: Tuple[bool, str, str, Callable, Tuple, Dict]
     timeout_processing, task_name, task_id, func, args, kwargs = task
 
     with skip_on_demand() as skip_ctx:
-        task_manager.add(skip_ctx, task_id)
+        task_manager.add(skip_ctx, None, task_id)
 
         task_status_queue.put(("running", task_id, None, time.time(), None, None, None))
         logger.debug(f"Start running cpu asyncio task, task ID: {task_id}")
@@ -311,7 +311,7 @@ class CpuAsyncioTask:
                 with self._lock:
                     future = executor.submit(_execute_task, task, self._task_status_queue,
                                              self._task_signal_transmission)
-                    self._running_tasks[task_id] = [future, task_name]
+                    self._running_tasks[task_id] = [future, task_name, ]
 
                     future.add_done_callback(partial(self._task_done, task_id))
 

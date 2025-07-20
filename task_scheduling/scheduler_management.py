@@ -8,7 +8,7 @@ from typing import Callable, List, Tuple, Optional
 
 from .common import logger
 from .config import config
-from .function_data import task_function_type
+from .task_data import task_function_type
 from .manager import task_status_manager
 from .scheduler import io_asyncio_task, io_liner_task, cpu_liner_task, cpu_asyncio_task, timer_task
 

@@ -6,8 +6,10 @@ from typing import Callable, Tuple, Dict
 
 import psutil
 from ..common import logger
-from ..function_data import task_function_type
+from .function_type import TaskFunctionType
 from ..utils import is_async_function
+
+task_function_type = TaskFunctionType
 
 
 class FunctionRunner:

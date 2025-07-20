@@ -12,12 +12,13 @@ class ThreadTaskManager:
         self._tasks: Dict[str, Dict[str, Any]] = {}
         self._lock = threading.Lock()  # Use a lock to control concurrent operations
 
-    def add(self, cancel_obj: Any, skip_obj: Any, task_id: str) -> None:
+    def add(self, cancel_obj: Any, skip_obj: Any, pause_ctx: Any, task_id: str) -> None:
         """
         Add task control objects to the dictionary.
 
         :param cancel_obj: An object that has a cancel method.
         :param skip_obj: An object that has a skip method.
+        :param pause_ctx: An object that has a pause method.
         :param task_id: Task ID, used as the key in the dictionary.
         """
         with self._lock:  # Acquire the lock to ensure thread-safe operations
@@ -25,7 +26,8 @@ class ThreadTaskManager:
                 logger.warning(f"Task with task_id '{task_id}' already exists, overwriting")
             self._tasks[task_id] = {
                 'cancel': cancel_obj,
-                'skip': skip_obj
+                'skip': skip_obj,
+                'pause': pause_ctx
             }
 
     def remove(self, task_id: str) -> None:
@@ -94,3 +96,33 @@ class ThreadTaskManager:
         for task_id in list(
                 self._tasks.keys()):  # Use list(self._tasks.keys()) to avoid errors due to dictionary size changes
             self.skip_task(task_id)
+
+    def pause_task(self, task_id: str) -> None:
+        """
+        Pause the task based on task_id.
+
+        :param task_id: Task ID.
+        """
+        with self._lock:  # Acquire the lock to ensure thread-safe operations
+            if task_id in self._tasks:
+                try:
+                    self._tasks[task_id]['pause'].pause()
+                except Exception as error:
+                    logger.error(error)
+            else:
+                logger.warning(f"No task found with task_id '{task_id}', operation invalid")
+
+    def resume_task(self, task_id: str) -> None:
+        """
+        Resume the task based on task_id.
+
+        :param task_id: Task ID.
+        """
+        with self._lock:  # Acquire the lock to ensure thread-safe operations
+            if task_id in self._tasks:
+                try:
+                    self._tasks[task_id]['pause'].resume()
+                except Exception as error:
+                    logger.error(error)
+            else:
+                logger.warning(f"No task found with task_id '{task_id}', operation invalid")

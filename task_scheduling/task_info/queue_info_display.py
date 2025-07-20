@@ -3,7 +3,7 @@
 
 import time
 
-from task_scheduling.config import config
+from ..config import config
 from ..manager import task_status_manager
 
 

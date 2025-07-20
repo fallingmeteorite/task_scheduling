@@ -11,7 +11,7 @@ from typing import Callable, Dict, List, Tuple, Optional, Any
 from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
-from ..stopit import ThreadTaskManager, skip_on_demand, StopException, ThreadingTimeout, TimeoutException
+from ..control import ThreadTaskManager, skip_on_demand, StopException, ThreadingTimeout, TimeoutException
 
 # Create Manager instance
 _task_manager = ThreadTaskManager()
@@ -44,7 +44,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
         if timeout_processing:
             with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
                 with skip_on_demand() as skip_ctx:
-                    _task_manager.add(None, skip_ctx, task_id)
+                    _task_manager.add(None, skip_ctx, None, task_id)
                     return_results = func(*args, **kwargs)
         else:
             with skip_on_demand() as skip_ctx:

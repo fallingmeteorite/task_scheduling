@@ -61,7 +61,7 @@ pip install --upgrade task_scheduling
 Use the function in code
 ```
 
-from task_scheduling.control_interface import start_task_status_ui
+from task_scheduling.task_info import start_task_status_ui
 
 start_task_status_ui()
 
@@ -373,7 +373,7 @@ async def example_io_intensive_function():
 
 
 if __name__ == "__main__":
-    from task_scheduling.utils import FunctionRunner
+    from task_scheduling.task_data import FunctionRunner
 
     cpu_runner = FunctionRunner(example_cpu_intensive_function, "CPU_Task", 10000, 2)
     cpu_runner.run()

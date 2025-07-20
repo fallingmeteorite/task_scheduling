@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+# Author: fallingmeteorite
 import os
 import json
 import threading

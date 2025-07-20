@@ -13,8 +13,8 @@ task_scheduler = TaskScheduler()
 
 def task_creation(delay: int or None, daily_time: str or None, function_type: str, timeout_processing: bool,
                   task_name: str,
-                  func: Callable, *args,
-                  **kwargs) -> str or None:
+                  func: Callable,
+                  *args, **kwargs) -> str or None:
     """
     Add a task to the queue, choosing between asynchronous or linear task based on the function type.
     Generate a unique task ID and return it.

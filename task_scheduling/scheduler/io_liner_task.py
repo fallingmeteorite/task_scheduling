@@ -10,7 +10,7 @@ from typing import Callable, Dict, Tuple, Optional, Any
 from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
-from ..stopit import ThreadTaskManager, skip_on_demand, StopException, ThreadingTimeout, TimeoutException
+from ..control import ThreadTaskManager, skip_on_demand, StopException, ThreadingTimeout, TimeoutException, pausable
 
 # Create Manager instance
 _task_manager = ThreadTaskManager()
@@ -37,15 +37,17 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
     return_results = None
     try:
         with skip_on_demand() as skip_ctx:
-            _task_manager.add(None, skip_ctx, task_id)
+            with pausable() as pause_ctx:
 
-            task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None, None, None)
-            logger.debug(f"Start running io linear task, task ID: {task_id}")
-            if timeout_processing:
-                with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
+                _task_manager.add(None, skip_ctx, pause_ctx, task_id)
+
+                task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None, None, None)
+                logger.debug(f"Start running io linear task, task ID: {task_id}")
+                if timeout_processing:
+                    with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
+                        return_results = func(*args, **kwargs)
+                else:
                     return_results = func(*args, **kwargs)
-            else:
-                return_results = func(*args, **kwargs)
 
         _task_manager.remove(task_id)
     except TimeoutException:

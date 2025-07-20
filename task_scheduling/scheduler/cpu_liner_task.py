@@ -11,7 +11,7 @@ from typing import Callable, Dict, Tuple, Optional, Any
 from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
-from ..stopit import skip_on_demand, ProcessTaskManager, StopException, ThreadingTimeout, TimeoutException
+from ..control import skip_on_demand, ProcessTaskManager, StopException, ThreadingTimeout, TimeoutException, pausable
 from ..utils import worker_initializer_liner
 
 
@@ -42,19 +42,21 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
 
     try:
         with skip_on_demand() as skip_ctx:
-            task_manager.add(skip_ctx, task_id)
+            with pausable() as pause_ctx:
+                task_manager.add(skip_ctx, pause_ctx, task_id)
 
-            task_status_queue.put(("running", task_id, None, time.time(), None, None, None))
-            logger.debug(f"Start running cpu linear task, task ID: {task_id}")
-            if timeout_processing:
-                with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
-                    # Whether to pass in the task manager to facilitate other thread management
-                    if config["thread_management"]:
-                        return_results = func(task_manager, *args, **kwargs)
-                    else:
-                        return_results = func(*args, **kwargs)
-            else:
-                return_results = func(*args, **kwargs)
+                task_status_queue.put(("running", task_id, None, time.time(), None, None, None))
+                logger.debug(f"Start running cpu linear task, task ID: {task_id}")
+                if timeout_processing:
+                    with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
+                        # Whether to pass in the task manager to facilitate other thread management
+                        if config["thread_management"]:
+                            return_results = func(task_manager, *args, **kwargs)
+                        else:
+                            return_results = func(*args, **kwargs)
+                else:
+                    return_results = func(*args, **kwargs)
+
 
     except (StopException, KeyboardInterrupt):
         logger.debug(f"Cpu linear task | {task_id} | cancelled, forced termination")
@@ -371,7 +373,7 @@ class CpuLinerTask:
         if not future.running():
             future.cancel()
         else:
-            self._task_signal_transmission.put(task_id)
+            self._task_signal_transmission.put(task_id, target)
 
         self._task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
         with self._lock:

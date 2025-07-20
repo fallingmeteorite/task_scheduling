@@ -41,7 +41,6 @@ def set_log_level(level: str):
         backtrace=True,
         diagnose=True
     )
-    logger.info(f"Log level set to {_LOG_LEVEL}")
 
 
 def configure_logger():
