@@ -11,12 +11,14 @@ from typing import Callable, Dict, Tuple, Optional, Any
 from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
-from ..control import ThreadTaskManager, skip_on_demand, StopException, ThreadingTimeout, TimeoutException, pausable
+from ..control import ThreadTaskManager, skip_on_demand, StopException, ThreadingTimeout, TimeoutException, \
+    ThreadController
 from ..scheduler_tools import TaskCounter
 
 # Create Manager instance
 _task_manager = ThreadTaskManager()
 _task_counter = TaskCounter("io_liner_task")
+_controller = ThreadController()
 
 
 def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
@@ -40,9 +42,9 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
     return_results = None
     try:
         with skip_on_demand() as skip_ctx:
-            with pausable() as pause_ctx:
+            with _controller.control_context() as ctrlp_ctx:
 
-                _task_manager.add(None, skip_ctx, pause_ctx, task_id)
+                _task_manager.add(None, skip_ctx, ctrlp_ctx, task_id)
 
                 task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None, None, None)
                 logger.debug(f"Start running io linear task, task ID: {task_id}")
@@ -137,6 +139,10 @@ class IoLinerTask:
                         return False
 
                     if task_name in [details[1] for details in self._running_tasks.values()]:
+                        return False
+
+                else:
+                    if not _task_counter.add(math.ceil(config["io_liner_task"])):
                         return False
 
                 if self._scheduler_stop_event.is_set() and not self._scheduler_started:
@@ -320,7 +326,7 @@ class IoLinerTask:
 
         :return: bool: Whether the task was successfully force stopped.
         """
-        if self._running_tasks.get(task_id, None):
+        if not self._running_tasks.get(task_id, None):
             logger.debug(f"Io linear task | {task_id} | does not exist or is already completed")
             return False
 
@@ -344,19 +350,18 @@ class IoLinerTask:
         :param action: Task action.
         :return: bool: Whether the task was successfully pause and resume.
         """
-        if self._running_tasks.get(task_id, None):
+        if not self._running_tasks.get(task_id, None):
+            print(self._running_tasks.get(task_id, None))
             logger.debug(f"Io linear task | {task_id} | does not exist or is already completed")
             return False
 
         else:
             if action == "pause":
                 _task_manager.pause_task(task_id)
-                self._task_status_queue.put(("waiting", task_id, None, None, None, None, None))
+                task_status_manager.add_task_status(task_id, None, "waiting", None, None, None, None, None)
             elif action == "resume":
                 _task_manager.resume_task(task_id)
-                self._task_status_queue.put(("running", task_id, None, None, None, None, None))
-
-        task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None, None)
+                task_status_manager.add_task_status(task_id, None, "running", None, None, None, None, None)
 
         return True
 

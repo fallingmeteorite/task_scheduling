@@ -12,11 +12,13 @@ from typing import Callable, Dict, Tuple, Optional, Any
 from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
-from ..control import skip_on_demand, ProcessTaskManager, StopException, ThreadingTimeout, TimeoutException, pausable
+from ..control import skip_on_demand, ProcessTaskManager, StopException, ThreadingTimeout, TimeoutException, \
+    ThreadController
 from ..utils import worker_initializer_liner
 from ..scheduler_tools import TaskCounter
 
 _task_counter = TaskCounter("cpu_liner_task")
+_controller = ThreadController()
 
 
 def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
@@ -46,8 +48,8 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
 
     try:
         with skip_on_demand() as skip_ctx:
-            with pausable() as pause_ctx:
-                task_manager.add(skip_ctx, pause_ctx, task_id)
+            with _controller.control_context() as ctrlp_ctx:
+                task_manager.add(skip_ctx, ctrlp_ctx, task_id)
 
                 task_status_queue.put(("running", task_id, None, time.time(), None, None, None))
                 logger.debug(f"Start running cpu linear task, task ID: {task_id}")
@@ -178,6 +180,9 @@ class CpuLinerTask:
                         return False
 
                     if task_name in [details[1] for details in self._running_tasks.values()]:
+                        return False
+                else:
+                    if not _task_counter.add(math.ceil(config["cpu_liner_task"])):
                         return False
 
                 if self._scheduler_stop_event.is_set() and not self._scheduler_started:

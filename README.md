@@ -49,7 +49,7 @@ monitoring.
 
 ## Installation
 
-!!! WARNING: If I/O-intensive task is running in a series of blocking tasks such as time.sleep, the task cannot be
+!!! WARNING: If task is running in a series of blocking tasks such as time.sleep, the task cannot be
 forced terminated, it is recommended to use `interruptible_sleep` instead of `time.sleep` for long waits
 So, use `await asyncio.sleep` for asynchronous tasks
 
@@ -78,7 +78,7 @@ Task status UI available at http://localhost:8000
 
 3.Most of the API calls for this task scheduling can be added to the scheduler for execution as tasks.
 
-4. The log display level is available 
+4.The log display level is available
 ```
 from task_scheduling.common import set_log_level
 
@@ -87,6 +87,8 @@ set_log_level("DEBUG") # INFO, DEBUG, ERROR, WARNING
 if __name__ == "__main__":
     ......
 ```
+5.The task priority is modified to high when necessary, and the task will start executing directly after submission. However, this can also cause some running tasks to pause to free up resources to run high-priority tasks
+
 ### Function: task_creation(delay: int or None, daily_time: str or None, function_type: str, timeout_processing: bool, task_name: str, func: Callable, *args, **kwargs) -> str or None:
 
 The core function is used to create a task and submit it to the scheduler. Currently the scheduler has
@@ -134,6 +136,8 @@ if __name__ == "__main__":
                              # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
                              line_task,
                              # The function to be executed, parameters should not be passed here
+                             priority_low, #priority_high
+                             # The task priority is modified to high when necessary, and the task will start executing directly after submission
                              input_info
                              # Pass the parameters required by the function, no restrictions
                              )
@@ -152,6 +156,8 @@ if __name__ == "__main__":
                              # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
                              asyncio_task,
                              # The function to be executed, parameters should not be passed here
+                             priority_low,
+                             # The task priority is modified to high when necessary, and the task will start executing directly after submission
                              input_info
                              # Pass the parameters required by the function, no restrictions
                              )
@@ -199,6 +205,8 @@ if __name__ == "__main__":
                              # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
                              line_task,
                              # The function to be executed, parameters should not be passed here
+                             priority_low,
+                             # The task priority is modified to high when necessary, and the task will start executing directly after submission
                              input_info
                              # Pass the parameters required by the function, no restrictions
                              )
@@ -217,6 +225,8 @@ if __name__ == "__main__":
                              # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
                              line_task,
                              # The function to be executed, parameters should not be passed here
+                             priority_low,
+                             # The task priority is modified to high when necessary, and the task will start executing directly after submission
                              input_info
                              # Pass the parameters required by the function, no restrictions
                              )
@@ -274,6 +284,8 @@ if __name__ == "__main__":
                              # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
                              line_task,
                              # The function to be executed, parameters should not be passed here
+                             priority_low,
+                             # The task priority is modified to high when necessary, and the task will start executing directly after submission
                              input_info
                              # Pass the parameters required by the function, no restrictions
                              )
@@ -292,7 +304,7 @@ if __name__ == "__main__":
 ```
 import time
 
-from task_scheduling.stopit import skip_on_demand
+from task_scheduling.control import skip_on_demand
 
 
 def line_task(task_manager, input_info):
@@ -324,6 +336,8 @@ if __name__ == "__main__":
                              # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
                              line_task,
                              # The function to be executed, parameters should not be passed here
+                             priority_low,
+                             # The task priority is modified to high when necessary, and the task will start executing directly after submission
                              input_info
                              # Pass the parameters required by the function, no restrictions
                              )
@@ -391,7 +405,7 @@ Add a function type and a view type. Files are stored in:`task_scheduling/functi
 
 ```
 if __name__ == "__main__":
-    from task_scheduling.function_data import task_function_type
+    from task_scheduling.task_data task_function_type
 
     task_function_type.append_to_dict("CPU_Task", "test")
 
@@ -439,6 +453,8 @@ if __name__ == "__main__":
                              # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
                              line_task,
                              # The function to be executed, parameters should not be passed here
+                             priority_low,
+                             # The task priority is modified to high when necessary, and the task will start executing directly after submission
                              input_info
                              # Pass the parameters required by the function, no restrictions
                              )
@@ -480,7 +496,7 @@ input_info = "test"
 
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation, shutdown
-    from task_scheduling.control_interface import get_tasks_info
+    from task_scheduling.task_info import get_tasks_info
     from task_scheduling.variable import *
 
     task_id1 = task_creation(5,
@@ -497,6 +513,8 @@ if __name__ == "__main__":
                              # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
                              line_task,
                              # The function to be executed, parameters should not be passed here
+                             priority_low,
+                             # The task priority is modified to high when necessary, and the task will start executing directly after submission
                              input_info
                              # Pass the parameters required by the function, no restrictions
                              )
@@ -554,6 +572,8 @@ if __name__ == "__main__":
                              # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
                              line_task,
                              # The function to be executed, parameters should not be passed here
+                             priority_low,
+                             # The task priority is modified to high when necessary, and the task will start executing directly after submission
                              input_info
                              # Pass the parameters required by the function, no restrictions
                              )
@@ -611,6 +631,8 @@ if __name__ == "__main__":
                              # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
                              line_task,
                              # The function to be executed, parameters should not be passed here
+                             priority_low,
+                             # The task priority is modified to high when necessary, and the task will start executing directly after submission
                              input_info
                              # Pass the parameters required by the function, no restrictions
                              )
@@ -671,6 +693,8 @@ if __name__ == "__main__":
                              # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
                              line_task,
                              # The function to be executed, parameters should not be passed here
+                             priority_low,
+                             # The task priority is modified to high when necessary, and the task will start executing directly after submission
                              input_info
                              # Pass the parameters required by the function, no restrictions
                              )
@@ -750,6 +774,8 @@ if __name__ == "__main__":
                              # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
                              line_task,
                              # The function to be executed, parameters should not be passed here
+                             priority_low,
+                             # The task priority is modified to high when necessary, and the task will start executing directly after submission
                              input_info
                              # Pass the parameters required by the function, no restrictions
                              )
@@ -810,6 +836,8 @@ if __name__ == "__main__":
                              # Task ID, in linear tasks, tasks with the same ID will be queued, different IDs will be executed directly, the same applies to asynchronous tasks
                              line_task,
                              # The function to be executed, parameters should not be passed here
+                             priority_low,
+                             # The task priority is modified to high when necessary, and the task will start executing directly after submission
                              input_info
                              # Pass the parameters required by the function, no restrictions
                              )
@@ -857,19 +885,19 @@ Files are stored in:`task_scheduling/config/config.yaml`
 
 The maximum number of CPU-optimized asynchronous tasks of the same type can run
 
-`cpu_asyncio_task: 4`
+`cpu_asyncio_task: 8`
 
 The maximum number of tasks of the same type in an IO intensive asynchronous task
 
-`io_asyncio_task: 4`
+`io_asyncio_task: 20`
 
 The maximum number of CPU-oriented linear tasks of the same type can run
 
-`cpu_liner_task: 4`
+`cpu_liner_task: 20`
 
 The maximum number of tasks of the same type in an I-O intensive linear task
 
-`io_liner_task: 4`
+`io_liner_task: 20`
 
 The timer performs the most tasks
 

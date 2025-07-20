@@ -6,4 +6,4 @@ from .skip_run import skip_on_demand, StopException
 from .thread_manager import ThreadTaskManager
 from .timeout_run import TimeoutException, ThreadingTimeout
 
-from .pause_run import pausable
+from .pause_run import ThreadController

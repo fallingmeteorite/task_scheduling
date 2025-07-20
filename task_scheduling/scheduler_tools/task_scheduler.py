@@ -15,6 +15,14 @@ class TaskCounter:
         self.target_priority = "high"  # Priority level to monitor for preemption
         self.task_type = task_type  # Task type identifier
         self.paused_tasks = set()  # Set of currently paused task IDs
+        self.count = 0  # Limit the quantity
+
+    def add(self, max_count) -> None:
+        if self.count >= max_count:
+            return False
+        self.count += 1
+        return True
+
 
     def is_high_priority(self, priority: str) -> bool:
         """Check if a task has the target priority level
@@ -50,6 +58,7 @@ class TaskCounter:
         if delta > 0:
             self._pause_low_priority(running_tasks, delta)
         elif delta < 0:
+            self.count = self.count - delta
             self._resume_low_priority(abs(delta))
 
         # Update tracking of high-priority tasks
