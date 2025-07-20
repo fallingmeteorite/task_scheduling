@@ -2,6 +2,7 @@
 # Author: fallingmeteorite
 import queue
 import threading
+import math
 import time
 from concurrent.futures import ThreadPoolExecutor, Future
 from functools import partial
@@ -11,9 +12,11 @@ from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
 from ..control import ThreadTaskManager, skip_on_demand, StopException, ThreadingTimeout, TimeoutException, pausable
+from ..scheduler_tools import TaskCounter
 
 # Create Manager instance
 _task_manager = ThreadTaskManager()
+_task_counter = TaskCounter("io_liner_task")
 
 
 def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
@@ -32,7 +35,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
     Returns:
         Any: Result of the task execution or error message.
     """
-    timeout_processing, task_name, task_id, func, args, kwargs = task
+    timeout_processing, task_name, task_id, func, priority, args, kwargs = task
 
     return_results = None
     try:
@@ -83,6 +86,7 @@ class IoLinerTask:
         """
         Initialize the IoLinerTask manager.
         """
+
         self._task_queue = queue.Queue()  # Task queue
         self._running_tasks = {}  # Running tasks
 
@@ -106,6 +110,7 @@ class IoLinerTask:
                  task_name: str,
                  task_id: str,
                  func: Callable,
+                 priority: str,
                  *args,
                  **kwargs) -> bool:
         """
@@ -116,6 +121,7 @@ class IoLinerTask:
             task_name (str): Task name (can be repeated).
             task_id (str): Task ID (must be unique).
             func (Callable): Task function.
+            priority (str): Mission importance level.
             *args: Positional arguments for the task function.
             **kwargs: Keyword arguments for the task function.
 
@@ -125,11 +131,13 @@ class IoLinerTask:
         try:
             with self._scheduler_lock:
 
-                if self._task_queue.qsize() >= config["io_liner_task"]:
-                    return False
+                if not _task_counter.is_high_priority(priority):
 
-                if task_name in [details[1] for details in self._running_tasks.values()]:
-                    return False
+                    if self._task_queue.qsize() >= config["io_liner_task"]:
+                        return False
+
+                    if task_name in [details[1] for details in self._running_tasks.values()]:
+                        return False
 
                 if self._scheduler_stop_event.is_set() and not self._scheduler_started:
                     self._join_scheduler_thread()
@@ -137,7 +145,7 @@ class IoLinerTask:
                 # Reduce the granularity of the lock
                 task_status_manager.add_task_status(task_id, None, "waiting", None, None, None, None, "io_liner_task")
 
-                self._task_queue.put((timeout_processing, task_name, task_id, func, args, kwargs))
+                self._task_queue.put((timeout_processing, task_name, task_id, func, priority, args, kwargs))
 
                 if not self._scheduler_started:
                     self._start_scheduler()
@@ -212,7 +220,8 @@ class IoLinerTask:
         """
         Scheduler function, fetch tasks from the task queue and submit them to the thread pool for execution.
         """
-        with ThreadPoolExecutor(max_workers=int(config["io_liner_task"]), initializer=None) as executor:
+        with ThreadPoolExecutor(max_workers=int(config["io_liner_task"] + math.ceil(config["io_liner_task"] / 2)),
+                                initializer=None) as executor:
             while not self._scheduler_stop_event.is_set():
                 with self._condition:
                     while self._task_queue.empty() and not self._scheduler_stop_event.is_set():
@@ -226,12 +235,14 @@ class IoLinerTask:
 
                     task = self._task_queue.get()
 
-                timeout_processing, task_name, task_id, func, args, kwargs = task
+                timeout_processing, task_name, task_id, func, priority, args, kwargs = task
+
                 with self._lock:
                     future = executor.submit(_execute_task, task)
-                    self._running_tasks[task_id] = [future, task_name]
+                    self._running_tasks[task_id] = [future, task_name, priority]
 
                     future.add_done_callback(partial(self._task_done, task_id))
+                _task_counter.schedule_tasks(self._running_tasks)
 
     # A function that executes a task
     def _task_done(self,
@@ -323,6 +334,30 @@ class IoLinerTask:
         with self._lock:
             if task_id in self._task_results:
                 del self._task_results[task_id]
+        return True
+
+    def pause_and_resume_task(self,
+                              task_id: str, action: str) -> bool:
+        """
+        Pause and resume a task by its task ID.
+        :param task_id: Task ID.
+        :param action: Task action.
+        :return: bool: Whether the task was successfully pause and resume.
+        """
+        if self._running_tasks.get(task_id, None):
+            logger.debug(f"Io linear task | {task_id} | does not exist or is already completed")
+            return False
+
+        else:
+            if action == "pause":
+                _task_manager.pause_task(task_id)
+                self._task_status_queue.put(("waiting", task_id, None, None, None, None, None))
+            elif action == "resume":
+                _task_manager.resume_task(task_id)
+                self._task_status_queue.put(("running", task_id, None, None, None, None, None))
+
+        task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None, None)
+
         return True
 
     # Obtain the information returned by the corresponding task

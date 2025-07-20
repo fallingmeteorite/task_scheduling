@@ -187,7 +187,7 @@ class CpuAsyncioTask:
         """
         try:
             with self._scheduler_lock:
-                if self._task_queue.qsize() >= config["io_liner_task"]:
+                if self._task_queue.qsize() >= config["cpu_asyncio_task"]:
                     return False
 
                 if task_name in [details[1] for details in self._running_tasks.values()]:

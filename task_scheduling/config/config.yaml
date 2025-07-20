@@ -1,14 +1,14 @@
-# The maximum number of CPU-optimized asynchronous tasks of the same type can run
-cpu_asyncio_task: 4
+# The maximum number of CPU-optimized asynchronous tasks
+cpu_asyncio_task: 8
 
 # The maximum number of tasks of the same type in an IO intensive asynchronous task
-io_asyncio_task: 4
+io_asyncio_task: 20
 
-# The maximum number of CPU-oriented linear tasks of the same type can run
-cpu_liner_task: 4
+# The maximum number of CPU-oriented linear tasks
+cpu_liner_task: 20
 
 # The maximum number of tasks of the same type in an I-O intensive linear task
-io_liner_task: 4
+io_liner_task: 20
 
 # The timer performs the most tasks
 timer_task: 30

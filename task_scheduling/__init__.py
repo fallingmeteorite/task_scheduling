@@ -12,4 +12,3 @@ ensure_config_loaded()
 # Import scheduler types
 from .variable import *
 
-__version__ = "2.2.0"

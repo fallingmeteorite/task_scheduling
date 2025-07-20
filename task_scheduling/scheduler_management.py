@@ -40,7 +40,7 @@ class TaskScheduler:
                  function_type: str,
                  timeout_processing: bool,
                  task_name: str, task_id: str,
-                 func: Callable, *args, **kwargs) -> bool:
+                 func: Callable, priority: str, *args, **kwargs) -> bool:
         # Check if the task name is in the ban list
         if task_name in self.ban_task_names:
             logger.warning(f"Task name '{task_name}' is banned, cannot add task, task ID: {task_id}")
@@ -61,6 +61,7 @@ class TaskScheduler:
                                   task_name,
                                   task_id,
                                   func,
+                                  priority,
                                   args,
                                   kwargs))
         self._task_event.set()  # Wake up the allocator thread
@@ -77,7 +78,7 @@ class TaskScheduler:
     def _allocator(self) -> None:
         while self.allocator_running:
             if not self.core_task_queue.empty():
-                delay, daily_time, async_function, function_type, timeout_processing, task_name, task_id, func, args, kwargs = self.core_task_queue.get()
+                delay, daily_time, async_function, function_type, timeout_processing, task_name, task_id, func, priority, args, kwargs = self.core_task_queue.get()
                 state = False
 
                 if async_function:
@@ -92,10 +93,10 @@ class TaskScheduler:
                 if not async_function:
 
                     if function_type == "io":
-                        state = io_liner_task.add_task(timeout_processing, task_name, task_id, func,
+                        state = io_liner_task.add_task(timeout_processing, task_name, task_id, func, priority,
                                                        *args, **kwargs)
                     if function_type == "cpu":
-                        state = cpu_liner_task.add_task(timeout_processing, task_name, task_id, func,
+                        state = cpu_liner_task.add_task(timeout_processing, task_name, task_id, func, priority,
                                                         *args, **kwargs)
 
                 if function_type == "timer":
@@ -118,6 +119,7 @@ class TaskScheduler:
                                               task_name,
                                               task_id,
                                               func,
+                                              priority,
                                               args,
                                               kwargs))
 

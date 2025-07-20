@@ -3,6 +3,7 @@
 import queue
 import threading
 import time
+import math
 from concurrent.futures import ProcessPoolExecutor, Future
 from functools import partial
 from multiprocessing import Manager
@@ -13,6 +14,9 @@ from ..config import config
 from ..manager import task_status_manager
 from ..control import skip_on_demand, ProcessTaskManager, StopException, ThreadingTimeout, TimeoutException, pausable
 from ..utils import worker_initializer_liner
+from ..scheduler_tools import TaskCounter
+
+_task_counter = TaskCounter("cpu_liner_task")
 
 
 def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
@@ -36,7 +40,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
         Any: Result of the task execution or error message.
     """
 
-    timeout_processing, task_name, task_id, func, args, kwargs = task
+    timeout_processing, task_name, task_id, func, priority, args, kwargs = task
     task_manager = ProcessTaskManager(task_signal_transmission)
     return_results = None
 
@@ -150,6 +154,7 @@ class CpuLinerTask:
                  task_name: str,
                  task_id: str,
                  func: Callable,
+                 priority: str,
                  *args, **kwargs) -> bool:
         """
         Add the task to the scheduler.
@@ -159,6 +164,7 @@ class CpuLinerTask:
             task_name (str): Task name.
             task_id (str): Task ID.
             func (Callable): The function to execute.
+            priority (str): Mission importance level.
             *args: Arguments to pass to the function.
             **kwargs: Keyword arguments to pass to the function.
 
@@ -167,11 +173,12 @@ class CpuLinerTask:
         """
         try:
             with self._scheduler_lock:
-                if self._task_queue.qsize() >= config["cpu_liner_task"]:
-                    return False
+                if not _task_counter.is_high_priority(priority):
+                    if self._task_queue.qsize() >= config["cpu_liner_task"]:
+                        return False
 
-                if task_name in [details[1] for details in self._running_tasks.values()]:
-                    return False
+                    if task_name in [details[1] for details in self._running_tasks.values()]:
+                        return False
 
                 if self._scheduler_stop_event.is_set() and not self._scheduler_started:
                     self._join_scheduler_thread()
@@ -179,7 +186,7 @@ class CpuLinerTask:
                 # Reduce the granularity of the lock
                 self._task_status_queue.put(("waiting", task_id, None, None, None, None, None))
 
-                self._task_queue.put((timeout_processing, task_name, task_id, func, args, kwargs))
+                self._task_queue.put((timeout_processing, task_name, task_id, func, priority, args, kwargs))
 
                 if not self._scheduler_started:
                     self._start_scheduler()
@@ -269,7 +276,7 @@ class CpuLinerTask:
         """
         Scheduler function, fetch tasks from the task queue and submit them to the process pool for execution.
         """
-        with ProcessPoolExecutor(max_workers=int(config["cpu_liner_task"]),
+        with ProcessPoolExecutor(max_workers=int(config["cpu_liner_task"] + math.ceil(config["cpu_liner_task"] / 2)),
                                  initializer=worker_initializer_liner) as executor:
             self._executor = executor
             while not self._scheduler_stop_event.is_set():
@@ -285,12 +292,13 @@ class CpuLinerTask:
 
                     task = self._task_queue.get()
 
-                timeout_processing, task_name, task_id, func, args, kwargs = task
+                timeout_processing, task_name, task_id, func, priority, args, kwargs = task
                 with self._lock:
                     future = executor.submit(_execute_task, task, self._task_status_queue,
                                              self._task_signal_transmission)
-                    self._running_tasks[task_id] = [future, task_name]
+                    self._running_tasks[task_id] = [future, task_name, priority]
                     future.add_done_callback(partial(self._task_done, task_id))
+                _task_counter.schedule_tasks(self._running_tasks)
 
     def _task_done(self,
                    task_id: str,
@@ -373,12 +381,35 @@ class CpuLinerTask:
         if not future.running():
             future.cancel()
         else:
-            self._task_signal_transmission.put(task_id, target)
+            self._task_signal_transmission.put(task_id, "kill")
 
         self._task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
         with self._lock:
             if task_id in self._task_results:
                 del self._task_results[task_id]
+
+        return True
+
+    def pause_and_resume_task(self,
+                              task_id: str, action: str) -> bool:
+        """
+        pause and resume a task by its task ID.
+
+        :param task_id: Task ID.
+        :param action: Task action.
+        :return: bool: Whether the task was successfully pause and resume.
+        """
+        if self._running_tasks.get(task_id) is None:
+            logger.debug(f"Cpu linear task | {task_id} | does not exist or is already completed")
+            return False
+
+        else:
+            if action == "pause":
+                self._task_signal_transmission.put(task_id, "pause")
+                self._task_status_queue.put(("waiting", task_id, None, None, None, None, None))
+            elif action == "resume":
+                self._task_signal_transmission.put(task_id, "resume")
+                self._task_status_queue.put(("running", task_id, None, None, None, None, None))
 
         return True
 

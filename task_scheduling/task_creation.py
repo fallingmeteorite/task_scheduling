@@ -14,6 +14,7 @@ task_scheduler = TaskScheduler()
 def task_creation(delay: int or None, daily_time: str or None, function_type: str, timeout_processing: bool,
                   task_name: str,
                   func: Callable,
+                  priority: str,
                   *args, **kwargs) -> str or None:
     """
     Add a task to the queue, choosing between asynchronous or linear task based on the function type.
@@ -25,6 +26,7 @@ def task_creation(delay: int or None, daily_time: str or None, function_type: st
     :param timeout_processing: Whether to enable timeout processing.
     :param task_name: The task name.
     :param func: The task function.
+    :param priority: Mission importance level.
     :param args: Positional arguments for the task function.
     :param kwargs: Keyword arguments for the task function.
     :return: A unique task ID.
@@ -41,19 +43,21 @@ def task_creation(delay: int or None, daily_time: str or None, function_type: st
     if async_function and not function_type == "timer":
         # Add asynchronous task
         task_scheduler.add_task(None, None, async_function, function_type, timeout_processing, task_name, task_id, func,
+                                priority,
                                 *args,
                                 **kwargs)
 
     if not async_function and not function_type == "timer":
         # Add linear task
         task_scheduler.add_task(None, None, async_function, function_type, timeout_processing, task_name, task_id, func,
+                                priority,
                                 *args,
                                 **kwargs)
 
     if function_type == "timer":
         # Add timer task
         task_scheduler.add_task(delay, daily_time, async_function, function_type, timeout_processing, task_name,
-                                task_id, func,
+                                task_id, func, priority,
                                 *args,
                                 **kwargs)
 
