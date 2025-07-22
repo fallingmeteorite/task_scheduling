@@ -130,7 +130,7 @@ class ProcessTaskManager:
                             break  # Stop the loop if tasks dictionary is empty
 
                 else:
-                    self._task_queue.put(task_id)
+                    self._task_queue.put((task_id, target))
             except queue.Empty:
                 pass  # Ignore empty queue exceptions
             except Exception as error:

@@ -386,7 +386,7 @@ class CpuLinerTask:
         if not future.running():
             future.cancel()
         else:
-            self._task_signal_transmission.put(task_id, "kill")
+            self._task_signal_transmission.put((task_id, "kill"))
 
         self._task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
         with self._lock:
@@ -410,10 +410,10 @@ class CpuLinerTask:
 
         else:
             if action == "pause":
-                self._task_signal_transmission.put(task_id, "pause")
+                self._task_signal_transmission.put((task_id, "pause"))
                 self._task_status_queue.put(("waiting", task_id, None, None, None, None, None))
             elif action == "resume":
-                self._task_signal_transmission.put(task_id, "resume")
+                self._task_signal_transmission.put((task_id, "resume"))
                 self._task_status_queue.put(("running", task_id, None, None, None, None, None))
 
         return True
