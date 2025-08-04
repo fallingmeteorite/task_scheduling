@@ -23,10 +23,10 @@ class ProcessTaskManager:
         self._start: bool = True
         self._start_monitor_thread()  # Start the monitor thread
 
-    def add(self, skip_obj: Any, pause_ctx: Any, task_id: str) -> None:
+    def add(self, terminate_obj: Any, pause_ctx: Any, task_id: str) -> None:
         """
         Add task control objects to the dictionary.
-        :param skip_obj: An object that has a skip method.
+        :param terminate_obj: An object that has a terminate method.
           :param pause_ctx: An object that has a pause method.
         :param task_id: Task ID, used as the key in the dictionary.
         """
@@ -34,7 +34,7 @@ class ProcessTaskManager:
             if task_id in self._tasks:
                 logger.warning(f"Task with task_id '{task_id}' already exists, overwriting")
             self._tasks[task_id] = {
-                'skip': skip_obj,
+                'terminate': terminate_obj,
                 'pause': pause_ctx
             }
 
@@ -59,17 +59,17 @@ class ProcessTaskManager:
         with self._operation_lock:  # Lock for thread-safe dictionary access
             return task_id in self._tasks
 
-    def skip_task(self, task_id: str) -> None:
+    def terminate_task(self, task_id: str) -> None:
         """
-        Skip the task based on task_id.
+        Terminate the task based on task_id.
         :param task_id: Task ID.
         """
         with self._operation_lock:  # Lock for thread-safe dictionary access
             if task_id in self._tasks:
                 try:
-                    self._tasks[task_id]['skip'].skip()  # Perform the skip operation outside the lock
+                    self._tasks[task_id]['terminate'].terminate()  # Perform the terminate operation outside the lock
                 except Exception as error:
-                    logger.error(f"Error skipping task '{task_id}': {error}")
+                    logger.error(f"Error terminating task '{task_id}': {error}")
 
             else:
                 logger.warning(f"No task found with task_id '{task_id}', operation invalid")
@@ -118,7 +118,7 @@ class ProcessTaskManager:
 
                 if self.check(task_id):  # Check if the task_id exists in the dictionary
                     if target == "kill":
-                        self.skip_task(task_id)  # Skip the task if it exists
+                        self.terminate_task(task_id)  # Terminate the task if it exists
                     if target == "pause":
                         self.pause_task(task_id)  # Pause the task if it exists
                     if target == "resume":

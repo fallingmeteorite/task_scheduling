@@ -402,7 +402,7 @@ class IoAsyncioTask:
         if not future.running():
             future.cancel()
         else:
-            _task_manager.skip_task(task_id)
+            _task_manager.terminate_task(task_id)
 
         with self._condition:
             if task_id in self._task_results:

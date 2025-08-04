@@ -11,14 +11,15 @@ from typing import Callable, Dict, Tuple, Optional, Any
 from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
-from ..control import ThreadTaskManager, skip_on_demand, StopException, ThreadingTimeout, TimeoutException, \
-    ThreadController
+from ..control import ThreadTaskManager, ThreadTerminator, StopException, ThreadingTimeout, TimeoutException, \
+    ThreadSuspender
 from ..scheduler_tools import TaskCounter
 
 # Create Manager instance
 _task_manager = ThreadTaskManager()
 _task_counter = TaskCounter("io_liner_task")
-_controller = ThreadController()
+_threadsuspender = ThreadSuspender()
+_threadterminator = ThreadTerminator()
 
 
 def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
@@ -41,13 +42,14 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
 
     return_results = None
     try:
-        with skip_on_demand() as skip_ctx:
-            with _controller.control_context() as ctrlp_ctx:
+        with _threadterminator.terminate_control() as terminate_ctx:
+            with _threadsuspender.suspend_context() as pause_ctx:
 
-                _task_manager.add(None, skip_ctx, ctrlp_ctx, task_id)
+                _task_manager.add(None, terminate_ctx, pause_ctx, task_id)
 
                 task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None, None, None)
                 logger.debug(f"Start running io linear task, task ID: {task_id}")
+
                 if timeout_processing:
                     with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
                         return_results = func(*args, **kwargs)
@@ -196,7 +198,7 @@ class IoLinerTask:
             if force_cleanup:
                 logger.debug("Force stopping scheduler and cleaning up tasks")
                 # Force stop all running tasks
-                _task_manager.skip_all_tasks()
+                _task_manager.terminate_all_tasks()
                 self._scheduler_stop_event.set()
             else:
                 self._scheduler_stop_event.set()
@@ -334,7 +336,7 @@ class IoLinerTask:
         if not future.running():
             future.cancel()
         else:
-            _task_manager.skip_task(task_id)
+            _task_manager.terminate_task(task_id)
 
         task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None, None)
         with self._lock:

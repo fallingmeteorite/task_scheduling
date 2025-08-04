@@ -12,8 +12,10 @@ from typing import Callable, Dict, Tuple, Optional, Any
 from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
-from ..control import ProcessTaskManager, skip_on_demand, StopException
+from ..control import ProcessTaskManager, ThreadTerminator, StopException
 from ..utils import worker_initializer_asyncio
+
+_threadterminator = ThreadTerminator()
 
 
 async def _execute_task_async(task: Tuple[bool, str, str, Callable, Tuple, Dict],
@@ -36,8 +38,8 @@ async def _execute_task_async(task: Tuple[bool, str, str, Callable, Tuple, Dict]
     """
     timeout_processing, task_name, task_id, func, args, kwargs = task
 
-    with skip_on_demand() as skip_ctx:
-        task_manager.add(skip_ctx, None, task_id)
+    with _threadterminator.terminate_control() as terminate_ctx:
+        task_manager.add(terminate_ctx, None, task_id)
 
         task_status_queue.put(("running", task_id, None, time.time(), None, None, None))
         logger.debug(f"Start running cpu asyncio task, task ID: {task_id}")

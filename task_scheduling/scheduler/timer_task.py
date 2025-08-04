@@ -11,10 +11,11 @@ from typing import Callable, Dict, List, Tuple, Optional, Any
 from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
-from ..control import ThreadTaskManager, skip_on_demand, StopException, ThreadingTimeout, TimeoutException
+from ..control import ThreadTaskManager, ThreadTerminator, StopException, ThreadingTimeout, TimeoutException
 
 # Create Manager instance
 _task_manager = ThreadTaskManager()
+_threadterminator = ThreadTerminator()
 
 
 def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
@@ -37,20 +38,22 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
 
     return_results = None
     try:
-        task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None,
-                                            None, None)
+        with _threadterminator.terminate_control() as terminate_ctx:
+            _task_manager.add(None, terminate_ctx, None, task_id)
+            task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None,
+                                                None, None)
 
-        logger.debug(f"Start running timer task, task ID: {task_id}")
-        if timeout_processing:
-            with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
-                with skip_on_demand() as skip_ctx:
-                    _task_manager.add(None, skip_ctx, None, task_id)
+            logger.debug(f"Start running timer task, task ID: {task_id}")
+
+            if timeout_processing:
+                with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
+
                     return_results = func(*args, **kwargs)
-        else:
-            with skip_on_demand() as skip_ctx:
-                _task_manager.add(None, skip_ctx, task_id)
+            else:
                 return_results = func(*args, **kwargs)
-        _task_manager.remove(task_id)
+
+            _task_manager.remove(task_id)
+
     except TimeoutException:
         logger.debug(f"Timer task | {task_id} | timed out, forced termination")
         task_status_manager.add_task_status(task_id, None, "timeout", None, None, None,
@@ -200,7 +203,7 @@ class TimerTask:
             if force_cleanup:
                 logger.debug("Force stopping scheduler and cleaning up tasks")
                 # Force stop all running tasks
-                _task_manager.skip_all_tasks()
+                _task_manager.terminate_all_tasks()
                 self._scheduler_stop_event.set()
             else:
                 self._scheduler_stop_event.set()
@@ -358,7 +361,7 @@ class TimerTask:
         if not future.running():
             future.cancel()
         else:
-            _task_manager.skip_task(task_id)
+            _task_manager.terminate_task(task_id)
 
         task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None, None)
         with self._lock:

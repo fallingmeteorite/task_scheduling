@@ -9,7 +9,7 @@ from typing import Dict
 from ..common import logger
 
 
-class ThreadController:
+class ThreadSuspender:
     """Simplified thread controller, fully controlled through context management"""
 
     def __init__(self):
@@ -31,7 +31,7 @@ class ThreadController:
             raise NotImplementedError(f"Unsupported platform: {self.platform}")
 
     @contextmanager
-    def control_context(self):
+    def suspend_context(self):
         """Thread control context manager"""
         current_thread = threading.current_thread()
         tid = current_thread.ident
@@ -125,7 +125,7 @@ class ThreadController:
 class _ThreadControl:
     """Thread control interface (for internal use only)"""
 
-    def __init__(self, controller: ThreadController, tid: int):
+    def __init__(self, controller: ThreadSuspender, tid: int):
         self._controller = controller
         self._tid = tid
         self._paused = False

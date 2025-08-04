@@ -12,12 +12,12 @@ class ThreadTaskManager:
         self._tasks: Dict[str, Dict[str, Any]] = {}
         self._lock = threading.Lock()  # Use a lock to control concurrent operations
 
-    def add(self, cancel_obj: Any, skip_obj: Any, pause_ctx: Any, task_id: str) -> None:
+    def add(self, cancel_obj: Any, terminate_obj: Any, pause_ctx: Any, task_id: str) -> None:
         """
         Add task control objects to the dictionary.
 
         :param cancel_obj: An object that has a cancel method.
-        :param skip_obj: An object that has a skip method.
+        :param terminate_obj: An object that has a terminate method.
         :param pause_ctx: An object that has a pause method.
         :param task_id: Task ID, used as the key in the dictionary.
         """
@@ -26,7 +26,7 @@ class ThreadTaskManager:
                 logger.warning(f"Task with task_id '{task_id}' already exists, overwriting")
             self._tasks[task_id] = {
                 'cancel': cancel_obj,
-                'skip': skip_obj,
+                'terminate': terminate_obj,
                 'pause': pause_ctx
             }
 
@@ -74,28 +74,28 @@ class ThreadTaskManager:
                 self._tasks.keys()):  # Use list(self._tasks.keys()) to avoid errors due to dictionary size changes
             self.cancel_task(task_id)
 
-    def skip_task(self, task_id: str) -> None:
+    def terminate_task(self, task_id: str) -> None:
         """
-        Skip the task based on task_id.
+        Terminate the task based on task_id.
 
         :param task_id: Task ID.
         """
         with self._lock:  # Acquire the lock to ensure thread-safe operations
             if task_id in self._tasks:
                 try:
-                    self._tasks[task_id]['skip'].skip()
+                    self._tasks[task_id]['terminate'].terminate()
                 except Exception as error:
                     logger.error(error)
             else:
                 logger.warning(f"No task found with task_id '{task_id}', operation invalid")
 
-    def skip_all_tasks(self) -> None:
+    def terminate_all_tasks(self) -> None:
         """
-        Skip all tasks in the dictionary.
+        Terminate all tasks in the dictionary.
         """
         for task_id in list(
                 self._tasks.keys()):  # Use list(self._tasks.keys()) to avoid errors due to dictionary size changes
-            self.skip_task(task_id)
+            self.terminate_task(task_id)
 
     def pause_task(self, task_id: str) -> None:
         """
