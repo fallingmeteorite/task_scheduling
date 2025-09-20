@@ -67,9 +67,38 @@ from task_scheduling.task_info import start_task_status_ui
 
 start_task_status_ui()
 
+# Task status UI available at http://localhost:8000
+
 ```
 
-Task status UI available at http://localhost:8000
+# command line use
+
+## Tips
+
+!!! WARNING: Command line running does not support terminating tasks, pausing tasks, and error catching
+
+## Use
+
+```
+python -m task_scheduling
+
+#  The task scheduler starts.
+#  Wait for the task to be added.
+#  Task status UI available at http://localhost:8000
+```
+
+## add task
+
+```
+use: -cmd <command> -n <task_name>
+
+-cmd 'python test.py' -n 'test'
+#  Parameter: {'command': 'python test.py', 'name': 'test'}
+#  Create a success. task ID: 7fc6a50c-46c1-4f71-b3c9-dfacec04f833
+#  Wait for the task to be added.
+```
+
+Use ctrl + c force exit
 
 # Function introduction
 
@@ -1003,6 +1032,10 @@ How many seconds to check whether the task status is correct,recommended a longe
 Whether to enable thread management in the process
 
 `thread_management: False`
+
+Should an exception be thrown to facilitate error location
+
+`exception_thrown: True`
 
 ### If you have a better idea, feel free to submit a PR
 

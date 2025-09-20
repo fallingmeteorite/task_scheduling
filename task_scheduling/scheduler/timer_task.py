@@ -65,10 +65,14 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
                                             None, None)
         return_results = "error happened"
     except Exception as e:
+        if config["exception_thrown"]:
+            raise
+
         logger.debug(f"Timer task | {task_id} | execution failed: {e}")
         task_status_manager.add_task_status(task_id, None, "failed", None, None, e,
                                             None, None)
         return_results = "error happened"
+
     finally:
         if _task_manager.check(task_id):
             _task_manager.remove(task_id)
@@ -118,7 +122,7 @@ class TimerTask:
                  task_id: str,
                  func: Callable,
                  *args,
-                 **kwargs) -> bool:
+                 **kwargs) -> Any:
         """
         Add a task to the task queue.
 
@@ -171,7 +175,7 @@ class TimerTask:
                 return True
         except Exception as e:
             logger.debug(f"Error adding task | {task_id} |: {e}")
-            return f"Error adding task | {task_id} |: {e}"
+            return e
 
     # Start the scheduler
     def _start_scheduler(self) -> None:
@@ -225,8 +229,8 @@ class TimerTask:
             self._idle_timer = None
             self._task_results = {}
 
-            # logger.debug(
-            #     "Scheduler and event loop have stopped, all resources have been released and parameters reset")
+            logger.debug(
+                "Scheduler and event loop have stopped, all resources have been released and parameters reset")
 
     # Scheduler function
     def _scheduler(self) -> None:

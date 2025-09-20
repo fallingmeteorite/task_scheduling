@@ -4,7 +4,7 @@ import queue
 import threading
 import time
 import math
-from concurrent.futures import ProcessPoolExecutor, Future
+from concurrent.futures import ProcessPoolExecutor, Future, BrokenExecutor
 from functools import partial
 from multiprocessing import Manager
 from typing import Callable, Dict, Tuple, Optional, Any
@@ -14,7 +14,7 @@ from ..config import config
 from ..manager import task_status_manager
 from ..control import ThreadTerminator, ProcessTaskManager, StopException, ThreadingTimeout, TimeoutException, \
     ThreadSuspender
-from ..utils import worker_initializer_liner
+
 from ..scheduler_tools import TaskCounter
 
 _task_counter = TaskCounter("cpu_liner_task")
@@ -76,6 +76,9 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
         return_results = "error happened"
 
     except Exception as e:
+        if config["exception_thrown"]:
+            raise
+
         logger.debug(f"Cpu linear task | {task_id} | execution failed: {e}")
         task_status_queue.put(("failed", task_id, None, None, None, e, None))
         return_results = "error happened"
@@ -147,7 +150,7 @@ class CpuLinerTask:
                     task_status_manager.add_task_status(task_id, task_name, status, start_time, end_time, error,
                                                         timeout_processing, "cpu_liner_task")
 
-            except queue.Empty:
+            except (queue.Empty, ValueError):
                 pass  # Ignore empty queue exceptions
             finally:
                 time.sleep(0.1)
@@ -158,7 +161,7 @@ class CpuLinerTask:
                  task_id: str,
                  func: Callable,
                  priority: str,
-                 *args, **kwargs) -> bool:
+                 *args, **kwargs) -> Any:
         """
         Add the task to the scheduler.
 
@@ -205,7 +208,7 @@ class CpuLinerTask:
                 return True
         except Exception as e:
             logger.debug(f"Cpu linear task | {task_id} | error adding task: {e}")
-            return f"Cpu linear task | {task_id} | error adding task: {e}"
+            return e
 
     def _start_scheduler(self) -> None:
         """
@@ -236,13 +239,10 @@ class CpuLinerTask:
             if force_cleanup:
                 logger.debug("Force stopping scheduler and cleaning up tasks")
                 self.stop_all_running_task()
-                # Ensure the executor is properly shut down
-                if self._executor:
-                    self._executor.shutdown(wait=False, cancel_futures=True)
-            else:
-                # Ensure the executor is properly shut down
-                if self._executor:
-                    self._executor.shutdown(wait=True, cancel_futures=True)
+
+            # Ensure the executor is properly shut down
+            if self._executor:
+                self._executor.shutdown(wait=True, cancel_futures=True)
 
             # Wait for all running tasks to complete
             self._scheduler_stop_event.set()
@@ -268,14 +268,14 @@ class CpuLinerTask:
             self._idle_timer = None
             self._task_results = {}
 
-            # logger.debug(
-            #     "Scheduler and event loop have stopped, all resources have been released and parameters reset")
+            logger.debug(
+                "Scheduler and event loop have stopped, all resources have been released and parameters reset")
 
     def stop_all_running_task(self):
         for task_id in self._running_tasks.keys():
-            self._task_status_queue.put(task_id)
+            self._task_signal_transmission.put((task_id, "kill"))
 
-        while not self._task_status_queue.qsize() == 0:
+        while not self._task_signal_transmission.qsize() == 0:
             time.sleep(0.1)
 
     def _scheduler(self) -> None:
@@ -283,7 +283,7 @@ class CpuLinerTask:
         Scheduler function, fetch tasks from the task queue and submit them to the process pool for execution.
         """
         with ProcessPoolExecutor(max_workers=int(config["cpu_liner_task"] + math.ceil(config["cpu_liner_task"] / 2)),
-                                 initializer=worker_initializer_liner) as executor:
+                                 initializer=None) as executor:
             self._executor = executor
             while not self._scheduler_stop_event.is_set():
                 with self._condition:
@@ -322,10 +322,11 @@ class CpuLinerTask:
                 if result != "error happened":
                     with self._lock:
                         self._task_results[task_id] = result
+        except (KeyboardInterrupt, BrokenExecutor):
+            # Prevent problems caused by exit errors
+            logger.debug(f"Cpu linear task | {task_id} | cancelled, forced termination")
+            self._task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
 
-        except Exception as e:
-            logger.debug(f"Cpu linear task | {task_id} | execution failed in callback: {e}")
-            self._task_status_queue.put(("failed", task_id, None, None, None, e, None))
         finally:
             # Make sure the Future object is deleted
             with self._lock:

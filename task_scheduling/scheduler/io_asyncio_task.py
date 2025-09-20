@@ -58,7 +58,7 @@ class IoAsyncioTask:
                  task_id: str,
                  func: Callable,
                  *args,
-                 **kwargs) -> bool:
+                 **kwargs) -> Any:
         """
         Add a task to the task queue.
 
@@ -100,7 +100,7 @@ class IoAsyncioTask:
                 return True
         except Exception as e:
             logger.debug(f"Io asyncio task | {task_id} | error adding task: {e}")
-            return f"Io asyncio task | {task_id} | error adding task: {e}"
+            return e
 
     # Start the scheduler
     def _start_scheduler(self,
@@ -163,8 +163,8 @@ class IoAsyncioTask:
             if task_name in self._task_counters:
                 del self._task_counters[task_name]
 
-            # logger.debug(
-            #     f"Scheduler and event loop for task | {task_name} | have stopped, all resources have been released and parameters reset")
+            logger.debug(
+                f"Scheduler and event loop for task | {task_name} | have stopped, all resources have been released and parameters reset")
 
     def stop_all_schedulers(self,
                             force_cleanup: bool,
@@ -218,8 +218,8 @@ class IoAsyncioTask:
             self._idle_timers.clear()
             self._task_counters.clear()
 
-            # logger.debug(
-            #     "Scheduler and event loop have stopped, all resources have been released and parameters reset")
+            logger.debug(
+                "Scheduler and event loop have stopped, all resources have been released and parameters reset")
 
     # Task scheduler
     def _scheduler(self,
@@ -301,9 +301,13 @@ class IoAsyncioTask:
                                                 None, None)
             return_results = "error happened"
         except Exception as e:
+            if config["exception_thrown"]:
+                raise
+
             logger.debug(f"Io asyncio task | {task_id} | execution failed: {e}")
             task_status_manager.add_task_status(task_id, None, "failed", None, None, e, None, None)
             return_results = "error happened"
+
         finally:
             if return_results == "error happened":
                 _task_manager.remove(task_id)

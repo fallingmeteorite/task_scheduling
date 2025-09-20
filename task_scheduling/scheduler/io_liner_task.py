@@ -65,9 +65,13 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
         logger.debug(f"Io linear task | {task_id} | was cancelled")
         task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None, None)
     except Exception as e:
+        if config["exception_thrown"]:
+            raise
+
         logger.debug(f"Io linear task | {task_id} | execution failed: {e}")
         task_status_manager.add_task_status(task_id, None, "failed", None, None, e, None, None)
         return_results = "error happened"
+
     finally:
         if _task_manager.check(task_id):
             _task_manager.remove(task_id)
@@ -116,7 +120,7 @@ class IoLinerTask:
                  func: Callable,
                  priority: str,
                  *args,
-                 **kwargs) -> bool:
+                 **kwargs) -> Any:
         """
         Add a task to the task queue.
 
@@ -166,7 +170,7 @@ class IoLinerTask:
                 return True
         except Exception as e:
             logger.debug(f"Io linear task | {task_id} | error adding task: {e}")
-            return f"Io linear task | {task_id} | error adding task: {e}"
+            return e
 
     # Start the scheduler
     def _start_scheduler(self) -> None:
@@ -220,8 +224,8 @@ class IoLinerTask:
             self._idle_timer = None
             self._task_results = {}
 
-            # logger.debug(
-            #     "Scheduler and event loop have stopped, all resources have been released and parameters reset")
+            logger.debug(
+                "Scheduler and event loop have stopped, all resources have been released and parameters reset")
 
     # Task scheduler
     def _scheduler(self) -> None:
@@ -271,9 +275,7 @@ class IoLinerTask:
                     with self._lock:
                         self._task_results[task_id] = result
                 task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None, None)
-        except Exception as e:
-            logger.debug(f"Io linear task | {task_id} | execution failed in callback: {e}")
-            task_status_manager.add_task_status(task_id, None, "failed", None, None, e, None, None)
+
         finally:
             # Ensure the Future object is deleted
             with self._lock:

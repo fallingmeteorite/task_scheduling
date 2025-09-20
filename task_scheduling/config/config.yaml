@@ -27,3 +27,6 @@ status_check_interval: 800
 
 # Whether to enable thread management in the process
 thread_management: False
+
+# Should an exception be thrown to facilitate error location
+exception_thrown: True

@@ -131,6 +131,7 @@ class ProcessTaskManager:
 
                 else:
                     self._task_queue.put((task_id, target))
+
             except queue.Empty:
                 pass  # Ignore empty queue exceptions
             except Exception as error:
