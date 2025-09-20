@@ -1035,7 +1035,7 @@ Whether to enable thread management in the process
 
 Should an exception be thrown to facilitate error location
 
-`exception_thrown: True`
+`exception_thrown: False`
 
 ### If you have a better idea, feel free to submit a PR
 

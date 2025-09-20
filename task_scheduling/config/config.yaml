@@ -29,4 +29,4 @@ status_check_interval: 800
 thread_management: False
 
 # Should an exception be thrown to facilitate error location
-exception_thrown: True
+exception_thrown: False
