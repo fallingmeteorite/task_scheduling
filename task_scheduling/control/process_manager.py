@@ -101,7 +101,6 @@ class ProcessTaskManager:
                     self._tasks[task_id]['pause'].resume()
                 except Exception as error:
                     logger.error(error)
-                del self._tasks[task_id]
             else:
                 logger.warning(f"No task found with task_id '{task_id}', operation invalid")
 

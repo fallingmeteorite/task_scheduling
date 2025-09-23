@@ -355,7 +355,6 @@ class IoLinerTask:
         :return: bool: Whether the task was successfully pause and resume.
         """
         if not self._running_tasks.get(task_id, None):
-            print(self._running_tasks.get(task_id, None))
             logger.debug(f"Io linear task | {task_id} | does not exist or is already completed")
             return False
 

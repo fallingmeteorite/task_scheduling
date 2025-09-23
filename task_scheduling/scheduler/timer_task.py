@@ -11,11 +11,13 @@ from typing import Callable, Dict, List, Tuple, Optional, Any
 from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
-from ..control import ThreadTaskManager, ThreadTerminator, StopException, ThreadingTimeout, TimeoutException
+from ..control import ThreadTaskManager, ThreadTerminator, StopException, ThreadingTimeout, TimeoutException, \
+    ThreadSuspender
 
 # Create Manager instance
 _task_manager = ThreadTaskManager()
 _threadterminator = ThreadTerminator()
+_threadsuspender = ThreadSuspender()
 
 
 def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
@@ -39,9 +41,10 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
     return_results = None
     try:
         with _threadterminator.terminate_control() as terminate_ctx:
-            _task_manager.add(None, terminate_ctx, None, task_id)
-            task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None,
-                                                None, None)
+            with _threadsuspender.suspend_context() as pause_ctx:
+                _task_manager.add(None, terminate_ctx, pause_ctx, task_id)
+                task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None,
+                                                    None, None)
 
             logger.debug(f"Start running timer task, task ID: {task_id}")
 
@@ -371,6 +374,28 @@ class TimerTask:
         with self._lock:
             if task_id in self._task_results:
                 del self._task_results[task_id]
+        return True
+
+    def pause_and_resume_task(self,
+                              task_id: str, action: str) -> bool:
+        """
+        Pause and resume a task by its task ID.
+        :param task_id: Task ID.
+        :param action: Task action.
+        :return: bool: Whether the task was successfully pause and resume.
+        """
+        if not self._running_tasks.get(task_id, None):
+            logger.debug(f"Timer task | {task_id} | does not exist or is already completed")
+            return False
+
+        else:
+            if action == "pause":
+                _task_manager.pause_task(task_id)
+                task_status_manager.add_task_status(task_id, None, "waiting", None, None, None, None, None)
+            elif action == "resume":
+                _task_manager.resume_task(task_id)
+                task_status_manager.add_task_status(task_id, None, "running", None, None, None, None, None)
+
         return True
 
     # Obtain the information returned by the corresponding task

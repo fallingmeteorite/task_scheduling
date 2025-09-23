@@ -13,6 +13,7 @@ from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
 from ..control import ThreadTerminator, ProcessTaskManager, StopException, ThreadSuspender
+from ..utils import worker_initializer
 
 _threadsuspender = ThreadSuspender()
 _threadterminator = ThreadTerminator()
@@ -295,7 +296,7 @@ class CpuAsyncioTask:
         Scheduler function, fetch tasks from the task queue and submit them to the process pool for execution.
         """
         with ProcessPoolExecutor(max_workers=int(config["cpu_asyncio_task"]),
-                                 initializer=None) as executor:
+                                 initializer=worker_initializer) as executor:
             self._executor = executor
             while not self._scheduler_stop_event.is_set():
                 with self._condition:

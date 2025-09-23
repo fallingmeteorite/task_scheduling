@@ -1,6 +1,6 @@
 [project]
 name = "task_scheduling"
-version = "2.5.1"
+version = "2.5.2"
 description = "It is mainly used for task scheduling"
 authors = [
     { name = "fallingmeteorite", email = "2327667836@qq.com" }

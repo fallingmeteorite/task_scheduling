@@ -9,11 +9,12 @@ from typing import Dict, Tuple, Callable, Optional, Any
 from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
-from ..control import ThreadTaskManager
+from ..control import ThreadTaskManager, ThreadSuspender, ThreadTerminator
 
 # Create Manager instance
 _task_manager = ThreadTaskManager()
-
+_threadsuspender = ThreadSuspender()
+_threadterminator = ThreadTerminator()
 
 class IoAsyncioTask:
     """
@@ -249,7 +250,6 @@ class IoAsyncioTask:
             # Execute the task after the lock is released
             timeout_processing, task_name, task_id, func, args, kwargs = task
             future = asyncio.run_coroutine_threadsafe(self._execute_task(task), self._event_loops[task_name])
-            _task_manager.add(future, None, None, task_id)
             with self._condition:
                 self._running_tasks[task_id] = [future, task_name]
                 self._task_counters[task_name] += 1
@@ -283,8 +283,11 @@ class IoAsyncioTask:
 
             # If the task needs timeout processing, set the timeout time
             if timeout_processing:
-                return_results = await asyncio.wait_for(func(*args, **kwargs),
-                                                        timeout=config["watch_dog_time"])
+                with _threadterminator.terminate_control() as terminate_ctx:
+                    with _threadsuspender.suspend_context() as pause_ctx:
+                        _task_manager.add(None, terminate_ctx, pause_ctx, task_id)
+                        return_results = await asyncio.wait_for(func(*args, **kwargs),
+                                                                timeout=config["watch_dog_time"])
             else:
                 return_results = await func(*args, **kwargs)
 
@@ -411,6 +414,28 @@ class IoAsyncioTask:
         with self._condition:
             if task_id in self._task_results:
                 del self._task_results[task_id]
+        return True
+
+    def pause_and_resume_task(self,
+                              task_id: str, action: str) -> bool:
+        """
+        Pause and resume a task by its task ID.
+        :param task_id: Task ID.
+        :param action: Task action.
+        :return: bool: Whether the task was successfully pause and resume.
+        """
+        if not self._running_tasks.get(task_id, None):
+            logger.debug(f"Io asyncio task | {task_id} | does not exist or is already completed")
+            return False
+
+        else:
+            if action == "pause":
+                _task_manager.pause_task(task_id)
+                task_status_manager.add_task_status(task_id, None, "waiting", None, None, None, None, None)
+            elif action == "resume":
+                _task_manager.resume_task(task_id)
+                task_status_manager.add_task_status(task_id, None, "running", None, None, None, None, None)
+
         return True
 
     # Obtain the information returned by the corresponding task

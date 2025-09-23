@@ -14,6 +14,7 @@ from ..config import config
 from ..manager import task_status_manager
 from ..control import ThreadTerminator, ProcessTaskManager, StopException, ThreadingTimeout, TimeoutException, \
     ThreadSuspender
+from ..utils import worker_initializer
 
 from ..scheduler_tools import TaskCounter
 
@@ -283,7 +284,7 @@ class CpuLinerTask:
         Scheduler function, fetch tasks from the task queue and submit them to the process pool for execution.
         """
         with ProcessPoolExecutor(max_workers=int(config["cpu_liner_task"] + math.ceil(config["cpu_liner_task"] / 2)),
-                                 initializer=None) as executor:
+                                 initializer=worker_initializer) as executor:
             self._executor = executor
             while not self._scheduler_stop_event.is_set():
                 with self._condition:
