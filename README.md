@@ -29,7 +29,7 @@ task management and monitoring capabilities.
 - Queue task cancellation
 - Thread-level task management (experimental feature)
 
-### 警告
+### Warning
 
 - The code cannot terminate blocking tasks, such as write operations or network requests. Be sure to add corresponding
   logic, such as timeout interruption. For computational tasks and other tasks, termination is possible as long as the
