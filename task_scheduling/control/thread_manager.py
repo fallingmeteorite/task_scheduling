@@ -21,14 +21,20 @@ class ThreadTaskManager:
         :param pause_ctx: An object that has a pause method.
         :param task_id: Task ID, used as the key in the dictionary.
         """
-        with self._lock:  # Acquire the lock to ensure thread-safe operations
+        with self._lock:
             if task_id in self._tasks:
-                logger.warning(f"Task with task_id '{task_id}' already exists, overwriting")
-            self._tasks[task_id] = {
-                'cancel': cancel_obj,
-                'terminate': terminate_obj,
-                'pause': pause_ctx
-            }
+                # Partial update: Only update parameters that are not None
+                if terminate_obj is not None:
+                    self._tasks[task_id]['terminate'] = terminate_obj
+                if pause_ctx is not None:
+                    self._tasks[task_id]['pause'] = pause_ctx
+            else:
+                # New task: Ensure that all required parameters are not None
+                self._tasks[task_id] = {
+                    'cancel': cancel_obj,
+                    'terminate': terminate_obj,
+                    'pause': pause_ctx
+                }
 
     def remove(self, task_id: str) -> None:
         """

@@ -23,7 +23,7 @@ def _get_package_directory() -> str:
     return os.path.dirname(os.path.abspath(__file__))
 
 
-def _load_config(_file_path: str = None) -> bool:
+def _load_config(_file_path: str = None) -> Any:
     """
     Load the configuration file into the global variable `config`.
 
@@ -43,12 +43,11 @@ def _load_config(_file_path: str = None) -> bool:
             config.update(yaml.safe_load(f) or {})
             return True  # Return True indicating successful loading
     except Exception as error:
-        logger.error(f"Unknown error occurred while loading configuration file: {error}")
-    return False  # Return False indicating loading failure
+        return error  # Return False indicating loading failure
 
 
 def update_config(key: str,
-                  value: Any) -> bool:
+                  value: Any) -> Any:
     """
     Update a specific key-value pair in the global configuration dictionary.
     Changes are only applied in memory and do not persist to the file.
@@ -64,11 +63,9 @@ def update_config(key: str,
         # Update the global config directly
         global config
         config[key] = value
-        logger.info(f"Configuration updated in memory: {key} = {value}")
         return True  # Return True indicating successful update
     except Exception as error:
-        logger.error(f"Unknown error occurred while updating configuration in memory: {error}")
-    return False  # Return False indicating update failure
+        return error  # Return False indicating update failure
 
 
 def _save_config(_file_path: str = None) -> bool:

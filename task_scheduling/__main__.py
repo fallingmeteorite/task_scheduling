@@ -3,9 +3,9 @@ import shlex
 import sys
 
 from .task_creation import task_creation, shutdown
-from task_scheduling.task_info import start_task_status_ui
+from task_scheduling import start_task_status_ui
 from .common.log_config import logger
-from task_scheduling.variable import *
+from task_scheduling import *
 
 
 def command_creation(task_name: str,

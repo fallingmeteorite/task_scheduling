@@ -3,54 +3,47 @@
 
 # Task Scheduling Library
 
-A powerful Python task scheduling library that supports asynchronous and synchronous task execution, providing robust
-task management and monitoring capabilities.
+一个功能强大的Python任务调度库,支持异步和同步任务执行,提供强大的任务管理和监控功能
 
-## Features
+## 功能特性
 
-### Core Features
+### 核心功能
 
-- Task scheduling: Supports asynchronous and synchronous code, with tasks of the same type automatically queued for
-  execution
+- 任务调度: 支持异步代码和同步代码,相同类型的任务自动排队执行
 
-- Task Management: Powerful task status monitoring and management capabilities
-- Flexible termination: Supports sending termination commands to executing code
-- Timeout Handling: You can enable timeout detection for tasks, and long-running tasks will be forcibly terminated.
-- Disable List: Tasks that fail to run can be added to the disable list to prevent repeated execution.
-- Status Inquiry: Directly obtain the current status of the task through the interface (completed, error, timeout, etc.)
-- Intelligent Sleep: Automatically enters sleep mode when idle to save resources
+- 任务管理: 强大的任务状态监控和管理能力
+- 灵活终止: 支持向执行代码发送终止命令
+- 超时处理: 可为任务启用超时检测,长时间运行的任务会被强制终止
+- 禁用列表: 运行失败的任务可加入禁用列表，避免重复执行
+- 状态查询: 通过接口直接获取任务当前状态(完成,错误,超时等)
+- 智能休眠: 无任务时自动休眠节省资源
 
-### Advanced Features
+### 高级特性
 
-- Task priority management (low priority / high priority)
-- Task pause and resume
-- Task result retrieval
-- Blocked task management
-- Queue task cancellation
-- Thread-level task management (experimental feature)
+- 任务优先级管理(低优先级/高优先级)
+- 任务暂停与恢复
+- 任务结果获取
+- 禁用任务管理
+- 队列任务取消
+- 线程级任务管理(实验性功能)
 
 ### 警告
 
-- The code cannot terminate blocking tasks, such as write operations or network requests. Be sure to add corresponding
-  logic, such as timeout interruption. For computational tasks and other tasks, termination is possible as long as the
-  code is still running and not blocked (That is, the code continues to run without waiting and can terminate
-  immediately.).
-- For `time.sleep`, the library provides an alternative version. Use `interruptible_sleep` for long waits, and use await
-  `asyncio.sleep` for asynchronous code.
-- If you need to check errors and find the error location, please set the log level to `set_log_level("DEBUG")` and set
-  the configuration file `exception_thrown: True`.
-- The functions introduced below are applicable to all four schedulers, and special functions will be specifically
-  marked.
+- 代码不支持终止堵塞任务,比如写入,网络请求,请务必添加对应逻辑比如超时中断,对于运算任务和其他任务只要没有堵塞(
+  即代码还在运行而不是等待即可终止)
+- 对于time.sleep,库给出了替代的版本,当要进行长时间等待请使用`interruptible_sleep`,异步代码使用`await asyncio.sleep`
+- 如果需要检查错误和查找报错位置,请设置日志等级为`set_log_level("DEBUG")`,设置配置文件`exception_thrown: True`
+- 下面介绍的函数对于4个调度器都适用，特殊的函数的将会专门标记
 
-## Installation
+## 安装
 
 ```
 pip install --upgrade task_scheduling
 ```
 
-## Command Line Operation
+## 命令行运行
 
-!!!Does not support precise control over tasks.!!!
+!!!不支持对于任务的精密控制!!!
 
 ```
 python -m task_scheduling
@@ -59,7 +52,7 @@ python -m task_scheduling
 #  Wait for the task to be added.
 #  Task status UI available at http://localhost:8000
 
-# Add command: -cmd <command> -n <task_name>
+# 添加命令: -cmd <command> -n <task_name>
 
 -cmd 'python test.py' -n 'test'
 #  Parameter: {'command': 'python test.py', 'name': 'test'}
@@ -67,15 +60,15 @@ python -m task_scheduling
 #  Wait for the task to be added.
 ```
 
-Use `ctrl + c` to exit.
+使用 `ctrl + c` 退出运行
 
-## Core API Details
+## 核心API详解
 
-### Usage Examples:
+### 使用示例:
 
-- Change log level
+- 修改日志等级
 
-Please place it before all import statements.
+请放在所有导入语句前面
 
 ```
 from task_scheduling.common import set_log_level
@@ -86,7 +79,7 @@ if __name__ == "__main__":
     ......
 ```
 
-- Start monitoring page
+- 开启监视页面
 
 ```
 from task_scheduling.task_info import start_task_status_ui
@@ -98,29 +91,29 @@ start_task_status_ui()
 - task_creation(delay: int or None, daily_time: str or None, function_type: str, timeout_processing: bool, task_name:
   str, func: Callable, *args, **kwargs) -> str or None:
 
-Create and schedule a task for execution.
+创建并调度任务执行
 
-Parameter Description:
+参数说明:
 
-**delay**: Delay execution time (seconds), used for scheduled tasks.
+**delay**: 延迟执行时间（秒），用于定时任务
 
-**daily_time**: Daily execution time, format "HH:MM", used for scheduled tasks.
+**daily_time**: 每日执行时间，格式"HH:MM"，用于定时任务
 
-**function_type**: Function type (scheduler_io, scheduler_cpu, scheduler_timer).
+**function_type**: 函数类型 (`scheduler_io`, `scheduler_cpu`, `scheduler_timer`)
 
-**timeout_processing**: Whether to enable timeout detection and forced termination (True, False).
+**timeout_processing**: 是否启用超时检测和强制终止 (`True`, `False`)
 
-**task_name**: Tasks with the same name will be queued for execution.
+**task_name**: 任务名称，相同名称的任务会排队执行
 
-**func**: The function to execute.
+**func**: 要执行的函数
 
-**priority**: Task priority (priority_low, priority_high).
+**priority**: 任务优先级 (`priority_low`, `priority_high`)
 
-*args, **kwargs: Function arguments.
+*args, **kwargs: 函数参数
 
-Return Value: Task ID string.
+返回值: 任务ID字符串
 
-### Usage Example:
+### 使用示例:
 
 ```
 import asyncio
@@ -160,24 +153,22 @@ if __name__ == "__main__":
         shutdown(True)
 ```
 
-When `thread_management=True` is set in the configuration file, enabling this feature
-`thread-level task management (experimental feature)`, this feature is turned off by default.
+当配置文件中`thread_management=True`,开启该功能`线程级任务管理(实验性功能)`,默认这个功能是关闭的
 
-!!!This feature only supports CPU-intensive linear tasks!!!
+!!!该功能只支持CPU密集型线性任务!!!
 
-The first three parameters accepted in `mian_task` must be `task_manager`, `_threadterminator`, and `StopException`.
+`mian_task`中前三位接受参数必须为`task_manager`, `_threadterminator`, `StopException`
 
-In `other_task`, the first two parameters must accept `_threadterminator` and `StopException`.
+`other_task`中前两位接受参数必须为`_threadterminator`, `StopException`
 
-`task_id` must be unique and not duplicated. It is used to terminate other branch threads under the main thread, and all
-other branch threads must be closed before closing the main thread.
+`task_id`必须是唯一不重复的,用于终止主线程下其他分支线程,关闭主线程之前必须关闭其他分支线程
 
-When using the `threading.Thread` statement, you must add `daemon=True` to set the thread as a daemon thread.
+使用`threading.Thread`语句必须添加`daemon=True`将线程设置为守护线程
 
-`cpu_liner_task.force_stop_task()` is quite special. In the `cpu_liner_task` scheduler, it also needs to accept a
-boolean parameter, which must be set to `False` to skip the check and close the branch thread.
+`cpu_liner_task.force_stop_task()`较为特殊,在`cpu_liner_task`调度器中还要接受一个布尔参数,设置为`False`
+才能跳过检测去关闭分支线程`
 
-### Usage Example:
+### 使用示例:
 
 ```
 import threading
@@ -235,17 +226,17 @@ if __name__ == "__main__":
 
 - pause_and_resume_task(self, task_id: str, action: str) -> bool:
 
-Pause or resume a running task.
+暂停或恢复运行中的任务
 
-Parameter Description:
+参数说明:
 
-**task_id**: The ID of the task to control.
+**task_id**: 要控制的任务ID
 
-**action**: (Can be `pause`, `resume`).
+**action**: (可填写`pause`, `resume`)
 
-Return Value: Boolean indicating whether the operation was successful.
+返回值: 布尔值，表示操作是否成功
 
-### Usage Example:
+### 使用示例:
 
 ```
 import time
@@ -281,17 +272,17 @@ if __name__ == "__main__":
 
 - FunctionRunner(self, func: Callable, task_name: str, *args, **kwargs) -> None:
 
-Check the function type and record it (two types: `scheduler_cpu`, `scheduler_io`).
+检查函数类型并记录仪(一共两个类型`scheduler_cpu`, `scheduler_io`)
 
-Parameter Description:
+参数说明:
 
-**func**: The function to check.
+**func**:要检测的函数
 
-**task_name**: The function name.
+**task_name**:函数名字
 
-*args, **kwargs: Function arguments.
+*args, **kwargs:函数参数
 
-### Usage Example:
+### 使用示例:
 
 ```
 import time
@@ -333,17 +324,17 @@ if __name__ == "__main__":
 
 - task_function_type.read_from_dict(task_name: str) -> Optional[str]:
 
-Read the stored type of a function or write it. Storage file: `task_scheduling/function_data/task_type.pkl`
+读取已存储函数的类型或写入，储存文件:`task_scheduling/function_data/task_type.pkl`
 
-Parameter Description:
+参数说明:
 
-**task_name**: The function name.
+**task_name**:函数名字
 
-**function_type**:The function type to write (can be `scheduler_cpu`, `scheduler_io`).
+**function_type**:要写入的函数类型(可填写为`scheduler_cpu`, `scheduler_io`)
 
-*args, **kwargs:Function arguments.
+*args, **kwargs:函数参数
 
-### Usage Example:
+### 使用示例:
 
 ```
 from task_scheduling.task_data task_function_type
@@ -356,15 +347,15 @@ print(task_function_type.read_from_dict("CPU_Task"))
 
 - get_task_result(task_id: str) -> Optional[Any]:
 
-Get the return value of a completed task.
+获取已完成任务的返回值。
 
-Parameter Description:
+参数说明:
 
-**task_id**: Task ID.
+**task_id**: 任务ID
 
-Return Value: The task result, or None if not completed.
+返回值: 任务结果，如果未完成则返回None
 
-### Usage Example:
+### 使用示例:
 
 ```
 import time
@@ -400,11 +391,11 @@ if __name__ == "__main__":
 
 - get_tasks_info() -> str:
 
-Get information about all tasks.
+获取所有任务的信息。
 
-Return Value: A formatted string containing task information.
+返回值: 包含任务信息的格式化字符串
 
-### Usage Example:
+### 使用示例:
 
 ```
 import time
@@ -428,15 +419,15 @@ if __name__ == "__main__":
 
 - get_task_status(self, task_id: str) -> Optional[Dict[str, Optional[Union[str, float, bool]]]]:
 
-Get detailed status information for a specific task.
+获取特定任务的详细状态信息。
 
-Parameter Description:
+参数说明:
 
-- task_id: Task ID.
+- task_id: 任务ID
 
-Return Value: A dictionary containing task status information.
+返回值: 包含任务状态信息的字典
 
-### Usage Example:
+### 使用示例:
 
 ```
 import time
@@ -464,15 +455,15 @@ if __name__ == "__main__":
 
 - get_all_task_count(self) -> Dict[str, int]:
 
-Get the total count of tasks.
+获取任务的总存在
 
-Parameter Description:
+参数说明:
 
-**task_name**: The function name.
+**task_name**:函数名字
 
-Return Value: Dictionary or integer.
+返回值: 字典或者整数
 
-### Usage Example:
+### 使用示例:
 
 ```
 import time
@@ -513,17 +504,17 @@ if __name__ == "__main__":
 
 - force_stop_task(task_id: str, main_task: bool) -> bool:
 
-Forcefully terminate a running task.
+强制终止运行中的任务。
 
-Parameter Description:
+参数说明:
 
-**task_id**: The ID of the task to terminate.
+**task_id**: 要终止的任务ID
 
-**main_task**: Whether it is the main task (only needs to be specified for CPU-intensive linear tasks).
+**main_task**: 是否为主任务(只需在cpu密集型线性任务中填写)
 
-Return Value: Boolean indicating whether the termination was successful.
+返回值: 布尔值，表示终止是否成功
 
-### Usage Example:
+### 使用示例:
 
 ```
 import time
@@ -559,13 +550,13 @@ if __name__ == "__main__":
 
 - task_scheduler.remove_ban_task_name(task_name: str) -> None:
 
-Add and remove blocked task names. Added tasks will be prevented from running.
+添加和删除禁用任务名称。已添加的任务会被阻止运行
 
-Parameter Description:
+参数说明:
 
-**task_name**: The function name.
+**task_name**:函数名字
 
-### Usage Example:
+### 使用示例:
 
 ```
 import time
@@ -613,13 +604,13 @@ if __name__ == "__main__":
 
 - cancel_the_queue_task_by_name(self, task_name: str) -> None:
 
-Cancel queued tasks of a certain type.
+取消队列中的某类任务
 
-Parameter Description:
+参数说明:
 
-**task_name**: The function name.
+**task_name**:函数名字
 
-### Usage Example:
+### 使用示例:
 
 ```
 import time
@@ -657,13 +648,13 @@ if __name__ == "__main__":
 
 - shutdown(force_cleanup: bool) -> None:
 
-Shut down the scheduler. Necessary code must be run upon shutdown.
+关闭调度器，必要代码在关闭时必须运行
 
-Parameter Description:
+参数说明:
 
-**force_cleanup**: Whether to wait for remaining tasks to finish.
+**force_cleanup**:是否等待剩下任务运行
 
-### Usage Example:
+### 使用示例:
 
 ```
 from task_scheduling.task_creation import shutdown
@@ -672,74 +663,74 @@ shutdown(True)
 
 - update_config(key: str, value: Any) -> Any:
 
-Temporarily update parameters in the configuration file.
+临时更新配置文件中参数,请放在所有导入语句前面
 
-Parameter Description:
+参数说明:
 
-**key**: key
+**key**: 键
 
-**value**: value
+**value**: 值
 
-Return value: True or error information
+返回值:True或者报错信息
 
-### Usage Example:
+### 使用示例:
 
 ```
 from task_scheduling import update_config
 update_config(key, value)
 ```
 
-## Configuration
+## 配置
 
-File location: `task_scheduling/config/config.yaml`
+文件存储在:`task_scheduling/config/config.yaml`
 
-Maximum number of CPU-optimized asynchronous tasks of the same type that can run concurrently.
+同一类型的 CPU 优化异步任务可以运行的最大数量
 
 `cpu_asyncio_task: 8`
 
-Maximum number of I/O-intensive asynchronous tasks of the same type.
+IO 密集型异步任务中相同类型任务的最大数量
 
 `io_asyncio_task: 20`
 
-Maximum number of CPU-oriented linear tasks of the same type that can run concurrently.
+可以运行的相同类型的面向 CPU 的线性任务的最大数量
 
 `cpu_liner_task: 20`
 
-Maximum number of I/O-intensive linear tasks of the same type.
+I-O 密集型线性任务中相同类型任务的最大数量
 
 `io_liner_task: 20`
 
-Maximum number of tasks for the timer to execute.
+定时器执行最多的任务
 
 `timer_task: 30`
 
-Shut down the task scheduler after being idle for a long time (seconds).
+当长时间没有任务时，关闭任务调度器（秒）
 
 `max_idle_time: 60`
 
-Forcefully terminate a task if it runs for a long time without completing (seconds).
+当一个任务运行很长时间而未完成时，它会被强制结束（秒）
 
 `watch_dog_time: 80`
 
-Maximum number of records that can be stored in the task status.
+任务状态中可以存储的最大记录数
 
 `maximum_task_info_storage: 20`
 
-Interval (seconds) for checking if the task status is correct. A longer interval is recommended.
+检查任务状态是否正确需要多少秒，建议使用较长的时间间隔（秒）
 
 `status_check_interval: 800`
 
-Whether to enable thread management in the process.
+是否在进程中启用线程管理
 
 `thread_management: False`
 
-Whether exceptions should be thrown to locate errors.
+是否应该抛出异常以便定位错误
 
 `exception_thrown: False`
 
-### If you have a better idea, feel free to submit a PR
+### 如果你有更好的想法，欢迎提交一个 PR
 
-## Reference libraries:
+## 参考库：
 
-For ease of subsequent modification, some files are directly placed in the folder instead of being installed via pip, so
-the libraries used are explicitly stated here: https://github.com/glenfant/stopit
+为了便于后续修改,有些文件是直接放入文件夹,而不是通过 pip
+安装的,所以这里明确说明了使用的库:https://github.com/glenfant/stopit

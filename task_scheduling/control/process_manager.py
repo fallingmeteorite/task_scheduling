@@ -32,11 +32,16 @@ class ProcessTaskManager:
         """
         with self._operation_lock:  # Lock for thread-safe dictionary access
             if task_id in self._tasks:
-                logger.warning(f"Task with task_id '{task_id}' already exists, overwriting")
-            self._tasks[task_id] = {
-                'terminate': terminate_obj,
-                'pause': pause_ctx
-            }
+                if pause_ctx is not None:
+                    self._tasks[task_id]['terminate'] = terminate_obj
+                if pause_ctx is not None:
+                    self._tasks[task_id]['pause'] = pause_ctx
+            else:
+                self._tasks[task_id] = {
+                    'terminate': terminate_obj,
+                    'pause': pause_ctx
+                }
+
 
     def remove(self, task_id: str) -> None:
         """

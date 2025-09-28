@@ -59,7 +59,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
                     with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
                         # Whether to pass in the task manager to facilitate other thread management
                         if config["thread_management"]:
-                            return_results = func(task_manager, *args, **kwargs)
+                            return_results = func(task_manager, _threadterminator, StopException, *args, **kwargs)
                         else:
                             return_results = func(*args, **kwargs)
                 else:
@@ -384,10 +384,13 @@ class CpuLinerTask:
         if self._running_tasks.get(task_id) is None and main_task:
             logger.debug(f"Cpu linear task | {task_id} | does not exist or is already completed")
             return False
-
-        future = self._running_tasks[task_id][0]
-        if not future.running():
-            future.cancel()
+        # Handling situations on non-main threads
+        if main_task:
+            future = self._running_tasks[task_id][0]
+            if not future.running():
+                future.cancel()
+            else:
+                self._task_signal_transmission.put((task_id, "kill"))
         else:
             self._task_signal_transmission.put((task_id, "kill"))
 

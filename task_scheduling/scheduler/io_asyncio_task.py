@@ -16,6 +16,7 @@ _task_manager = ThreadTaskManager()
 _threadsuspender = ThreadSuspender()
 _threadterminator = ThreadTerminator()
 
+
 class IoAsyncioTask:
     """
     Asynchronous task manager class, responsible for scheduling, executing, and monitoring asynchronous tasks.
@@ -250,6 +251,7 @@ class IoAsyncioTask:
             # Execute the task after the lock is released
             timeout_processing, task_name, task_id, func, args, kwargs = task
             future = asyncio.run_coroutine_threadsafe(self._execute_task(task), self._event_loops[task_name])
+            _task_manager.add(future, None, None, task_id)
             with self._condition:
                 self._running_tasks[task_id] = [future, task_name]
                 self._task_counters[task_name] += 1
@@ -276,23 +278,22 @@ class IoAsyncioTask:
         timeout_processing, task_name, task_id, func, args, kwargs = task
         return_results = None
         try:
-            # Modify the task status
-            task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None, None, None)
+            with _threadsuspender.suspend_context() as pause_ctx:
+                _task_manager.add(None, None, pause_ctx, task_id)
+                # Modify the task status
+                task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None, None, None)
 
-            logger.debug(f"Start running io asyncio task | {task_id} | ")
+                logger.debug(f"Start running io asyncio task | {task_id} | ")
 
-            # If the task needs timeout processing, set the timeout time
-            if timeout_processing:
-                with _threadterminator.terminate_control() as terminate_ctx:
-                    with _threadsuspender.suspend_context() as pause_ctx:
-                        _task_manager.add(None, terminate_ctx, pause_ctx, task_id)
-                        return_results = await asyncio.wait_for(func(*args, **kwargs),
-                                                                timeout=config["watch_dog_time"])
-            else:
-                return_results = await func(*args, **kwargs)
+                # If the task needs timeout processing, set the timeout time
+                if timeout_processing:
+                    return_results = await asyncio.wait_for(func(*args, **kwargs),
+                                                            timeout=config["watch_dog_time"])
+                else:
+                    return_results = await func(*args, **kwargs)
 
-            # Update task status to "completed"
-            task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None, None)
+                # Update task status to "completed"
+                task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None, None)
 
         except asyncio.TimeoutError:
             logger.debug(f"Io asyncio task | {task_id} | timed out, forced termination")
