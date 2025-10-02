@@ -31,11 +31,20 @@ def branch_thread_control(share_info, _sharedtaskdict, timeout_processing, task_
                 try:
                     return_results = None
                     task_manager.add(terminate_ctx, None, task_id)
-                    return func(*args, **kwargs)
+                    if timeout_processing:
+                        with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
+                            return func(*args, **kwargs)
+                    else:
+                        return func(*args, **kwargs)
 
                 except StopException:
                     logger.warning(f"task | {task_id} | cancelled, forced termination")
                     task_status_queue.put(("cancelled", task_id, None, None, time.time(), None, None))
+
+                except TimeoutException:
+                    logger.warning(f"task | {task_id} | timed out, forced termination")
+                    task_status_queue.put(("timeout", task_id, None, None, None, None, None))
+                    return_results = "error happened"
 
                 except Exception as error:
                     # Whether to throw an exception
