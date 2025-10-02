@@ -4,3 +4,6 @@ from .sleep import interruptible_sleep
 # Used for task tagging
 from .worker_initializer import worker_initializer
 from .random_name import random_name
+
+# Decorator used to control threads
+from .branch_thread_decorator import branch_thread_control, wait_branch_thread_ended
