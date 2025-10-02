@@ -75,7 +75,7 @@ Use `ctrl + c` to exit.
 
 - Change log level
 
-Please place it before all import statements.
+Please place it before `if __name__ == "__main__":`
 
 ```
 from task_scheduling.common import set_log_level
@@ -158,79 +158,6 @@ if __name__ == "__main__":
             time.sleep(1)
     except KeyboardInterrupt:
         shutdown(True)
-```
-
-When `thread_management=True` is set in the configuration file, enabling this feature
-`thread-level task management (experimental feature)`, this feature is turned off by default.
-
-!!!This feature only supports CPU-intensive linear tasks!!!
-
-The first three parameters accepted in `mian_task` must be `task_manager`, `_threadterminator`, and `StopException`.
-
-In `other_task`, the first two parameters must accept `_threadterminator` and `StopException`.
-
-`task_id` must be unique and not duplicated. It is used to terminate other branch threads under the main thread, and all
-other branch threads must be closed before closing the main thread.
-
-When using the `threading.Thread` statement, you must add `daemon=True` to set the thread as a daemon thread.
-
-`cpu_liner_task.force_stop_task()` is quite special. In the `cpu_liner_task` scheduler, it also needs to accept a
-boolean parameter, which must be set to `False` to skip the check and close the branch thread.
-
-### Usage Example:
-
-```
-import threading
-import time
-from task_scheduling.utils import interruptible_sleep
-
-
-def main_task(task_manager, _threadterminator, StopException, input_info):
-    def other_task(_threadterminator, StopException, input_info):
-        with _threadterminator.terminate_control() as terminate_ctx:
-            try:
-                task_id = 1001001
-                task_manager.add(terminate_ctx, None, task_id)
-                while True:
-                    interruptible_sleep(1)
-                    print(input_info)
-            except StopException:
-                pass
-
-    threading.Thread(target=other_task, args=(_threadterminator, StopException, input_info,), daemon=True).start()
-
-    while True:
-        interruptible_sleep(1)
-        print(2)
-
-from task_scheduling.config import update_config
-
-update_config("thread_management", True)
-input_info = "test"
-
-if __name__ == "__main__":
-    from task_scheduling.task_creation import task_creation, shutdown
-    from task_scheduling.variable import *
-    from task_scheduling.scheduler import cpu_liner_task
-
-    from task_scheduling.common import set_log_level
-
-
-    set_log_level("DEBUG")
-
-
-    task_id1 = task_creation(
-        None, None, scheduler_cpu, True, "linear_task",
-        main_task, priority_low, "test")
-    time.sleep(3)
-    cpu_liner_task.force_stop_task(1001001, False)
-
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        shutdown(True)
-
 ```
 
 - pause_and_resume_task(self, task_id: str, action: str) -> bool:
@@ -672,7 +599,7 @@ shutdown(True)
 
 - update_config(key: str, value: Any) -> Any:
 
-Temporarily update parameters in the configuration file.
+Temporarily update parameters in the configuration file,Please place it before `if __name__ == "__main__":`
 
 Parameter Description:
 
@@ -687,6 +614,83 @@ Return value: True or error information
 ```
 from task_scheduling import update_config
 update_config(key, value)
+if __name__ == "__main__":
+    ...
+```
+
+## 线程级任务管理(实验性功能)
+
+!!!This feature only supports CPU-intensive linear tasks!!!
+
+When `thread_management=True` is set in the configuration file, this feature `Thread-level Task Management (experimental feature)` is enabled. By default, it is turned off.
+
+In `main_task`, the first three parameters must be `share_info`, `_sharedtaskdict`, and `task_signal_transmission`.
+
+`@wait_branch_thread_ended` must be placed above the main_task to prevent errors caused by the main thread ending before the branch thread has finished running.
+
+`other_task` is the branch thread that needs to run, and the `@branch_thread_control` decorator must be added above it to control and monitor it.
+
+The `@branch_thread_control` decorator receives the parameters `share_info`, `_sharedtaskdict`, `timeout_processing`, and `task_name`.
+
+`task_name` must be unique and not duplicated, used to obtain the task_id of other branch threads (use `_sharedtaskdict.read(task_name)` to get the task_id for termination, pause, or resume).
+
+When using the `threading.Thread` statement, you must add `daemon=True` to set the thread as a daemon thread (not adding it will increase the shutdown time; anyway, when the main thread ends, all child threads will be forcibly terminated).
+
+All branch threads' running status can be viewed on the web interface (to enable the web interface, please use `start_task_status_ui()`)
+
+Here are two control functions:
+
+In the main thread, use `task_signal_transmission.put((_sharedtaskdict.read(task_name), "action"))`. The action can be set to `kill`, `pause`, or `resume`.
+
+Outside the main thread, you can use APIs such as `cpu_liner_task.force_stop_task()` mentioned above.
+
+`cpu_liner_task.force_stop_task()` is quite special. In the `cpu_liner_task` scheduler, it also needs to accept a boolean parameter, which must be set to `False` to skip the check and close the branch thread.
+
+### Usage Example:
+
+```
+import threading
+import time
+from task_scheduling.utils import wait_branch_thread_ended, branch_thread_control
+
+
+@wait_branch_thread_ended
+def main_task(share_info, _sharedtaskdict, task_signal_transmission, input_info):
+    task_name = "other_task"
+    timeout_processing = True
+
+    @branch_thread_control(share_info, _sharedtaskdict, timeout_processing, task_name)
+    def other_task(input_info):
+        while True:
+            time.sleep(1)
+            print(input_info)
+
+    threading.Thread(target=other_task, args=(input_info,), daemon=True).start()
+
+    # Use this statement to terminate the branch thread
+    # time.sleep(4)
+    # task_signal_transmission.put((_sharedtaskdict.read(task_name), "kill"))
+
+
+from task_scheduling.config import update_config
+update_config("thread_management", True)
+
+if __name__ == "__main__":
+    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.task_info import start_task_status_ui
+    from task_scheduling.variable import *
+
+    start_task_status_ui()
+
+    task_id1 = task_creation(
+        None, None, scheduler_cpu, True, "linear_task",
+        main_task, priority_low, "test")
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        shutdown(True)
 ```
 
 ## Configuration

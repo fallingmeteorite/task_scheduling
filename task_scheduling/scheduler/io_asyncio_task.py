@@ -296,11 +296,11 @@ class IoAsyncioTask:
                 task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None, None)
 
         except asyncio.TimeoutError:
-            logger.debug(f"Io asyncio task | {task_id} | timed out, forced termination")
+            logger.warning(f"Io asyncio task | {task_id} | timed out, forced termination")
             task_status_manager.add_task_status(task_id, None, "timeout", None, None, None, None, None)
             return_results = "error happened"
         except asyncio.CancelledError:
-            logger.debug(f"Io asyncio task | {task_id} | was cancelled")
+            logger.warning(f"Io asyncio task | {task_id} | was cancelled")
             task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None,
                                                 None, None)
             return_results = "error happened"
@@ -308,7 +308,7 @@ class IoAsyncioTask:
             if config["exception_thrown"]:
                 raise
 
-            logger.debug(f"Io asyncio task | {task_id} | execution failed: {e}")
+            logger.error(f"Io asyncio task | {task_id} | execution failed: {e}")
             task_status_manager.add_task_status(task_id, None, "failed", None, None, e, None, None)
             return_results = "error happened"
 

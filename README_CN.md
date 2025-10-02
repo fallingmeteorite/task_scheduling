@@ -68,7 +68,7 @@ python -m task_scheduling
 
 - 修改日志等级
 
-请放在所有导入语句前面
+请放在`if __name__ == "__main__":`前面
 
 ```
 from task_scheduling.common import set_log_level
@@ -151,77 +151,6 @@ if __name__ == "__main__":
             time.sleep(1)
     except KeyboardInterrupt:
         shutdown(True)
-```
-
-当配置文件中`thread_management=True`,开启该功能`线程级任务管理(实验性功能)`,默认这个功能是关闭的
-
-!!!该功能只支持CPU密集型线性任务!!!
-
-`mian_task`中前三位接受参数必须为`task_manager`, `_threadterminator`, `StopException`
-
-`other_task`中前两位接受参数必须为`_threadterminator`, `StopException`
-
-`task_id`必须是唯一不重复的,用于终止主线程下其他分支线程,关闭主线程之前必须关闭其他分支线程
-
-使用`threading.Thread`语句必须添加`daemon=True`将线程设置为守护线程
-
-`cpu_liner_task.force_stop_task()`较为特殊,在`cpu_liner_task`调度器中还要接受一个布尔参数,设置为`False`
-才能跳过检测去关闭分支线程`
-
-### 使用示例:
-
-```
-import threading
-import time
-from task_scheduling.utils import interruptible_sleep
-
-
-def main_task(task_manager, _threadterminator, StopException, input_info):
-    def other_task(_threadterminator, StopException, input_info):
-        with _threadterminator.terminate_control() as terminate_ctx:
-            try:
-                task_id = 1001001
-                task_manager.add(terminate_ctx, None, task_id)
-                while True:
-                    interruptible_sleep(1)
-                    print(input_info)
-            except StopException:
-                pass
-
-    threading.Thread(target=other_task, args=(_threadterminator, StopException, input_info,), daemon=True).start()
-
-    while True:
-        interruptible_sleep(1)
-        print(2)
-
-from task_scheduling.config import update_config
-
-update_config("thread_management", True)
-input_info = "test"
-
-if __name__ == "__main__":
-    from task_scheduling.task_creation import task_creation, shutdown
-    from task_scheduling.variable import *
-    from task_scheduling.scheduler import cpu_liner_task
-
-    from task_scheduling.common import set_log_level
-
-
-    set_log_level("DEBUG")
-
-
-    task_id1 = task_creation(
-        None, None, scheduler_cpu, True, "linear_task",
-        main_task, priority_low, "test")
-    time.sleep(3)
-    cpu_liner_task.force_stop_task(1001001, False)
-
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        shutdown(True)
-
 ```
 
 - pause_and_resume_task(self, task_id: str, action: str) -> bool:
@@ -663,7 +592,7 @@ shutdown(True)
 
 - update_config(key: str, value: Any) -> Any:
 
-临时更新配置文件中参数,请放在所有导入语句前面
+临时更新配置文件中参数,请放在`if __name__ == "__main__":`前面
 
 参数说明:
 
@@ -678,6 +607,85 @@ shutdown(True)
 ```
 from task_scheduling import update_config
 update_config(key, value)
+if __name__ == "__main__":
+    ...
+```
+
+## 线程级任务管理(实验性功能)
+
+!!!该功能只支持CPU密集型线性任务!!!
+
+当配置文件中`thread_management=True`,开启该功能`线程级任务管理(实验性功能)`默认为关闭状态
+
+`main_task`中前三位接受参数必须为`share_info`, `_sharedtaskdict`, `task_signal_transmission`
+
+`@wait_branch_thread_ended`必须放在main_task上面，防止主线程结束,分支线程还没运行完导致错误
+
+`other_task`为需要运行的分支线程,上面必须添加`@branch_thread_control`装饰器来控制和监视
+
+`@branch_thread_control`装饰器接收参数`share_info`, `_sharedtaskdict`, `timeout_processing`, `task_name`
+
+`task_name`必须是唯一不重复的,用于获取其他分支线程的task_id(使用`_sharedtaskdict.read(task_name)`获取task_id去终止，暂停或恢复)
+
+使用`threading.Thread`语句必须添加`daemon=True`将线程设置为守护线程(没有添加会让关闭操作时间增加,反正主线程结束,会强制终止所有分支线程)
+
+所有的分支线程都可以在网页端查看到运行状态(开启网页端请使用`start_task_status_ui()`)
+
+这里提供两个控制函数:
+
+在主线程内使用`task_signal_transmission.put((_sharedtaskdict.read(task_name), "action"))` action可以填写为`kill`,
+`pause`, `resume`
+
+在主线程外部可以使用`cpu_liner_task.force_stop_task()`等上面介绍的api
+
+`cpu_liner_task.force_stop_task()`较为特殊,在`cpu_liner_task`调度器中还要接受一个布尔参数,设置为`False`
+才能跳过检测去关闭分支线程`
+
+### 使用示例:
+
+```
+import threading
+import time
+from task_scheduling.utils import wait_branch_thread_ended, branch_thread_control
+
+
+@wait_branch_thread_ended
+def main_task(share_info, _sharedtaskdict, task_signal_transmission, input_info):
+    task_name = "other_task"
+    timeout_processing = True
+
+    @branch_thread_control(share_info, _sharedtaskdict, timeout_processing, task_name)
+    def other_task(input_info):
+        while True:
+            time.sleep(1)
+            print(input_info)
+
+    threading.Thread(target=other_task, args=(input_info,), daemon=True).start()
+
+    # Use this statement to terminate the branch thread
+    # time.sleep(4)
+    # task_signal_transmission.put((_sharedtaskdict.read(task_name), "kill"))
+
+
+from task_scheduling.config import update_config
+update_config("thread_management", True)
+
+if __name__ == "__main__":
+    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.task_info import start_task_status_ui
+    from task_scheduling.variable import *
+
+    start_task_status_ui()
+
+    task_id1 = task_creation(
+        None, None, scheduler_cpu, True, "linear_task",
+        main_task, priority_low, "test")
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        shutdown(True)
 ```
 
 ## 配置

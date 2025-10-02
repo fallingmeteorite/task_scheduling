@@ -35,15 +35,18 @@ class TaskStatusManager:
             task_type (Optional[str]): Task type. If not provided, it is not updated.
         """
         if task_id not in self._task_status_dict:
-            self._task_status_dict[task_id] = {
-                'task_name': None,
-                'status': None,
-                'start_time': None,
-                'end_time': None,
-                'error_info': None,
-                'is_timeout_enabled': None,
-                'task_type': None
-            }
+            if status not in ["failed", "completed", "timeout", "cancelled"]:
+                self._task_status_dict[task_id] = {
+                    'task_name': None,
+                    'status': None,
+                    'start_time': None,
+                    'end_time': None,
+                    'error_info': None,
+                    'is_timeout_enabled': None,
+                    'task_type': None
+                }
+            else:
+                return
 
         task_status = self._task_status_dict[task_id]
 
@@ -63,8 +66,11 @@ class TaskStatusManager:
             task_status['task_type'] = task_type
 
         self._task_status_dict[task_id] = task_status
+
         if len(self._task_status_dict) > self._max_storage:
             self._clean_up()
+
+        return
 
     def _clean_up(self) -> None:
         """

@@ -11,7 +11,7 @@ from typing import Callable, Dict, Tuple, Optional, Any
 
 from ..common import logger
 from ..config import config
-from ..manager import task_status_manager
+from ..manager import task_status_manager, SharedTaskDict
 from ..control import ThreadTerminator, ProcessTaskManager, StopException, ThreadingTimeout, TimeoutException, \
     ThreadSuspender
 from ..utils import worker_initializer
@@ -43,6 +43,8 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
     Returns:
         Any: Result of the task execution or error message.
     """
+    # Create a shared dictionary
+    _sharedtaskdict = SharedTaskDict()
 
     timeout_processing, task_name, task_id, func, priority, args, kwargs = task
     task_manager = ProcessTaskManager(task_signal_transmission)
@@ -59,7 +61,10 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
                     with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
                         # Whether to pass in the task manager to facilitate other thread management
                         if config["thread_management"]:
-                            return_results = func(task_manager, _threadterminator, StopException, *args, **kwargs)
+                            share_info = (task_manager, _threadterminator, StopException, ThreadingTimeout,
+                                          TimeoutException, _threadsuspender, task_status_queue)
+                            return_results = func(share_info, _sharedtaskdict, task_signal_transmission, *args,
+                                                  **kwargs)
                         else:
                             return_results = func(*args, **kwargs)
                 else:
@@ -67,12 +72,12 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
 
 
     except (StopException, KeyboardInterrupt):
-        logger.debug(f"Cpu linear task | {task_id} | cancelled, forced termination")
+        logger.warning(f"Cpu linear task | {task_id} | cancelled, forced termination")
         task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
         return_results = "error happened"
 
     except TimeoutException:
-        logger.debug(f"Cpu linear task | {task_id} | timed out, forced termination")
+        logger.warning(f"Cpu linear task | {task_id} | timed out, forced termination")
         task_status_queue.put(("timeout", task_id, None, None, None, None, None))
         return_results = "error happened"
 
@@ -80,17 +85,22 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
         if config["exception_thrown"]:
             raise
 
-        logger.debug(f"Cpu linear task | {task_id} | execution failed: {e}")
+        logger.error(f"Cpu linear task | {task_id} | execution failed: {e}")
         task_status_queue.put(("failed", task_id, None, None, None, e, None))
         return_results = "error happened"
 
     finally:
+        task_manager.remove(task_id)
+
+        # Terminate all other threads under the main thread
+        if config["thread_management"]:
+            task_manager.terminate_task_all()
+
         if return_results != "error happened":
             try:
                 task_status_queue.put(("completed", task_id, None, None, time.time(), None, None))
             except BrokenPipeError:
                 pass
-        task_manager.remove(task_id)
 
         return return_results
 

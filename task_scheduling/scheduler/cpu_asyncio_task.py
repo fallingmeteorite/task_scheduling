@@ -82,12 +82,12 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
         return_results = asyncio.run(_execute_task_async(task, task_status_queue, task_manager))
 
     except StopException:
-        logger.debug(f"Cpu asyncio task | {task_id} | cancelled, forced termination")
+        logger.warning(f"Cpu asyncio task | {task_id} | cancelled, forced termination")
         task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
         return_results = "error happened"
 
     except asyncio.TimeoutError:
-        logger.debug(f"Cpu asyncio task | {task_id} | timed out, forced termination")
+        logger.warning(f"Cpu asyncio task | {task_id} | timed out, forced termination")
         task_status_queue.put(("timeout", task_id, None, None, None, None, None))
         return_results = "error happened"
 
@@ -96,7 +96,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
             raise
 
         # if not "Cannot close a running event loop" in str(e):
-        logger.debug(f"Cpu asyncio task | {task_id} | execution failed: {e}")
+        logger.error(f"Cpu asyncio task | {task_id} | execution failed: {e}")
         task_status_queue.put(("failed", task_id, None, None, None, e, None))
         return_results = "error happened"
 
@@ -339,7 +339,7 @@ class CpuAsyncioTask:
                         self._task_results[task_id] = result
         except (KeyboardInterrupt, BrokenExecutor):
             # Prevent problems caused by exit errors
-            logger.debug(f"Cpu asyncio task | {task_id} | cancelled, forced termination")
+            logger.warning(f"Cpu asyncio task | {task_id} | cancelled, forced termination")
             self._task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
 
         finally:

@@ -65,7 +65,6 @@ class TaskScheduler:
                                   args,
                                   kwargs))
         self._task_event.set()  # Wake up the allocator thread
-
         task_status_manager.add_task_status(task_id, task_name, "queuing", None, None, None, timeout_processing, "NAN")
 
         if not self.allocator_started:
@@ -124,7 +123,7 @@ class TaskScheduler:
                                               kwargs))
 
                 if not state == False and not state == True:
-                    task_status_manager.add_task_status(task_id, task_name, "failed", None, None, state,
+                    task_status_manager.add_task_status(task_id, None, "failed", None, None, state,
                                                         timeout_processing, "NAN")
 
                 time.sleep(0.1)

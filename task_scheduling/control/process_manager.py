@@ -42,7 +42,6 @@ class ProcessTaskManager:
                     'pause': pause_ctx
                 }
 
-
     def remove(self, task_id: str) -> None:
         """
         Remove the task and its associated data from the dictionary based on task_id.
@@ -64,6 +63,22 @@ class ProcessTaskManager:
         with self._operation_lock:  # Lock for thread-safe dictionary access
             return task_id in self._tasks
 
+    def wait(self) -> None:
+        """
+        Blocking the main thread from ending while a child thread has not finished leads to errors.
+        """
+        # Checking only starts when a branch thread is added, to prevent bypassing wait due to errors completing in the middle of thread startup.
+        while True:
+            if len(self._tasks) == 2:
+                break
+            time.sleep(0.1)
+
+        # Prevent errors caused by branch threads still running after the main thread ends
+        while True:
+            if len(self._tasks) == 1:
+                break
+            time.sleep(0.1)
+
     def terminate_task(self, task_id: str) -> None:
         """
         Terminate the task based on task_id.
@@ -73,11 +88,26 @@ class ProcessTaskManager:
             if task_id in self._tasks:
                 try:
                     self._tasks[task_id]['terminate'].terminate()  # Perform the terminate operation outside the lock
+                    # Used to remove branch threads
+                    del self._tasks[task_id]
                 except Exception as error:
                     logger.error(f"Error terminating task '{task_id}': {error}")
 
             else:
                 logger.warning(f"No task found with task_id '{task_id}', operation invalid")
+
+    def terminate_task_all(self) -> None:
+        """
+        Terminate the all tasks based on task_id.
+        """
+        with self._operation_lock:  # Lock for thread-safe dictionary access
+            for task_id in self._tasks:
+                try:
+                    self._tasks[task_id]['terminate'].terminate()  # Perform the terminate operation outside the lock
+                except Exception as error:
+                    logger.error(f"Error terminating task '{task_id}': {error}")
+            # Used to remove all threads
+            self._tasks = {}
 
     def pause_task(self, task_id: str) -> None:
         """
@@ -132,9 +162,6 @@ class ProcessTaskManager:
                         if not self._tasks:  # Check if the tasks dictionary is empty
                             logger.debug(f"Worker {os.getpid()} no tasks remaining, stopping the monitor thread")
                             break  # Stop the loop if tasks dictionary is empty
-
-                else:
-                    self._task_queue.put((task_id, target))
 
             except queue.Empty:
                 pass  # Ignore empty queue exceptions

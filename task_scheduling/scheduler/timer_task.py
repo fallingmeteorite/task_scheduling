@@ -58,12 +58,12 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
             _task_manager.remove(task_id)
 
     except TimeoutException:
-        logger.debug(f"Timer task | {task_id} | timed out, forced termination")
+        logger.warning(f"Timer task | {task_id} | timed out, forced termination")
         task_status_manager.add_task_status(task_id, None, "timeout", None, None, None,
                                             None, None)
         return_results = "error happened"
     except StopException:
-        logger.debug(f"Timer task | {task_id} | cancelled, forced termination")
+        logger.warning(f"Timer task | {task_id} | cancelled, forced termination")
         task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None,
                                             None, None)
         return_results = "error happened"
@@ -71,7 +71,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
         if config["exception_thrown"]:
             raise
 
-        logger.debug(f"Timer task | {task_id} | execution failed: {e}")
+        logger.error(f"Timer task | {task_id} | execution failed: {e}")
         task_status_manager.add_task_status(task_id, None, "failed", None, None, e,
                                             None, None)
         return_results = "error happened"
