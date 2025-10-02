@@ -77,9 +77,11 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
         return_results = "error happened"
 
     except TimeoutException:
+        # Terminate all other threads under the main thread
         logger.warning(f"Cpu linear task | {task_id} | timed out, forced termination")
         task_status_queue.put(("timeout", task_id, None, None, None, None, None))
         return_results = "error happened"
+        task_manager.wait()
 
     except Exception as e:
         if config["exception_thrown"]:
