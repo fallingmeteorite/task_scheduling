@@ -73,7 +73,7 @@ class ProcessTaskManager:
         """
         # Prevent errors caused by branch threads still running after the main thread ends
         while True:
-            if threading.active_count() == 2:
+            if threading.active_count() <= 2:
                 break
             time.sleep(0.1)
 
