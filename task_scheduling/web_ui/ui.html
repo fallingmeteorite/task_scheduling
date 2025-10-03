@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Status Monitor</title>
+    <style>
+        :root {
+            --primary: #4a4a4a;
+            --secondary: #757575;
+            --light: #f5f5f5;
+            --dark: #212121;
+            --white: #ffffff;
+            --black: #000000;
+            --success: #4caf50;
+            --warning: #ffc107;
+            --error: #f44336;
+            --info: #2196f3;
+            --bg-color: #f5f5f5;
+            --text-color: #212121;
+            --card-bg: #ffffff;
+            --border-color: #e0e0e0;
+            --waiting: #9c27b0;
+        }
+
+        .dark-theme {
+            --primary: #e0e0e0;
+            --secondary: #9e9e9e;
+            --light: #424242;
+            --dark: #f5f5f5;
+            --white: #212121;
+            --black: #f5f5f5;
+            --success: #81c784;
+            --warning: #ffd54f;
+            --error: #e57373;
+            --info: #64b5f6;
+            --bg-color: #121212;
+            --text-color: #f5f5f5;
+            --card-bg: #1e1e1e;
+            --border-color: #424242;
+            --waiting: #ba68c8;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', sans-serif;
+            line-height: 1.5;
+            color: var(--text-color);
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: var(--bg-color);
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        h1 {
+            color: var(--text-color);
+            font-weight: 500;
+            margin-bottom: 24px;
+            font-size: 1.6rem;
+        }
+
+        .summary-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .total-summary-row {
+            display: grid;
+            grid-template-columns: repeat(1, 1fr);
+            gap: 16px;
+        }
+
+        .status-summary-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+        }
+
+        .summary-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+        }
+
+        .total-summary-card {
+            padding: 24px 20px;
+        }
+
+        .summary-label {
+            font-size: 0.85rem;
+            color: var(--secondary);
+            margin-bottom: 8px;
+        }
+
+        .total-summary-card .summary-label {
+            font-size: 0.95rem;
+        }
+
+        .summary-value {
+            font-size: 1.6rem;
+            font-weight: 500;
+            margin: 0;
+        }
+
+        .total-summary-card .summary-value {
+            font-size: 2rem;
+        }
+
+        .total .summary-value {
+            color: var(--primary);
+        }
+
+        .running .summary-value {
+            color: var(--info);
+        }
+
+        .failed .summary-value {
+            color: var(--error);
+        }
+
+        .completed .summary-value {
+            color: var(--success);
+        }
+
+        .queuing .summary-value {
+            color: var(--warning);
+        }
+
+        .waiting .summary-value {
+            color: var(--waiting);
+        }
+
+        .cancelled .summary-value {
+            color: var(--secondary);
+        }
+
+        .search-container {
+            margin-bottom: 24px;
+            display: flex;
+            gap: 12px;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 12px 16px;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            font-size: 0.9rem;
+            transition: border-color 0.3s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .search-button {
+            padding: 12px 24px;
+            border-radius: 16px;
+            border: none;
+            background-color: var(--primary);
+            color: var(--card-bg);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .search-button:hover {
+            background-color: var(--secondary);
+        }
+
+        .task-table-container {
+            width: 100%;
+            overflow-x: auto;
+            margin-bottom: 24px;
+            max-height: 60vh;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+        }
+
+        .task-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            table-layout: fixed;
+        }
+
+        .task-table th {
+            position: sticky;
+            top: 0;
+            text-align: left;
+            padding: 14px 20px;
+            background-color: var(--card-bg);
+            color: var(--secondary);
+            font-weight: 500;
+            font-size: 0.8rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .task-table td {
+            padding: 16px 20px;
+            vertical-align: middle;
+            word-wrap: break-word;
+        }
+
+        .task-row {
+            background: var(--card-bg);
+            transition: background-color 0.2s;
+        }
+
+        .task-row:not(:last-child) {
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .task-row:hover {
+            background-color: var(--light);
+        }
+
+        .task-name {
+            font-weight: 500;
+            color: var(--text-color);
+            margin-bottom: 4px;
+            word-break: break-word;
+        }
+
+        .task-id {
+            color: var(--secondary);
+            font-size: 0.75rem;
+            word-break: break-all;
+        }
+
+        .task-type {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            background-color: var(--light);
+            color: var(--text-color);
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .task-status {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            width: 100%;
+        }
+
+        .status-queued {
+            background-color: rgba(255, 235, 59, 0.1);
+            color: #ffc107;
+        }
+
+        .status-queuing {
+            background-color: rgba(255, 235, 59, 0.1);
+            color: #ffc107;
+        }
+
+        .status-waiting {
+            background-color: rgba(156, 39, 176, 0.1);
+            color: var(--waiting);
+        }
+
+        .status-running {
+            background-color: rgba(33, 150, 243, 0.1);
+            color: var(--info);
+        }
+
+        .status-failed {
+            background-color: rgba(244, 67, 54, 0.1);
+            color: var(--error);
+        }
+
+        .status-completed {
+            background-color: rgba(76, 175, 80, 0.1);
+            color: var(--success);
+        }
+
+        .status-cancelled {
+            background-color: rgba(158, 158, 158, 0.1);
+            color: var(--secondary);
+        }
+
+        .status-paused {
+            background-color: rgba(255, 152, 0, 0.1);
+            color: #ff9800;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+
+        .error-info {
+            color: var(--error);
+            font-size: 0.8rem;
+            padding: 8px 16px;
+            background-color: rgba(244, 67, 54, 0.05);
+            border-radius: 8px;
+            margin-top: 4px;
+            word-break: break-word;
+        }
+
+        .timestamp {
+            text-align: right;
+            font-size: 0.75rem;
+            color: var(--secondary);
+            margin-top: 24px;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 5px;
+            display: flex;
+            cursor: pointer;
+            z-index: 1000;
+        }
+
+        .theme-toggle span {
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.75rem;
+            transition: all 0.3s;
+        }
+
+        .theme-toggle .light {
+            background-color: var(--light);
+            color: var(--dark);
+        }
+
+        .theme-toggle .dark {
+            background-color: var(--dark);
+            color: var(--light);
+        }
+
+        .active-theme {
+            background-color: var(--primary) !important;
+            color: var(--card-bg) !important;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .empty-state-icon {
+            font-size: 2.5rem;
+            color: var(--secondary);
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-state-title {
+            font-size: 1rem;
+            color: var(--secondary);
+            margin-bottom: 8px;
+        }
+
+        .empty-state-description {
+            font-size: 0.85rem;
+            color: var(--secondary);
+            opacity: 0.8;
+        }
+
+        .highlight {
+            background-color: rgba(255, 235, 59, 0.3);
+            padding: 0 2px;
+            border-radius: 2px;
+        }
+
+        /* Action buttons styling */
+        .task-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-start;
+        }
+
+        .action-button {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 60px;
+        }
+
+        .terminate-button {
+            background-color: var(--error);
+            color: white;
+        }
+
+        .terminate-button:hover:not(:disabled) {
+            background-color: #d32f2f;
+            transform: translateY(-1px);
+        }
+
+        .pause-button {
+            background-color: var(--warning);
+            color: white;
+        }
+
+        .pause-button:hover:not(:disabled) {
+            background-color: #ff8f00;
+            transform: translateY(-1px);
+        }
+
+        .resume-button {
+            background-color: var(--success);
+            color: white;
+        }
+
+        .resume-button:hover:not(:disabled) {
+            background-color: #388e3c;
+            transform: translateY(-1px);
+        }
+
+        .action-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        /* Column width adjustments */
+        .task-table th:nth-child(1), .task-table td:nth-child(1) {
+            width: 30%;
+        }
+
+        .task-table th:nth-child(2), .task-table td:nth-child(2) {
+            width: 15%;
+        }
+
+        .task-table th:nth-child(3), .task-table td:nth-child(3) {
+            width: 15%;
+        }
+
+        .task-table th:nth-child(4), .task-table td:nth-child(4) {
+            width: 15%;
+        }
+
+        .task-table th:nth-child(5), .task-table td:nth-child(5) {
+            width: 25%;
+        }
+
+        /* Notification system styling */
+        .notification-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 400px;
+        }
+
+        .notification {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid var(--primary);
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            transform: translateX(400px);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            max-width: 380px;
+            border: 1px solid var(--border-color);
+        }
+
+        .notification.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        .notification.hide {
+            transform: translateX(400px);
+            opacity: 0;
+        }
+
+        .notification-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .notification.success {
+            border-left-color: var(--success);
+        }
+
+        .notification.success .notification-icon {
+            background-color: var(--success);
+            color: white;
+        }
+
+        .notification.error {
+            border-left-color: var(--error);
+        }
+
+        .notification.error .notification-icon {
+            background-color: var(--error);
+            color: white;
+        }
+
+        .notification.warning {
+            border-left-color: var(--warning);
+        }
+
+        .notification.warning .notification-icon {
+            background-color: var(--warning);
+            color: white;
+        }
+
+        .notification.info {
+            border-left-color: var(--info);
+        }
+
+        .notification.info .notification-icon {
+            background-color: var(--info);
+            color: white;
+        }
+
+        .notification-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .notification-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 4px;
+            color: var(--text-color);
+        }
+
+        .notification-message {
+            font-size: 0.8rem;
+            color: var(--secondary);
+            line-height: 1.4;
+            word-break: break-word;
+        }
+
+        .progress-bar {
+            height: 3px;
+            background: var(--border-color);
+            border-radius: 2px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.1s linear;
+        }
+
+        .notification.success .progress-fill {
+            background: var(--success);
+        }
+
+        .notification.error .progress-fill {
+            background: var(--error);
+        }
+
+        .notification.warning .progress-fill {
+            background: var(--warning);
+        }
+
+        .notification.info .progress-fill {
+            background: var(--info);
+        }
+
+        /* Loading animation */
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid transparent;
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Button loading state */
+        .action-button.loading {
+            position: relative;
+            color: transparent !important;
+        }
+
+        .action-button.loading::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 16px;
+            height: 16px;
+            margin: -8px 0 0 -8px;
+            border: 2px solid transparent;
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body class="light-theme">
+<!-- Notification container -->
+<div class="notification-container" id="notificationContainer"></div>
+
+<div class="theme-toggle" id="themeToggle">
+    <span class="light active-theme">light</span>
+    <span class="dark">dark</span>
+</div>
+
+<h1>Task Status Monitor</h1>
+
+<div class="summary-container">
+    <div class="total-summary-row">
+        <div class="summary-card total total-summary-card">
+            <div class="summary-label">Total Tasks</div>
+            <div class="summary-value" id="total-count">0</div>
+        </div>
+    </div>
+    <div class="status-summary-row">
+        <div class="summary-card running">
+            <div class="summary-label">Running Tasks</div>
+            <div class="summary-value" id="running-count">0</div>
+        </div>
+        <div class="summary-card failed">
+            <div class="summary-label">Failed Tasks</div>
+            <div class="summary-value" id="failed-count">0</div>
+        </div>
+        <div class="summary-card completed">
+            <div class="summary-label">Completed Tasks</div>
+            <div class="summary-value" id="completed-count">0</div>
+        </div>
+        <div class="summary-card queuing">
+            <div class="summary-label">Queuing Tasks</div>
+            <div class="summary-value" id="queuing-count">0</div>
+        </div>
+        <div class="summary-card waiting">
+            <div class="summary-label">Waiting Tasks</div>
+            <div class="summary-value" id="waiting-count">0</div>
+        </div>
+        <div class="summary-card cancelled">
+            <div class="summary-label">Cancelled Tasks</div>
+            <div class="summary-value" id="cancelled-count">0</div>
+        </div>
+    </div>
+</div>
+
+<div class="search-container">
+    <label for="searchInput"></label><input type="text" class="search-input" id="searchInput" placeholder="Search tasks by name...">
+    <button class="search-button" id="searchButton">Search</button>
+</div>
+
+<div class="task-table-container">
+    <table class="task-table">
+        <thead>
+        <tr>
+            <th>Task</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Duration</th>
+            <th>Actions</th>
+        </tr>
+        </thead>
+        <tbody id="tasks"></tbody>
+    </table>
+</div>
+
+<div class="timestamp" id="timestamp"></div>
+
+<script>
+    // Notification system
+    class NotificationSystem {
+        constructor() {
+            this.container = document.getElementById('notificationContainer');
+            this.notifications = new Set();
+        }
+
+        show({ title, message, type = 'info', duration = 5000 }) {
+            const id = Date.now() + Math.random();
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <div class="notification-icon">${this.getIcon(type)}</div>
+                <div class="notification-content">
+                    <div class="notification-title">${title}</div>
+                    <div class="notification-message">${message}</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 100%"></div>
+                    </div>
+                </div>
+            `;
+
+            this.container.appendChild(notification);
+            this.notifications.add(id);
+
+            // Show animation
+            setTimeout(() => notification.classList.add('show'), 10);
+
+            // Progress bar animation
+            const progressFill = notification.querySelector('.progress-fill');
+            let width = 100;
+            const interval = setInterval(() => {
+                width -= (100 / (duration / 100));
+                progressFill.style.width = width + '%';
+            }, 100);
+
+            // Auto close
+            const timeout = setTimeout(() => {
+                this.close(id);
+                clearInterval(interval);
+            }, duration);
+
+            notification._timeout = timeout;
+            notification._interval = interval;
+            notification._id = id;
+
+            return id;
+        }
+
+        close(id) {
+            const notification = Array.from(this.container.children).find(
+                child => child._id === id
+            );
+
+            if (notification) {
+                notification.classList.remove('show');
+                notification.classList.add('hide');
+
+                clearTimeout(notification._timeout);
+                clearInterval(notification._interval);
+
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                    this.notifications.delete(id);
+                }, 400);
+            }
+        }
+
+        getIcon(type) {
+            const icons = {
+                success: '✓',
+                error: '✕',
+                warning: '!',
+                info: 'i'
+            };
+            return icons[type] || 'i';
+        }
+    }
+
+    // Initialize notification system
+    const notificationSystem = new NotificationSystem();
+
+    // Theme toggle functionality
+    const themeToggle = document.getElementById('themeToggle');
+    const lightThemeBtn = themeToggle.querySelector('.light');
+    const darkThemeBtn = themeToggle.querySelector('.dark');
+    const body = document.body;
+
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+        enableDarkTheme();
+    }
+
+    themeToggle.addEventListener('click', (e) => {
+        if (e.target.classList.contains('light')) enableLightTheme();
+        else if (e.target.classList.contains('dark')) enableDarkTheme();
+    });
+
+    function enableDarkTheme() {
+        body.classList.replace('light-theme', 'dark-theme');
+        lightThemeBtn.classList.remove('active-theme');
+        darkThemeBtn.classList.add('active-theme');
+        localStorage.setItem('theme', 'dark');
+    }
+
+    function enableLightTheme() {
+        body.classList.replace('dark-theme', 'light-theme');
+        darkThemeBtn.classList.remove('active-theme');
+        lightThemeBtn.classList.add('active-theme');
+        localStorage.setItem('theme', 'light');
+    }
+
+    // Format duration (HH:MM:SS)
+    function formatDuration(seconds) {
+        if (!seconds) return '-';
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
+        return [h > 0 ? h : null, m, s]
+            .filter(x => x !== null)
+            .map(x => x.toString().padStart(2, '0'))
+            .join(':');
+    }
+
+    // Show empty state when no tasks available
+    function showNoTasksState() {
+        document.getElementById('tasks').innerHTML = `
+            <tr>
+                <td colspan="5">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">☁️</div>
+                        <div class="empty-state-title">No tasks available</div>
+                        <div class="empty-state-description">The system is currently idle</div>
+                    </div>
+                </td>
+            </tr>
+        `;
+        ['total-count', 'running-count', 'failed-count', 'completed-count', 'queuing-count', 'waiting-count', 'cancelled-count'].forEach(id => {
+            document.getElementById(id).textContent = '0';
+        });
+    }
+
+    // Highlight search terms in text
+    function highlightText(text, searchTerm) {
+        if (!searchTerm || !text) return text;
+
+        try {
+            const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            return text.replace(regex, '<span class="highlight">$1</span>');
+        } catch (e) {
+            return text;
+        }
+    }
+
+    // Filter tasks based on search term
+    function filterTasks(tasks, searchTerm) {
+        if (!searchTerm) return tasks;
+
+        const lowerSearchTerm = searchTerm.toLowerCase();
+        return tasks.filter(task =>
+            (task.name && task.name.toLowerCase().includes(lowerSearchTerm))
+        );
+    }
+
+    // Check if task supports actions
+    function canPerformActions(status) {
+        const lowerStatus = status.toLowerCase();
+        return ['running', 'queuing', 'waiting', 'paused'].includes(lowerStatus);
+    }
+
+    // Check if task can be paused
+    function canPause(status) {
+        const lowerStatus = status.toLowerCase();
+        return ['running'].includes(lowerStatus);
+    }
+
+    // Check if task can be resumed
+    function canResume(status) {
+        const lowerStatus = status.toLowerCase();
+        return ['paused'].includes(lowerStatus);
+    }
+
+    // Check if task can be terminated
+    function canTerminate(status) {
+        const lowerStatus = status.toLowerCase();
+        return ['running', 'queuing', 'waiting', 'paused'].includes(lowerStatus);
+    }
+
+    // Set button loading state
+    function setButtonLoading(button, loading) {
+        if (loading) {
+            button.classList.add('loading');
+            button.disabled = true;
+        } else {
+            button.classList.remove('loading');
+            button.disabled = false;
+        }
+    }
+
+    // Update individual task buttons
+    function updateTaskButtons(taskId, newStatus) {
+        const taskRow = document.querySelector(`[data-task-id="${taskId}"]`);
+        if (!taskRow) return;
+
+        const actionsCell = taskRow.querySelector('.task-actions');
+        if (!actionsCell) return;
+
+        const canPauseTask = canPause(newStatus);
+        const canResumeTask = canResume(newStatus);
+        const canTerminateTask = canTerminate(newStatus);
+
+        // Update status display
+        const statusCell = taskRow.querySelector('.task-status');
+        if (statusCell) {
+            statusCell.className = `task-status status-${newStatus.toLowerCase()}`;
+            statusCell.innerHTML = `<span class="status-indicator"></span>${newStatus.toLowerCase()}`;
+        }
+
+        // Update buttons
+        actionsCell.innerHTML = '';
+
+        if (canTerminateTask) {
+            const terminateBtn = document.createElement('button');
+            terminateBtn.className = 'action-button terminate-button';
+            terminateBtn.textContent = 'Terminate';
+            terminateBtn.onclick = () => handleAction(taskId, 'terminate');
+            actionsCell.appendChild(terminateBtn);
+        }
+
+        if (canPauseTask) {
+            const pauseBtn = document.createElement('button');
+            pauseBtn.className = 'action-button pause-button';
+            pauseBtn.textContent = 'Pause';
+            pauseBtn.onclick = () => handleAction(taskId, 'pause');
+            actionsCell.appendChild(pauseBtn);
+        }
+
+        if (canResumeTask) {
+            const resumeBtn = document.createElement('button');
+            resumeBtn.className = 'action-button resume-button';
+            resumeBtn.textContent = 'Resume';
+            resumeBtn.onclick = () => handleAction(taskId, 'resume');
+            actionsCell.appendChild(resumeBtn);
+        }
+
+        // Show "No actions" if no buttons available
+        if (actionsCell.children.length === 0) {
+            actionsCell.innerHTML = '<span style="color: var(--secondary); font-size: 0.8rem;">No actions</span>';
+        }
+    }
+
+    // Handle button click actions
+async function handleAction(taskId, action, taskType) {
+    console.log(`${action} task: ${taskId}, type: ${taskType}`);
+
+    // Set buttons to loading state
+    const taskRow = document.querySelector(`[data-task-id="${taskId}"]`);
+    const buttons = taskRow?.querySelectorAll('.action-button');
+    buttons?.forEach(btn => setButtonLoading(btn, true));
+
+    // Show action in progress notification
+    const actionMessages = {
+        pause: { title: 'Pausing Task', message: `Pausing task ${taskId}...` },
+        resume: { title: 'Resuming Task', message: `Resuming task ${taskId}...` },
+        terminate: { title: 'Terminating Task', message: `Terminating task ${taskId}...` }
+    };
+
+    const notificationId = notificationSystem.show({
+        ...actionMessages[action],
+        type: 'info',
+        duration: 3000
+    });
+
+    // Optimistic UI update
+    if (action === 'pause') {
+        updateTaskButtons(taskId, 'paused');
+    } else if (action === 'resume') {
+        updateTaskButtons(taskId, 'running');
+    } else if (action === 'terminate') {
+        updateTaskButtons(taskId, 'cancelled');
+    }
+
+    try {
+        // Send request to backend API with task type
+        const response = await fetch(`/tasks/${taskId}/${action}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                task_type: taskType
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to ${action} task`);
+        }
+
+        const data = await response.json();
+        console.log(`${action} successful for task ${taskId}`);
+
+        // Show success notification
+        notificationSystem.close(notificationId);
+        notificationSystem.show({
+            title: `${action.charAt(0).toUpperCase() + action.slice(1)} Successful`,
+            message: `Task ${taskId} has been ${action}d successfully`,
+            type: 'success',
+            duration: 3000
+        });
+
+        // Use backend status if provided
+        if (data.actualStatus) {
+            updateTaskButtons(taskId, data.actualStatus);
+        }
+
+    } catch (error) {
+        console.error(`Error ${action} task:`, error);
+
+        // Show error notification
+        notificationSystem.close(notificationId);
+        notificationSystem.show({
+            title: `${action.charAt(0).toUpperCase() + action.slice(1)} Failed`,
+            message: `Failed to ${action} task ${taskId}: ${error.message}`,
+            type: 'error',
+            duration: 5000
+        });
+
+        // Restore correct state on failure
+        fetchData();
+    } finally {
+        // Remove button loading state
+        buttons?.forEach(btn => setButtonLoading(btn, false));
+    }
+}
+
+// Update individual task buttons
+function updateTaskButtons(taskId, newStatus, taskType) {
+    const taskRow = document.querySelector(`[data-task-id="${taskId}"]`);
+    if (!taskRow) return;
+
+    const actionsCell = taskRow.querySelector('.task-actions');
+    if (!actionsCell) return;
+
+    const canPauseTask = canPause(newStatus);
+    const canResumeTask = canResume(newStatus);
+    const canTerminateTask = canTerminate(newStatus);
+
+    // Update status display
+    const statusCell = taskRow.querySelector('.task-status');
+    if (statusCell) {
+        statusCell.className = `task-status status-${newStatus.toLowerCase()}`;
+        statusCell.innerHTML = `<span class="status-indicator"></span>${newStatus.toLowerCase()}`;
+    }
+
+    // Update buttons
+    actionsCell.innerHTML = '';
+
+    if (canTerminateTask) {
+        const terminateBtn = document.createElement('button');
+        terminateBtn.className = 'action-button terminate-button';
+        terminateBtn.textContent = 'Terminate';
+        terminateBtn.onclick = () => handleAction(taskId, 'terminate', taskType);
+        actionsCell.appendChild(terminateBtn);
+    }
+
+    if (canPauseTask) {
+        const pauseBtn = document.createElement('button');
+        pauseBtn.className = 'action-button pause-button';
+        pauseBtn.textContent = 'Pause';
+        pauseBtn.onclick = () => handleAction(taskId, 'pause', taskType);
+        actionsCell.appendChild(pauseBtn);
+    }
+
+    if (canResumeTask) {
+        const resumeBtn = document.createElement('button');
+        resumeBtn.className = 'action-button resume-button';
+        resumeBtn.textContent = 'Resume';
+        resumeBtn.onclick = () => handleAction(taskId, 'resume', taskType);
+        actionsCell.appendChild(resumeBtn);
+    }
+
+    // Show "No actions" if no buttons available
+    if (actionsCell.children.length === 0) {
+        actionsCell.innerHTML = '<span style="color: var(--secondary); font-size: 0.8rem;">No actions</span>';
+    }
+}
+
+// Update UI with new data
+function updatePage(data, searchTerm = '') {
+    if (data === "nan" || !data || typeof data !== 'object') {
+        showNoTasksState();
+        updateTimestamp();
+        return;
+    }
+
+    // Calculate status counts from tasks array
+    let statusCounts = {
+        running: 0,
+        failed: 0,
+        completed: 0,
+        queuing: 0,
+        waiting: 0,
+        cancelled: 0,
+        queued: 0,
+        paused: 0
+    };
+
+    if (data.tasks?.length > 0) {
+        data.tasks.forEach(task => {
+            const status = task.status.toLowerCase();
+            if (statusCounts.hasOwnProperty(status)) {
+                statusCounts[status]++;
+            }
+        });
+    }
+
+    // Update summary counts
+    document.getElementById('total-count').textContent = data.tasks?.length || 0;
+    document.getElementById('running-count').textContent = data.running_count || statusCounts.running;
+    document.getElementById('failed-count').textContent = data.failed_count || statusCounts.failed;
+    document.getElementById('completed-count').textContent = data.completed_count || statusCounts.completed;
+    document.getElementById('queuing-count').textContent = statusCounts.queuing + statusCounts.queued;
+    document.getElementById('waiting-count').textContent = statusCounts.waiting;
+    document.getElementById('cancelled-count').textContent = statusCounts.cancelled;
+
+    // Update tasks table
+    const tasksContainer = document.getElementById('tasks');
+
+    if (data.tasks?.length > 0) {
+        const filteredTasks = filterTasks(data.tasks, searchTerm);
+
+        if (filteredTasks.length > 0) {
+            tasksContainer.innerHTML = filteredTasks.map(task => {
+                const canPauseTask = canPause(task.status);
+                const canResumeTask = canResume(task.status);
+                const canTerminateTask = canTerminate(task.status);
+                const showActions = canPerformActions(task.status);
+
+                return `
+                <tr class="task-row" data-task-id="${task.id}">
+                    <td class="task-info">
+                        <div class="task-name">${highlightText(task.name || 'Unnamed task', searchTerm)}</div>
+                        <div class="task-id">ID: ${task.id}</div>
+                    </td>
+                    <td><span class="task-type">${task.type || 'N/A'}</span></td>
+                    <td>
+                        <span class="task-status status-${task.status.toLowerCase()}"><span class="status-indicator"></span>${task.status.toLowerCase()}</span>
+                    </td>
+                    <td>${formatDuration(task.duration)}</td>
+                    <td>
+                        ${showActions ? `
+                        <div class="task-actions">
+                            ${canTerminateTask ? `
+                            <button class="action-button terminate-button"
+                                    onclick="handleAction('${task.id}', 'terminate', '${task.type || ''}')">
+                                Terminate
+                            </button>
+                            ` : ''}
+
+                            ${canPauseTask ? `
+                            <button class="action-button pause-button"
+                                    onclick="handleAction('${task.id}', 'pause', '${task.type || ''}')">
+                                Pause
+                            </button>
+                            ` : ''}
+
+                            ${canResumeTask ? `
+                            <button class="action-button resume-button"
+                                    onclick="handleAction('${task.id}', 'resume', '${task.type || ''}')">
+                                Resume
+                            </button>
+                            ` : ''}
+                        </div>
+                        ` : '<span style="color: var(--secondary); font-size: 0.8rem;">No actions</span>'}
+                    </td>
+                </tr>
+                ${task.error_info ? `
+                <tr class="task-row">
+                    <td colspan="5">
+                        <div class="error-info"><strong>Error:</strong> ${task.error_info}</div>
+                    </td>
+                </tr>
+                ` : ''}
+            `}).join('');
+        } else {
+            tasksContainer.innerHTML = `
+                <tr>
+                    <td colspan="5">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🔍</div>
+                            <div class="empty-state-title">No tasks found</div>
+                            <div class="empty-state-description">No tasks match your search criteria</div>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+    } else {
+        showNoTasksState();
+    }
+
+    updateTimestamp();
+    }
+
+    // Update last refresh timestamp
+    function updateTimestamp() {
+        document.getElementById('timestamp').textContent =
+            `Last updated: ${new Date().toLocaleString()}`;
+    }
+
+    // Fetch data from server or use mock data
+    let currentData = null;
+    let currentSearchTerm = '';
+
+    async function fetchData() {
+        try {
+            // Try to fetch from real API first
+            const response = await fetch('/tasks');
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+            const text = await response.text();
+            const data = text.trim().toLowerCase() === 'nan' ? "nan" : JSON.parse(text);
+
+            currentData = data;
+            updatePage(data, currentSearchTerm);
+        } catch (error) {
+            console.log('Using mock data due to fetch error:', error);
+
+            // Fallback to mock data if API fails
+            currentData = {
+                running_count: 2,
+                failed_count: 1,
+                completed_count: 5,
+                tasks: [
+                    {
+                        id: "task-001",
+                        name: "Process Data",
+                        type: "data",
+                        status: "Running",
+                        duration: 125
+                    },
+                    {
+                        id: "task-002",
+                        name: "Generate Report",
+                        type: "report",
+                        status: "Completed",
+                        duration: 45
+                    },
+                    {
+                        id: "task-003",
+                        name: "Backup Database",
+                        type: "database",
+                        status: "Failed",
+                        duration: 300,
+                        error_info: "Connection timeout"
+                    },
+                    {
+                        id: "task-004",
+                        name: "Send Notifications",
+                        type: "email",
+                        status: "Waiting",
+                        duration: null
+                    },
+                    {
+                        id: "task-005",
+                        name: "Data Analysis",
+                        type: "analysis",
+                        status: "Paused",
+                        duration: 180
+                    },
+                    {
+                        id: "task-006",
+                        name: "Cleanup Job",
+                        type: "maintenance",
+                        status: "Cancelled",
+                        duration: null
+                    },
+                    {
+                        id: "task-007",
+                        name: "Data Sync",
+                        type: "sync",
+                        status: "Queuing",
+                        duration: null
+                    },
+                    {
+                        id: "task-008",
+                        name: "Image Processing",
+                        type: "media",
+                        status: "Waiting",
+                        duration: null
+                    }
+                ]
+            };
+
+            updatePage(currentData, currentSearchTerm);
+        }
+    }
+
+    // Search functionality
+    const searchInput = document.getElementById('searchInput');
+    const searchButton = document.getElementById('searchButton');
+
+    searchButton.addEventListener('click', () => {
+        currentSearchTerm = searchInput.value.trim();
+        if (currentData) {
+            updatePage(currentData, currentSearchTerm);
+        }
+    });
+
+    searchInput.addEventListener('keyup', (e) => {
+        if (e.key === 'Enter') {
+            currentSearchTerm = searchInput.value.trim();
+            if (currentData) {
+                updatePage(currentData, currentSearchTerm);
+            }
+        }
+    });
+
+    // Initial load
+    fetchData();
+
+    // Auto-refresh every 5 seconds
+    setInterval(fetchData, 5000);
+</script>
+</body>
+</html>

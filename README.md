@@ -89,7 +89,7 @@ if __name__ == "__main__":
 - Start monitoring page
 
 ```
-from task_scheduling.task_info import start_task_status_ui
+from task_scheduling.web_ui import start_task_status_ui
 
 # Launch the web interface and visit: http://localhost:8000
 start_task_status_ui()
@@ -247,7 +247,7 @@ async def example_io_intensive_function():
 
 
 if __name__ == "__main__":
-    from task_scheduling.task_data import FunctionRunner
+    from task_scheduling.check import FunctionRunner
 
     cpu_runner = FunctionRunner(example_cpu_intensive_function, "CPU_Task", 10000, 2)
     cpu_runner.run()
@@ -273,7 +273,7 @@ Parameter Description:
 ### Usage Example:
 
 ```
-from task_scheduling.task_data task_function_type
+from task_scheduling.check task_function_type
 from task_scheduling.variable import *
 
 task_function_type.append_to_dict("CPU_Task", scheduler_cpu)
@@ -338,7 +338,7 @@ import time
 from task_scheduling.variable import *
 
 if __name__ == "__main__":
-    from task_scheduling.task_info import get_tasks_info
+    from task_scheduling.manager import get_tasks_info
     from task_scheduling.task_creation import task_creation, shutdown
 
     task_creation(None, None, scheduler_io, True, "task1", lambda: time.sleep(2), priority_low)
@@ -438,15 +438,13 @@ if __name__ == "__main__":
 
 ```
 
-- force_stop_task(task_id: str, main_task: bool) -> bool:
+- force_stop_task(task_id: str) -> bool:
 
 Forcefully terminate a running task.
 
 Parameter Description:
 
 **task_id**: The ID of the task to terminate.
-
-**main_task**: Whether it is the main task (only needs to be specified for CPU-intensive linear tasks).
 
 Return Value: Boolean indicating whether the termination was successful.
 
@@ -644,8 +642,6 @@ In the main thread, use `task_signal_transmission.put((_sharedtaskdict.read(task
 
 Outside the main thread, you can use APIs such as `cpu_liner_task.force_stop_task()` mentioned above.
 
-`cpu_liner_task.force_stop_task()` is quite special. In the `cpu_liner_task` scheduler, it also needs to accept a boolean parameter, which must be set to `False` to skip the check and close the branch thread.
-
 ### Usage Example:
 
 ```
@@ -677,7 +673,7 @@ update_config("thread_management", True)
 
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation, shutdown
-    from task_scheduling.task_info import start_task_status_ui
+    from task_scheduling.web_ui import start_task_status_ui
     from task_scheduling.variable import *
 
     start_task_status_ui()

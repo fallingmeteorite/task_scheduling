@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
-
 import inspect
 from typing import Callable
 

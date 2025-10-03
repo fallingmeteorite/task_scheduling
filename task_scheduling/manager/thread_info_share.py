@@ -1,6 +1,7 @@
+# -*- coding: utf-8 -*-
+# Author: fallingmeteorite
 import threading
-from typing import Any, Dict, Optional
-
+from typing import Any, Dict
 
 class SharedTaskDict:
     """

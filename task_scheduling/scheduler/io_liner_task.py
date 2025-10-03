@@ -13,7 +13,7 @@ from ..config import config
 from ..manager import task_status_manager
 from ..control import ThreadTaskManager, ThreadTerminator, StopException, ThreadingTimeout, TimeoutException, \
     ThreadSuspender
-from ..scheduler_tools import TaskCounter
+from ..tools import TaskCounter
 
 # Create Manager instance
 _task_manager = ThreadTaskManager()

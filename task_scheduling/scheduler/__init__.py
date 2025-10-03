@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# Author: fallingmeteorite
 # Linear task section
 from .cpu_asyncio_task import CpuAsyncioTask
 from .cpu_liner_task import CpuLinerTask

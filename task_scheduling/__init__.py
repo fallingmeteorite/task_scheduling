@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# Author: fallingmeteorite
 from .common import configure_logger
 
 # Initialize logger configuration at module load

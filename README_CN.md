@@ -82,7 +82,7 @@ if __name__ == "__main__":
 - 开启监视页面
 
 ```
-from task_scheduling.task_info import start_task_status_ui
+from task_scheduling.web_ui import start_task_status_ui
 
 # Launch the web interface and visit: http://localhost:8000
 start_task_status_ui()
@@ -240,7 +240,7 @@ async def example_io_intensive_function():
 
 
 if __name__ == "__main__":
-    from task_scheduling.task_data import FunctionRunner
+    from task_scheduling.check import FunctionRunner
 
     cpu_runner = FunctionRunner(example_cpu_intensive_function, "CPU_Task", 10000, 2)
     cpu_runner.run()
@@ -266,7 +266,7 @@ if __name__ == "__main__":
 ### 使用示例:
 
 ```
-from task_scheduling.task_data task_function_type
+from task_scheduling.check task_function_type
 from task_scheduling.variable import *
 
 task_function_type.append_to_dict("CPU_Task", scheduler_cpu)
@@ -331,7 +331,7 @@ import time
 from task_scheduling.variable import *
 
 if __name__ == "__main__":
-    from task_scheduling.task_info import get_tasks_info
+    from task_scheduling.manager import get_tasks_info
     from task_scheduling.task_creation import task_creation, shutdown
 
     task_creation(None, None, scheduler_io, True, "task1", lambda: time.sleep(2), priority_low)
@@ -431,15 +431,13 @@ if __name__ == "__main__":
 
 ```
 
-- force_stop_task(task_id: str, main_task: bool) -> bool:
+- force_stop_task(task_id: str) -> bool:
 
 强制终止运行中的任务。
 
 参数说明:
 
 **task_id**: 要终止的任务ID
-
-**main_task**: 是否为主任务(只需在cpu密集型线性任务中填写)
 
 返回值: 布尔值，表示终止是否成功
 
@@ -638,9 +636,6 @@ if __name__ == "__main__":
 
 在主线程外部可以使用`cpu_liner_task.force_stop_task()`等上面介绍的api
 
-`cpu_liner_task.force_stop_task()`较为特殊,在`cpu_liner_task`调度器中还要接受一个布尔参数,设置为`False`
-才能跳过检测去关闭分支线程`
-
 ### 使用示例:
 
 ```
@@ -672,7 +667,7 @@ update_config("thread_management", True)
 
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation, shutdown
-    from task_scheduling.task_info import start_task_status_ui
+    from task_scheduling.web_ui import start_task_status_ui
     from task_scheduling.variable import *
 
     start_task_status_ui()

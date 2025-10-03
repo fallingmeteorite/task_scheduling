@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
-
 import time
 
-from ..config import config
-from ..manager import task_status_manager
+from task_scheduling.config import config
+from task_scheduling.manager import task_status_manager
 
 
 def format_tasks_info(tasks_dict) -> str:

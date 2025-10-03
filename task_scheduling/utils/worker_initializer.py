@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
-
 import os
 import signal
 import sys

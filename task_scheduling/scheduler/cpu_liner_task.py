@@ -16,7 +16,7 @@ from ..control import ThreadTerminator, ProcessTaskManager, StopException, Threa
     ThreadSuspender
 from ..utils import worker_initializer
 
-from ..scheduler_tools import TaskCounter
+from ..tools import TaskCounter
 
 _task_counter = TaskCounter("cpu_liner_task")
 _threadsuspender = ThreadSuspender()
@@ -383,21 +383,21 @@ class CpuLinerTask:
             self._scheduler_thread.join()
 
     def force_stop_task(self,
-                        task_id: str,
-                        main_task: bool) -> bool:
+                        task_id: str) -> bool:
         """
         Force stop a task by its task ID.
 
         :param task_id: Task ID.
-        :param main_task: If the task is terminated as the main task, the flag is True.
 
         :return: bool: Whether the task was successfully force stopped.
         """
-        if self._running_tasks.get(task_id) is None and main_task:
+
+        if self._running_tasks.get(task_id) and not config["thread_management"]:
             logger.debug(f"Cpu linear task | {task_id} | does not exist or is already completed")
             return False
+
         # Handling situations on non-main threads
-        if main_task:
+        if self._running_tasks.get(task_id, None) is not None:
             future = self._running_tasks[task_id][0]
             if not future.running():
                 future.cancel()

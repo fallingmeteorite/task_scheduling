@@ -1,19 +1,22 @@
+# -*- coding: utf-8 -*-
+# Author: fallingmeteorite
 import os
 import shlex
 import sys
 
 from .task_creation import task_creation, shutdown
-from task_scheduling.task_info import start_task_status_ui
+from task_scheduling.web_ui import start_task_status_ui
 from .common.log_config import logger
 from task_scheduling import *
 
 
 def command_creation(task_name: str,
-                     command: str) -> str or None:
+                     command: str) -> str:
     def wrapper(command) -> None:
         os.system(command)
 
     return task_creation(None, None, scheduler_io, False, task_name, wrapper, priority_high, command)
+
 
 def parse_input(user_input):
     """Simplified input parsing"""

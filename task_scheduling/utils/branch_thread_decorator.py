@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+# Author: fallingmeteorite
 import time
 import uuid
 from functools import wraps
