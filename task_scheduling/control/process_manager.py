@@ -13,7 +13,8 @@ class ProcessTaskManager:
     __slots__ = ['_tasks',
                  '_operation_lock',  # Lock for dictionary operations
                  '_task_queue',
-                 '_start'
+                 '_start',
+                 '_main_task_id'
                  ]
 
     def __init__(self, task_queue: queue.Queue) -> None:
@@ -22,6 +23,7 @@ class ProcessTaskManager:
         self._task_queue = task_queue
         self._start: bool = True
         self._start_monitor_thread()  # Start the monitor thread
+        self._main_task_id = None  # Main thread
 
     def add(self, terminate_obj: Any, pause_ctx: Any, task_id: str) -> None:
         """
@@ -41,6 +43,8 @@ class ProcessTaskManager:
                     'terminate': terminate_obj,
                     'pause': pause_ctx
                 }
+                if self._main_task_id is None:
+                    self._main_task_id = task_id
 
     def remove(self, task_id: str) -> None:
         """
@@ -67,15 +71,9 @@ class ProcessTaskManager:
         """
         Blocking the main thread from ending while a child thread has not finished leads to errors.
         """
-        # Checking only starts when a branch thread is added, to prevent bypassing wait due to errors completing in the middle of thread startup.
-        while True:
-            if len(self._tasks) == 2:
-                break
-            time.sleep(0.1)
-
         # Prevent errors caused by branch threads still running after the main thread ends
         while True:
-            if len(self._tasks) == 1:
+            if threading.active_count() == 2:
                 break
             time.sleep(0.1)
 
@@ -88,26 +86,29 @@ class ProcessTaskManager:
             if task_id in self._tasks:
                 try:
                     self._tasks[task_id]['terminate'].terminate()  # Perform the terminate operation outside the lock
-                    # Used to remove branch threads
-                    del self._tasks[task_id]
                 except Exception as error:
                     logger.error(f"Error terminating task '{task_id}': {error}")
 
             else:
                 logger.warning(f"No task found with task_id '{task_id}', operation invalid")
 
-    def terminate_task_all(self) -> None:
+    def terminate_branch_task(self) -> None:
         """
         Terminate the all tasks based on task_id.
         """
         with self._operation_lock:  # Lock for thread-safe dictionary access
+            _tasks_copy = self._tasks.copy() # Copy the dictionary for modification
             for task_id in self._tasks:
-                try:
-                    self._tasks[task_id]['terminate'].terminate()  # Perform the terminate operation outside the lock
-                except Exception as error:
-                    logger.error(f"Error terminating task '{task_id}': {error}")
-            # Used to remove all threads
-            self._tasks = {}
+                if not task_id == self._main_task_id:
+                    try:
+                        self._tasks[task_id][
+                            'terminate'].terminate()  # Perform the terminate operation outside the lock
+                        del _tasks_copy[task_id]
+                    except Exception as error:
+                        logger.error(f"Error terminating task '{task_id}': {error}")
+
+            # Replace the processed dictionary
+            self._tasks = _tasks_copy
 
     def pause_task(self, task_id: str) -> None:
         """
@@ -118,6 +119,8 @@ class ProcessTaskManager:
             if task_id in self._tasks:
                 try:
                     self._tasks[task_id]['pause'].pause()
+                except RuntimeError:
+                    pass
                 except Exception as error:
                     logger.error(error)
 
@@ -134,6 +137,8 @@ class ProcessTaskManager:
             if task_id in self._tasks:
                 try:
                     self._tasks[task_id]['pause'].resume()
+                except RuntimeError:
+                    pass
                 except Exception as error:
                     logger.error(error)
             else:

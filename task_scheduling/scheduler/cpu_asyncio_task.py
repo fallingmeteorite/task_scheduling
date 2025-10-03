@@ -403,6 +403,8 @@ class CpuAsyncioTask:
         if not future.running():
             future.cancel()
         else:
+            # First ensure that the task is not paused.
+            self._task_signal_transmission.put((task_id, "resume"))
             self._task_signal_transmission.put((task_id, "kill"))
 
         self._task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
@@ -429,7 +431,7 @@ class CpuAsyncioTask:
         else:
             if action == "pause":
                 self._task_signal_transmission.put((task_id, "pause"))
-                self._task_status_queue.put(("waiting", task_id, None, None, None, None, None))
+                self._task_status_queue.put(("paused", task_id, None, None, None, None, None))
             elif action == "resume":
                 self._task_signal_transmission.put((task_id, "resume"))
                 self._task_status_queue.put(("running", task_id, None, None, None, None, None))

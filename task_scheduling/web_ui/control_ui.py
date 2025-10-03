@@ -214,7 +214,7 @@ class TaskControlHandler(BaseHTTPRequestHandler):
             bool: True if successful, False otherwise
         """
         try:
-            
+
             if task_type == "cpu_liner_task":
                 cpu_liner_task.force_stop_task(task_id)
             elif task_type == "cpu_asyncio_task":

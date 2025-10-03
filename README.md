@@ -1,5 +1,5 @@
-- [English version](./README.md)
-- [中文版本](./README_CN.md)
+- [English version](https://github.com/fallingmeteorite/task_scheduling/blob/main/README.md)
+- [中文版本](https://github.com/fallingmeteorite/task_scheduling/blob/main/README_CN.md)
 
 # Task Scheduling Library
 
@@ -688,6 +688,13 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         shutdown(True)
 ```
+
+## Web Control Panel
+![01.png](https://github.com/fallingmeteorite/task_scheduling/blob/main/img/01.png)
+
+- Monitor task execution status
+
+- Can control tasks ('Terminate', 'Pause', 'Resume')
 
 ## Configuration
 

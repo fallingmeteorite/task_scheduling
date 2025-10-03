@@ -81,7 +81,6 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
         logger.warning(f"Cpu linear task | {task_id} | timed out, forced termination")
         task_status_queue.put(("timeout", task_id, None, None, None, None, None))
         return_results = "error happened"
-        task_manager.wait()
 
     except Exception as e:
         if config["exception_thrown"]:
@@ -92,11 +91,12 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
         return_results = "error happened"
 
     finally:
-        task_manager.remove(task_id)
-
         # Terminate all other threads under the main thread
         if config["thread_management"]:
-            task_manager.terminate_task_all()
+            task_manager.terminate_branch_task()
+
+        # Remove main thread logging
+        task_manager.remove(task_id)
 
         if return_results != "error happened":
             try:
@@ -402,8 +402,12 @@ class CpuLinerTask:
             if not future.running():
                 future.cancel()
             else:
+                # First ensure that the task is not paused.
+                self._task_signal_transmission.put((task_id, "resume"))
                 self._task_signal_transmission.put((task_id, "kill"))
         else:
+            # First ensure that the task is not paused.
+            self._task_signal_transmission.put((task_id, "resume"))
             self._task_signal_transmission.put((task_id, "kill"))
 
         self._task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
@@ -422,14 +426,14 @@ class CpuLinerTask:
         :param action: Task action.
         :return: bool: Whether the task was successfully pause and resume.
         """
-        if self._running_tasks.get(task_id) is None:
+        if self._running_tasks.get(task_id) is None and not config["thread_management"]:
             logger.debug(f"Cpu linear task | {task_id} | does not exist or is already completed")
             return False
 
         else:
             if action == "pause":
                 self._task_signal_transmission.put((task_id, "pause"))
-                self._task_status_queue.put(("waiting", task_id, None, None, None, None, None))
+                self._task_status_queue.put(("paused", task_id, None, None, None, None, None))
             elif action == "resume":
                 self._task_signal_transmission.put((task_id, "resume"))
                 self._task_status_queue.put(("running", task_id, None, None, None, None, None))

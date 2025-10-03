@@ -683,6 +683,13 @@ if __name__ == "__main__":
         shutdown(True)
 ```
 
+## 网页控制端
+![01.png](https://github.com/fallingmeteorite/task_scheduling/blob/main/img/01.png)
+
+- 观察任务运行状态
+
+- 可以控制任务(`终止`,`暂停`,`恢复`)
+
 ## 配置
 
 文件存储在:`task_scheduling/config/config.yaml`

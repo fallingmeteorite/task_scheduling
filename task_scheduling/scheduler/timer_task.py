@@ -368,6 +368,8 @@ class TimerTask:
         if not future.running():
             future.cancel()
         else:
+            # First ensure that the task is not paused.
+            _task_manager.resume_task(task_id)
             _task_manager.terminate_task(task_id)
 
         task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None, None)
@@ -391,7 +393,7 @@ class TimerTask:
         else:
             if action == "pause":
                 _task_manager.pause_task(task_id)
-                task_status_manager.add_task_status(task_id, None, "waiting", None, None, None, None, None)
+                task_status_manager.add_task_status(task_id, None, "paused", None, None, None, None, None)
             elif action == "resume":
                 _task_manager.resume_task(task_id)
                 task_status_manager.add_task_status(task_id, None, "running", None, None, None, None, None)

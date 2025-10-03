@@ -113,6 +113,8 @@ class ThreadTaskManager:
             if task_id in self._tasks:
                 try:
                     self._tasks[task_id]['pause'].pause()
+                except RuntimeError:
+                    pass
                 except Exception as error:
                     logger.error(error)
             else:
@@ -128,6 +130,8 @@ class ThreadTaskManager:
             if task_id in self._tasks:
                 try:
                     self._tasks[task_id]['pause'].resume()
+                except RuntimeError:
+                    pass
                 except Exception as error:
                     logger.error(error)
             else:

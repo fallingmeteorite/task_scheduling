@@ -30,37 +30,40 @@ def branch_thread_control(share_info, _sharedtaskdict, timeout_processing, task_
             _sharedtaskdict.write(task_name, task_id)
             task_status_queue.put(("running", task_id, task_name, time.time(), None, None, timeout_processing))
             with _threadterminator.terminate_control() as terminate_ctx:
-                try:
-                    return_results = None
-                    task_manager.add(terminate_ctx, None, task_id)
-                    if timeout_processing:
-                        with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
+                with _threadsuspender.suspend_context() as pause_ctx:
+                    try:
+                        return_results = None
+                        task_manager.add(terminate_ctx, pause_ctx, task_id)
+                        if timeout_processing:
+                            with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
+                                return func(*args, **kwargs)
+                        else:
                             return func(*args, **kwargs)
-                    else:
-                        return func(*args, **kwargs)
 
-                except StopException:
-                    logger.warning(f"task | {task_id} | cancelled, forced termination")
-                    task_status_queue.put(("cancelled", task_id, None, None, time.time(), None, None))
+                    except StopException:
+                        logger.warning(f"task | {task_id} | cancelled, forced termination")
+                        task_status_queue.put(("cancelled", task_id, None, None, time.time(), None, None))
+                        return_results = "error happened"
 
-                except TimeoutException:
-                    logger.warning(f"task | {task_id} | timed out, forced termination")
-                    task_status_queue.put(("timeout", task_id, None, None, None, None, None))
-                    return_results = "error happened"
+                    except TimeoutException:
+                        logger.warning(f"task | {task_id} | timed out, forced termination")
+                        task_status_queue.put(("timeout", task_id, None, None, None, None, None))
+                        return_results = "error happened"
 
-                except Exception as error:
-                    # Whether to throw an exception
-                    if config["exception_thrown"]:
-                        raise
+                    except Exception as error:
+                        # Whether to throw an exception
+                        if config["exception_thrown"]:
+                            raise
 
-                    logger.error(f"task | {task_id} | execution failed: {error}")
-                    task_status_queue.put(("failed", task_id, None, None, time.time(), None, error))
-                    return_results = "error happened"
+                        logger.error(f"task | {task_id} | execution failed: {error}")
+                        task_status_queue.put(("failed", task_id, None, None, time.time(), None, error))
+                        return_results = "error happened"
 
-                finally:
-                    if return_results is None:
-                        task_status_queue.put(("completed", task_id, None, None, time.time(), None, None))
-                    task_manager.remove(task_id)
+                    finally:
+                        if return_results is None:
+                            task_status_queue.put(("completed", task_id, None, None, time.time(), None, None))
+                        task_manager.remove(task_id)
+
 
         return wrapper
 
