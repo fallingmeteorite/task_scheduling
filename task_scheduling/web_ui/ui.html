@@ -21,6 +21,7 @@
             --card-bg: #ffffff;
             --border-color: #e0e0e0;
             --waiting: #9c27b0;
+            --border-radius: 4px; /* Reduce corner radius size */
         }
 
         .dark-theme {
@@ -54,9 +55,9 @@
 
         h1 {
             color: var(--text-color);
-            font-weight: 500;
+            font-weight: 600;
             margin-bottom: 24px;
-            font-size: 1.6rem;
+            font-size: 1.8rem;
         }
 
         .summary-container {
@@ -80,10 +81,11 @@
 
         .summary-card {
             background: var(--card-bg);
-            border-radius: 16px;
+            border-radius: var(--border-radius);
             padding: 20px;
             text-align: center;
             border: 1px solid var(--border-color);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
         }
 
         .total-summary-card {
@@ -94,6 +96,7 @@
             font-size: 0.85rem;
             color: var(--secondary);
             margin-bottom: 8px;
+            font-weight: 500;
         }
 
         .total-summary-card .summary-label {
@@ -102,7 +105,7 @@
 
         .summary-value {
             font-size: 1.6rem;
-            font-weight: 500;
+            font-weight: 600;
             margin: 0;
         }
 
@@ -147,7 +150,7 @@
         .search-input {
             flex: 1;
             padding: 12px 16px;
-            border-radius: 16px;
+            border-radius: var(--border-radius);
             border: 1px solid var(--border-color);
             background-color: var(--card-bg);
             color: var(--text-color);
@@ -162,13 +165,14 @@
 
         .search-button {
             padding: 12px 24px;
-            border-radius: 16px;
+            border-radius: var(--border-radius);
             border: none;
             background-color: var(--primary);
             color: var(--card-bg);
             font-size: 0.9rem;
             cursor: pointer;
             transition: background-color 0.3s;
+            font-weight: 500;
         }
 
         .search-button:hover {
@@ -182,7 +186,7 @@
             max-height: 60vh;
             overflow-y: auto;
             border: 1px solid var(--border-color);
-            border-radius: 16px;
+            border-radius: var(--border-radius);
         }
 
         .task-table {
@@ -199,7 +203,7 @@
             padding: 14px 20px;
             background-color: var(--card-bg);
             color: var(--secondary);
-            font-weight: 500;
+            font-weight: 600;
             font-size: 0.8rem;
             border-bottom: 1px solid var(--border-color);
         }
@@ -239,7 +243,7 @@
         .task-type {
             display: inline-block;
             padding: 4px 12px;
-            border-radius: 12px;
+            border-radius: 6px;
             background-color: var(--light);
             color: var(--text-color);
             font-size: 0.75rem;
@@ -251,7 +255,7 @@
             align-items: center;
             justify-content: center;
             padding: 6px 12px;
-            border-radius: 12px;
+            border-radius: 6px;
             font-size: 0.75rem;
             font-weight: 500;
             width: 100%;
@@ -310,7 +314,7 @@
             font-size: 0.8rem;
             padding: 8px 16px;
             background-color: rgba(244, 67, 54, 0.05);
-            border-radius: 8px;
+            border-radius: 6px;
             margin-top: 4px;
             word-break: break-word;
         }
@@ -328,7 +332,7 @@
             right: 20px;
             background: var(--card-bg);
             border: 1px solid var(--border-color);
-            border-radius: 20px;
+            border-radius: var(--border-radius);
             padding: 5px;
             display: flex;
             cursor: pointer;
@@ -337,7 +341,7 @@
 
         .theme-toggle span {
             padding: 5px 12px;
-            border-radius: 15px;
+            border-radius: 6px;
             font-size: 0.75rem;
             transition: all 0.3s;
         }
@@ -397,7 +401,7 @@
         .action-button {
             padding: 6px 12px;
             border: none;
-            border-radius: 8px;
+            border-radius: 6px;
             font-size: 0.75rem;
             font-weight: 500;
             cursor: pointer;
@@ -476,9 +480,9 @@
 
         .notification {
             background: var(--card-bg);
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             padding: 16px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             border-left: 4px solid var(--primary);
             display: flex;
             align-items: flex-start;
@@ -681,7 +685,8 @@
 </div>
 
 <div class="search-container">
-    <label for="searchInput"></label><input type="text" class="search-input" id="searchInput" placeholder="Search tasks by name...">
+    <label for="searchInput"></label><input type="text" class="search-input" id="searchInput"
+                                            placeholder="Search tasks by name...">
     <button class="search-button" id="searchButton">Search</button>
 </div>
 
