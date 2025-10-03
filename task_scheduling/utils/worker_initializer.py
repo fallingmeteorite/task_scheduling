@@ -15,7 +15,7 @@ def worker_initializer():
 
     def signal_handler(signum, frame):
         # Ignore the monitoring thread itself.
-        if threading.active_count() == 1:
+        if threading.active_count() <= 1:
             logger.debug(f"Worker {os.getpid()}. Perform cleaning")
             sys.exit(0)
         else:
