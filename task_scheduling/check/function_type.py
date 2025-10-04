@@ -55,7 +55,7 @@ class TaskFunctionType:
         with open(f"{cls._get_package_directory()}/task_type.pkl", 'wb') as file:
             cls._write_to_file(file, _tasks_dict)
         cls._cache_dict[task_name] = function_type
-        logger.info(f"The task name {task_name} and its function type {function_type} have been added.")
+        logger.warning(f"The task name {task_name} and its function type {function_type} have been added.")
 
     @classmethod
     def read_from_dict(cls,
@@ -73,7 +73,7 @@ class TaskFunctionType:
             logger.info(f"Returning the function type for task name {task_name} from the cache.")
             return cls._cache_dict[task_name]
         else:
-            logger.info(f"The task name {task_name} is not in the cache, reading from the file.")
+            logger.warning(f"The task name {task_name} is not in the cache, reading from the file.")
             _tasks_dict = cls._init_dict()
             cls._cache_dict = _tasks_dict  # Update cache
             return _tasks_dict.get(task_name, None)

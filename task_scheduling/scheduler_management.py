@@ -168,7 +168,7 @@ class TaskScheduler:
         """
         Check for tasks that have exceeded their timeout time based on task start times.
         """
-        logger.warning("Start checking the status of all tasks and fix them")
+        logger.info("Start checking the status of all tasks and fix them")
         current_time = time.time()
         for task_id, task_status in task_status_manager.task_status_dict.items():
             if task_status['status'] == "running" and task_status['is_timeout_enabled']:

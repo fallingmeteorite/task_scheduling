@@ -172,6 +172,8 @@ Parameter Description:
 
 Return Value: Boolean indicating whether the operation was successful.
 
+!!!During pause, the timeout timer is still running. If you need to use the pause function, it is recommended to disable the timeout handling!!!
+
 ### Usage Example:
 
 ```
@@ -638,7 +640,7 @@ All branch threads' running status can be viewed on the web interface (to enable
 
 Here are two control functions:
 
-In the main thread, use `task_signal_transmission.put((_sharedtaskdict.read(task_name), "action"))`. The action can be set to `kill`, `pause`, or `resume`.
+In the main thread, using `task_signal_transmission[_sharedtaskdict.read(task_name)] = ["action"]`, the action can be set to `kill`, `pause`, `resume`, or you can specify several actions in sequence.
 
 Outside the main thread, you can use APIs such as `cpu_liner_task.force_stop_task()` mentioned above.
 
@@ -665,7 +667,7 @@ def main_task(share_info, _sharedtaskdict, task_signal_transmission, input_info)
 
     # Use this statement to terminate the branch thread
     # time.sleep(4)
-    # task_signal_transmission.put((_sharedtaskdict.read(task_name), "kill"))
+    # task_signal_transmission[_sharedtaskdict.read(task_name)] = ["kill"]
 
 
 from task_scheduling.config import update_config
@@ -691,6 +693,8 @@ if __name__ == "__main__":
 
 ## Web Control Panel
 ![01.png](https://github.com/fallingmeteorite/task_scheduling/blob/main/img/01.png)
+
+Task status UI available at http://localhost:8000
 
 - Monitor task execution status
 

@@ -101,7 +101,7 @@ class IoAsyncioTask:
 
                 return True
         except Exception as e:
-            logger.debug(f"Io asyncio task | {task_id} | error adding task: {e}")
+            logger.debug(f"task | {task_id} | error adding task: {e}")
             return e
 
     # Start the scheduler
@@ -135,7 +135,7 @@ class IoAsyncioTask:
         with self._scheduler_lock:
             # Check if all tasks are completed
             if not self._task_queues[task_name].empty() or len(self._running_tasks) != 0:
-                logger.debug(f"Io asyncio task was detected to be running, and the task stopped terminating")
+                logger.debug(f"task was detected to be running, and the task stopped terminating")
                 return None
 
             self._scheduler_stop_event.set()
@@ -182,7 +182,7 @@ class IoAsyncioTask:
             # Check if all tasks are completed
             if not all(q.empty() for q in self._task_queues.values()) or len(self._running_tasks) != 0:
                 if system_operations:
-                    logger.debug(f"Io asyncio task was detected to be running, and the task stopped terminating")
+                    logger.debug(f"task was detected to be running, and the task stopped terminating")
                     return None
 
             if force_cleanup:
@@ -283,7 +283,7 @@ class IoAsyncioTask:
                 # Modify the task status
                 task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None, None, None)
 
-                logger.debug(f"Start running io asyncio task | {task_id} | ")
+                logger.debug(f"Start running task | {task_id} | ")
 
                 # If the task needs timeout processing, set the timeout time
                 if timeout_processing:
@@ -296,11 +296,11 @@ class IoAsyncioTask:
                 task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None, None)
 
         except asyncio.TimeoutError:
-            logger.warning(f"Io asyncio task | {task_id} | timed out, forced termination")
+            logger.warning(f"task | {task_id} | timed out, forced termination")
             task_status_manager.add_task_status(task_id, None, "timeout", None, None, None, None, None)
             return_results = "error happened"
         except asyncio.CancelledError:
-            logger.warning(f"Io asyncio task | {task_id} | was cancelled")
+            logger.warning(f"task | {task_id} | was cancelled")
             task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None,
                                                 None, None)
             return_results = "error happened"
@@ -308,7 +308,7 @@ class IoAsyncioTask:
             if config["exception_thrown"]:
                 raise
 
-            logger.error(f"Io asyncio task | {task_id} | execution failed: {e}")
+            logger.error(f"task | {task_id} | execution failed: {e}")
             task_status_manager.add_task_status(task_id, None, "failed", None, None, e, None, None)
             return_results = "error happened"
 
@@ -403,7 +403,7 @@ class IoAsyncioTask:
         """
         # Read operation, no need to hold a lock
         if self._running_tasks.get(task_id, None):
-            logger.debug(f"Io asyncio task | {task_id} | does not exist or is already completed")
+            logger.debug(f"task | {task_id} | does not exist or is already completed")
             return False
 
         future = self._running_tasks[task_id][0]
@@ -428,7 +428,7 @@ class IoAsyncioTask:
         :return: bool: Whether the task was successfully pause and resume.
         """
         if not self._running_tasks.get(task_id, None):
-            logger.debug(f"Io asyncio task | {task_id} | does not exist or is already completed")
+            logger.debug(f"task | {task_id} | does not exist or is already completed")
             return False
 
         else:
@@ -486,4 +486,4 @@ class IoAsyncioTask:
                 if task_name in self._scheduler_threads and self._scheduler_threads[task_name].is_alive():
                     self._scheduler_threads[task_name].join(timeout=1.0)  # Wait up to 1 second
             except Exception as e:
-                logger.debug(f"Io asyncio task | stopping event loop | error occurred: {e}")
+                logger.debug(f"task | stopping event loop | error occurred: {e}")

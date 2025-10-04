@@ -6,7 +6,6 @@ import ctypes
 import platform
 from contextlib import contextmanager
 from typing import Dict
-from ..common import logger
 
 
 class ThreadSuspender:
@@ -57,18 +56,14 @@ class ThreadSuspender:
             if tid in self._handles:
                 return True
 
-            try:
-                if self.platform == "Windows":
-                    handle = self._kernel32.OpenThread(self.THREAD_ACCESS, False, tid)
-                    if not handle:
-                        raise ctypes.WinError()
-                    self._handles[tid] = handle
-                else:
-                    self._handles[tid] = tid
-                return True
-            except Exception as e:
-                logger.error(f"Failed to register thread {tid}: {e}")
-                return False
+            if self.platform == "Windows":
+                handle = self._kernel32.OpenThread(self.THREAD_ACCESS, False, tid)
+                if not handle:
+                    raise ctypes.WinError()
+                self._handles[tid] = handle
+            else:
+                self._handles[tid] = tid
+            return True
 
     def _unregister_thread(self, tid: int) -> bool:
         """Internal method: Unregister a thread"""
@@ -76,14 +71,10 @@ class ThreadSuspender:
             if tid not in self._handles:
                 return False
 
-            try:
-                if self.platform == "Windows":
-                    self._kernel32.CloseHandle(self._handles[tid])
-                del self._handles[tid]
-                return True
-            except Exception as e:
-                logger.error(f"Failed to unregister thread {tid}: {e}")
-                return False
+            if self.platform == "Windows":
+                self._kernel32.CloseHandle(self._handles[tid])
+            del self._handles[tid]
+            return True
 
     def _pause_thread(self, tid: int) -> bool:
         """Internal method: Pause a thread"""
@@ -91,17 +82,13 @@ class ThreadSuspender:
             if tid not in self._handles:
                 return False
 
-            try:
-                if self.platform == "Windows":
-                    if self._kernel32.SuspendThread(self._handles[tid]) == -1:
-                        raise ctypes.WinError()
-                else:
-                    if self._libc.pthread_kill(tid, 19) != 0:  # SIGSTOP
-                        raise RuntimeError("Failed to pause thread")
-                return True
-            except Exception as e:
-                logger.error(f"Failed to pause thread {tid}: {e}")
-                return False
+            if self.platform == "Windows":
+                if self._kernel32.SuspendThread(self._handles[tid]) == -1:
+                    raise ctypes.WinError()
+            else:
+                if self._libc.pthread_kill(tid, 19) != 0:  # SIGSTOP
+                    raise RuntimeError("Failed to pause thread")
+            return True
 
     def _resume_thread(self, tid: int) -> bool:
         """Internal method: Resume a thread"""
@@ -109,18 +96,13 @@ class ThreadSuspender:
             if tid not in self._handles:
                 return False
 
-            try:
-                if self.platform == "Windows":
-                    if self._kernel32.ResumeThread(self._handles[tid]) == -1:
-                        raise ctypes.WinError()
-                else:
-                    if self._libc.pthread_kill(tid, 18) != 0:  # SIGCONT
-                        raise RuntimeError("Failed to resume thread")
-                return True
-            except Exception as e:
-                logger.error(f"Failed to resume thread {tid}: {e}")
-                return False
-
+            if self.platform == "Windows":
+                if self._kernel32.ResumeThread(self._handles[tid]) == -1:
+                    raise ctypes.WinError()
+            else:
+                if self._libc.pthread_kill(tid, 18) != 0:  # SIGCONT
+                    raise RuntimeError("Failed to resume thread")
+            return True
 
 class _ThreadControl:
     """Thread control interface (for internal use only)"""

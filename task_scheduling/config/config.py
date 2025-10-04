@@ -68,30 +68,6 @@ def update_config(key: str,
         return error  # Return False indicating update failure
 
 
-def _save_config(_file_path: str = None) -> bool:
-    """
-    Save the current in-memory configuration to the configuration file.
-
-    Args:
-        _file_path (str): Path to the configuration file. If not provided, defaults to 'config.yaml' in the package directory.
-
-    Returns:
-        bool: Whether the configuration was successfully saved to the file.
-    """
-    if _file_path is None:
-        _file_path = f'{_get_package_directory()}/config.yaml'
-
-    try:
-        with open(_file_path, 'w', encoding='utf-8') as f:
-            global config
-            yaml.safe_dump(config, f, default_flow_style=False, allow_unicode=True)
-        logger.info("Configuration saved to file successfully")
-        return True
-    except Exception as error:
-        logger.error(f"Unknown error occurred while saving configuration to file: {error}")
-    return False
-
-
 def ensure_config_loaded():
     """
     Ensure that the configuration file is loaded into the global variable `config`.

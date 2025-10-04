@@ -4,8 +4,10 @@ import queue
 import threading
 import time
 import math
+
 from concurrent.futures import ProcessPoolExecutor, Future, BrokenExecutor
 from functools import partial
+from multiprocessing.managers import DictProxy
 from multiprocessing import Manager
 from typing import Callable, Dict, Tuple, Optional, Any
 
@@ -25,7 +27,7 @@ _threadterminator = ThreadTerminator()
 
 def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
                   task_status_queue: queue.Queue,
-                  task_signal_transmission: queue.Queue) -> Any:
+                  task_signal_transmission: DictProxy) -> Any:
     """
     Execute a task and handle its status.
 
@@ -38,7 +40,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
             - args (Tuple): Arguments to pass to the function.
             - kwargs (Dict): Keyword arguments to pass to the function.
         task_status_queue (queue.Queue): Queue to update task status.
-        task_signal_transmission (queue.Queue): Queue to transmission signal.
+        task_signal_transmission (DictProxy): Dict to transmission signal.
 
     Returns:
         Any: Result of the task execution or error message.
@@ -56,7 +58,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
                 task_manager.add(terminate_ctx, pause_ctx, task_id)
 
                 task_status_queue.put(("running", task_id, None, time.time(), None, None, None))
-                logger.debug(f"Start running cpu linear task, task ID: {task_id}")
+                logger.debug(f"Start running task, task ID: {task_id}")
                 if timeout_processing:
                     with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
                         # Whether to pass in the task manager to facilitate other thread management
@@ -72,13 +74,13 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
 
 
     except (StopException, KeyboardInterrupt):
-        logger.warning(f"Cpu linear task | {task_id} | cancelled, forced termination")
+        logger.warning(f"task | {task_id} | cancelled, forced termination")
         task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
         return_results = "error happened"
 
     except TimeoutException:
         # Terminate all other threads under the main thread
-        logger.warning(f"Cpu linear task | {task_id} | timed out, forced termination")
+        logger.warning(f"task | {task_id} | timed out, forced termination")
         task_status_queue.put(("timeout", task_id, None, None, None, None, None))
         return_results = "error happened"
 
@@ -86,7 +88,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
         if config["exception_thrown"]:
             raise
 
-        logger.error(f"Cpu linear task | {task_id} | execution failed: {e}")
+        logger.error(f"task | {task_id} | execution failed: {e}")
         task_status_queue.put(("failed", task_id, None, None, None, e, None))
         return_results = "error happened"
 
@@ -117,7 +119,8 @@ class CpuLinerTask:
         '_scheduler_started', '_scheduler_stop_event', '_scheduler_thread',
         '_idle_timer', '_idle_timeout', '_idle_timer_lock',
         '_task_results',
-        '_manager', '_task_status_queue', '_task_signal_transmission',
+        '_manager', '_task_status_queue',
+        '_task_signal_transmission',
         '_executor', '_status_thread'
     ]
 
@@ -144,7 +147,7 @@ class CpuLinerTask:
 
         self._manager = Manager()
         self._task_status_queue = self._manager.Queue()  # Queue for task status updates
-        self._task_signal_transmission = self._manager.Queue()  # Queue for task status updates
+        self._task_signal_transmission = self._manager.dict()  # Dict for task status updates
 
         self._executor: Optional[ProcessPoolExecutor] = None
 
@@ -220,7 +223,7 @@ class CpuLinerTask:
 
                 return True
         except Exception as e:
-            logger.debug(f"Cpu linear task | {task_id} | error adding task: {e}")
+            logger.error(f"task | {task_id} | error adding task: {e}")
             return e
 
     def _start_scheduler(self) -> None:
@@ -246,11 +249,11 @@ class CpuLinerTask:
             # Check if there are any running tasks
             if not self._task_queue.empty() or not len(self._running_tasks) == 0:
                 if system_operations:
-                    logger.debug(f"Cpu liner task | detected running tasks | stopping operation terminated")
+                    logger.warning(f"Cpu liner task | detected running tasks | stopping operation terminated")
                     return None
 
             if force_cleanup:
-                logger.debug("Force stopping scheduler and cleaning up tasks")
+                logger.warning("Force stopping scheduler and cleaning up tasks")
                 self.stop_all_running_task()
 
             # Ensure the executor is properly shut down
@@ -286,9 +289,9 @@ class CpuLinerTask:
 
     def stop_all_running_task(self):
         for task_id in self._running_tasks.keys():
-            self._task_signal_transmission.put((task_id, "kill"))
+            self._task_signal_transmission[task_id] = ["kill"]
 
-        while not self._task_signal_transmission.qsize() == 0:
+        while not self._task_status_queue.qsize() == 0:
             time.sleep(0.1)
 
     def _scheduler(self) -> None:
@@ -337,7 +340,7 @@ class CpuLinerTask:
                         self._task_results[task_id] = result
         except (KeyboardInterrupt, BrokenExecutor):
             # Prevent problems caused by exit errors
-            logger.debug(f"Cpu linear task | {task_id} | cancelled, forced termination")
+            logger.warning(f"task | {task_id} | cancelled, forced termination")
             self._task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
 
         finally:
@@ -392,23 +395,23 @@ class CpuLinerTask:
         :return: bool: Whether the task was successfully force stopped.
         """
 
-        if self._running_tasks.get(task_id) and not config["thread_management"]:
-            logger.debug(f"Cpu linear task | {task_id} | does not exist or is already completed")
-            return False
+        if self._running_tasks.get(task_id) is None:
+            if not config["thread_management"]:
+                logger.warning(f"task | {task_id} | does not exist or is already completed")
+                return False
 
-        # Handling situations on non-main threads
-        if self._running_tasks.get(task_id, None) is not None:
+        if self._running_tasks.get(task_id) is None:
+            # First ensure that the task is not paused.
+            self._task_signal_transmission[task_id] = ["resume", "kill"]
+
+        else:
+            # Handling situations on non-main threads
             future = self._running_tasks[task_id][0]
             if not future.running():
                 future.cancel()
             else:
                 # First ensure that the task is not paused.
-                self._task_signal_transmission.put((task_id, "resume"))
-                self._task_signal_transmission.put((task_id, "kill"))
-        else:
-            # First ensure that the task is not paused.
-            self._task_signal_transmission.put((task_id, "resume"))
-            self._task_signal_transmission.put((task_id, "kill"))
+                self._task_signal_transmission[task_id] = ["resume", "kill"]
 
         self._task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
         with self._lock:
@@ -427,15 +430,16 @@ class CpuLinerTask:
         :return: bool: Whether the task was successfully pause and resume.
         """
         if self._running_tasks.get(task_id) is None and not config["thread_management"]:
-            logger.debug(f"Cpu linear task | {task_id} | does not exist or is already completed")
+            logger.warning(f"task | {task_id} | does not exist or is already completed")
             return False
 
         else:
             if action == "pause":
-                self._task_signal_transmission.put((task_id, "pause"))
+                # First ensure that the task is not paused.
+                self._task_signal_transmission[task_id] = ["pause"]
                 self._task_status_queue.put(("paused", task_id, None, None, None, None, None))
             elif action == "resume":
-                self._task_signal_transmission.put((task_id, "resume"))
+                self._task_signal_transmission[task_id] = ["resume"]
                 self._task_status_queue.put(("running", task_id, None, None, None, None, None))
 
         return True

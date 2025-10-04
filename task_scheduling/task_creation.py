@@ -32,8 +32,9 @@ def task_creation(delay: int or None, daily_time: str or None, function_type: st
     :return: A unique task ID.
     """
     # Check if func is a callable function
+
     if not callable(func):
-        logger.warning("The provided func is not a callable function")
+        logger.error("The provided func is not a callable function")
         return None
 
     # Generate a unique task ID

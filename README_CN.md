@@ -165,6 +165,8 @@ if __name__ == "__main__":
 
 返回值: 布尔值，表示操作是否成功
 
+!!!暂停时候,超时计时器还在运作,如果需要使用暂停功能建议关闭超时处理!!!
+
 ### 使用示例:
 
 ```
@@ -631,8 +633,8 @@ if __name__ == "__main__":
 
 这里提供两个控制函数:
 
-在主线程内使用`task_signal_transmission.put((_sharedtaskdict.read(task_name), "action"))` action可以填写为`kill`,
-`pause`, `resume`
+在主线程内使用`task_signal_transmission[_sharedtaskdict.read(task_name)] = ["action"]` action可以填写为`kill`,
+`pause`, `resume`, 也可以按顺序填写几个操作
 
 在主线程外部可以使用`cpu_liner_task.force_stop_task()`等上面介绍的api
 
@@ -659,7 +661,7 @@ def main_task(share_info, _sharedtaskdict, task_signal_transmission, input_info)
 
     # Use this statement to terminate the branch thread
     # time.sleep(4)
-    # task_signal_transmission.put((_sharedtaskdict.read(task_name), "kill"))
+    # task_signal_transmission[_sharedtaskdict.read(task_name)] = ["kill"]
 
 
 from task_scheduling.config import update_config
@@ -685,6 +687,8 @@ if __name__ == "__main__":
 
 ## 网页控制端
 ![01.png](https://github.com/fallingmeteorite/task_scheduling/blob/main/img/01.png)
+
+Task status UI available at http://localhost:8000
 
 - 观察任务运行状态
 

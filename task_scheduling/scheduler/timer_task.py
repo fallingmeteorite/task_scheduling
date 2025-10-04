@@ -3,6 +3,7 @@
 import queue
 import threading
 import time
+
 from concurrent.futures import ThreadPoolExecutor, Future
 from datetime import datetime, timedelta
 from functools import partial
@@ -46,7 +47,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
                 task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None,
                                                     None, None)
 
-            logger.debug(f"Start running timer task, task ID: {task_id}")
+            logger.debug(f"Start running task, task ID: {task_id}")
 
             if timeout_processing:
                 with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
@@ -58,12 +59,12 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
             _task_manager.remove(task_id)
 
     except TimeoutException:
-        logger.warning(f"Timer task | {task_id} | timed out, forced termination")
+        logger.warning(f"task | {task_id} | timed out, forced termination")
         task_status_manager.add_task_status(task_id, None, "timeout", None, None, None,
                                             None, None)
         return_results = "error happened"
     except StopException:
-        logger.warning(f"Timer task | {task_id} | cancelled, forced termination")
+        logger.warning(f"task | {task_id} | cancelled, forced termination")
         task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None,
                                             None, None)
         return_results = "error happened"
@@ -71,7 +72,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
         if config["exception_thrown"]:
             raise
 
-        logger.error(f"Timer task | {task_id} | execution failed: {e}")
+        logger.error(f"task | {task_id} | execution failed: {e}")
         task_status_manager.add_task_status(task_id, None, "failed", None, None, e,
                                             None, None)
         return_results = "error happened"
@@ -159,8 +160,8 @@ class TimerTask:
                         scheduled_time += timedelta(days=1)
                     execution_time = scheduled_time.timestamp()
                 else:
-                    logger.debug(f"Timer task | {task_id} | no scheduling parameters provided")
-                    return f"Timer task | {task_id} | no scheduling parameters provided"
+                    logger.error(f"task | {task_id} | no scheduling parameters provided")
+                    return False
                 # Reduce the granularity of the lock
                 task_status_manager.add_task_status(task_id, None, "waiting", None, None, None,
                                                     None, "timer_task")
@@ -177,7 +178,7 @@ class TimerTask:
 
                 return True
         except Exception as e:
-            logger.debug(f"Error adding task | {task_id} |: {e}")
+            logger.error(f"Error adding task | {task_id} |: {e}")
             return e
 
     # Start the scheduler
@@ -204,11 +205,11 @@ class TimerTask:
             # Check if all tasks are completed
             if not self._task_queue.empty() or not len(self._running_tasks) == 0:
                 if system_operations:
-                    logger.debug(f"Timer task was detected to be running, and the task stopped terminating")
+                    logger.warning(f"task was detected to be running, and the task stopped terminating")
                     return None
 
             if force_cleanup:
-                logger.debug("Force stopping scheduler and cleaning up tasks")
+                logger.warning("Force stopping scheduler and cleaning up tasks")
                 # Force stop all running tasks
                 _task_manager.terminate_all_tasks()
                 self._scheduler_stop_event.set()
@@ -310,8 +311,8 @@ class TimerTask:
                     self._task_queue.put((execution_time, timeout_processing, task_name, task_id, func, args, kwargs))
                 except ValueError:
                     # If task_name is not a valid time string, do not reschedule
-                    logger.debug(
-                        f"Timer task | {task_id} | task_name is not a valid time string, not rescheduling")
+                    logger.error(
+                        f"task | {task_id} | task_name is not a valid time string, not rescheduling")
 
             # Check if all tasks are completed
             with self._lock:
@@ -362,7 +363,7 @@ class TimerTask:
         :return: bool: Whether the task was successfully force stopped.
         """
         if self._running_tasks.get(task_id, None):
-            logger.debug(f"Timer task | {task_id} | does not exist or is already completed")
+            logger.warning(f"task | {task_id} | does not exist or is already completed")
             return False
         future = self._running_tasks[task_id][0]
         if not future.running():
@@ -387,7 +388,7 @@ class TimerTask:
         :return: bool: Whether the task was successfully pause and resume.
         """
         if not self._running_tasks.get(task_id, None):
-            logger.debug(f"Timer task | {task_id} | does not exist or is already completed")
+            logger.warning(f"task | {task_id} | does not exist or is already completed")
             return False
 
         else:

@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
 import os
-import queue
 import threading
 import time
 from typing import Dict, Any
+from multiprocessing.managers import DictProxy
 
 from ..common import logger
+from ..config import config
 
 
 class ProcessTaskManager:
@@ -17,7 +18,7 @@ class ProcessTaskManager:
                  '_main_task_id'
                  ]
 
-    def __init__(self, task_queue: queue.Queue) -> None:
+    def __init__(self, task_queue: DictProxy) -> None:
         self._tasks: Dict[str, Dict[str, Any]] = {}
         self._operation_lock = threading.Lock()  # Lock for thread-safe dictionary operations
         self._task_queue = task_queue
@@ -97,12 +98,18 @@ class ProcessTaskManager:
         Terminate the all tasks based on task_id.
         """
         with self._operation_lock:  # Lock for thread-safe dictionary access
-            _tasks_copy = self._tasks.copy() # Copy the dictionary for modification
+            _tasks_copy = self._tasks.copy()  # Copy the dictionary for modification
             for task_id in self._tasks:
                 if not task_id == self._main_task_id:
                     try:
-                        self._tasks[task_id][
-                            'terminate'].terminate()  # Perform the terminate operation outside the lock
+                        # First check whether the task is paused, then send the termination signal.
+                        if config["thread_management"]:
+                            try:
+                                self._tasks[task_id]['pause'].resume()
+                            except RuntimeError:
+                                pass
+                            self._tasks[task_id]['terminate'].terminate()
+
                         del _tasks_copy[task_id]
                     except Exception as error:
                         logger.error(f"Error terminating task '{task_id}': {error}")
@@ -119,8 +126,7 @@ class ProcessTaskManager:
             if task_id in self._tasks:
                 try:
                     self._tasks[task_id]['pause'].pause()
-                except RuntimeError:
-                    pass
+                    logger.warning(f"task | {task_id} | paused")
                 except Exception as error:
                     logger.error(error)
 
@@ -137,6 +143,7 @@ class ProcessTaskManager:
             if task_id in self._tasks:
                 try:
                     self._tasks[task_id]['pause'].resume()
+                    logger.warning(f"task | {task_id} | resumed")
                 except RuntimeError:
                     pass
                 except Exception as error:
@@ -153,23 +160,31 @@ class ProcessTaskManager:
     def _monitor_task_queue(self) -> None:
         while self._start:
             try:
-                task_id, target = self._task_queue.get(timeout=0.1)
+                # Determine whether it is empty
+                if self._task_queue.items():
 
-                if self.check(task_id):  # Check if the task_id exists in the dictionary
-                    if target == "kill":
-                        self.terminate_task(task_id)  # Terminate the task if it exists
-                    if target == "pause":
-                        self.pause_task(task_id)  # Pause the task if it exists
-                    if target == "resume":
-                        self.resume_task(task_id)  # Resume the task if it exists
+                    # Make a copy to test
+                    task_id, target = self._task_queue.items()[0]
 
-                    with self._operation_lock:  # Lock for thread-safe dictionary access
-                        if not self._tasks:  # Check if the tasks dictionary is empty
-                            logger.debug(f"Worker {os.getpid()} no tasks remaining, stopping the monitor thread")
-                            break  # Stop the loop if tasks dictionary is empty
+                    if self.check(task_id):  # Check if the task_id exists in the dictionary
 
-            except queue.Empty:
-                pass  # Ignore empty queue exceptions
+                        # Delete parameters that passed the check
+                        del self._task_queue[task_id]
+                        # Perform operations in order to prevent mistakes in the steps.
+                        for action in target:
+                            if action == "kill":
+                                self.terminate_task(task_id)  # Terminate the task if it exists
+                            if action == "pause":
+                                self.pause_task(task_id)  # Pause the task if it exists
+                            if action == "resume":
+                                self.resume_task(task_id)  # Resume the task if it exists
+
+                            with self._operation_lock:  # Lock for thread-safe dictionary access
+                                if not self._tasks:  # Check if the tasks dictionary is empty
+                                    logger.debug(
+                                        f"Worker {os.getpid()} no tasks remaining, stopping the monitor thread")
+                                    break  # Stop the loop if tasks dictionary is empty
+
             except Exception as error:
                 logger.error(f"Error in monitor thread: {error}")
             finally:
