@@ -3,7 +3,7 @@
 
 # Task Scheduling Library
 
-一个功能强大的Python任务调度库,支持异步和同步任务执行,提供强大的任务管理和监控功能
+一个功能强大的Python任务调度库,支持异步和同步任务执行,提供强大的任务管理和监控功能(已支持`NO GIL`)
 
 ## 功能特性
 
@@ -64,11 +64,81 @@ python -m task_scheduling
 
 ## 核心API详解
 
+- 对于`NO GIL`的支持
+
+使用python3.14以上的版本并开启`NO GIL`设置既可以使用,如果启动了`NO GIL`,则会输出`Free threaded is enabled`
+
+运行下面示例在`GIL`和`NO GIL`版本查看速度差别
+
 ### 使用示例:
+
+```
+import time
+import math
+
+def linear_task(input_info):
+    total_start_time = time.time()
+
+    for i in range(18):
+        result = 0
+        for j in range(1000000):
+            result += math.sqrt(j) * math.sin(j) * math.cos(j)
+
+    total_elapsed = time.time() - total_start_time
+    print(f"{input_info} - Total time: {total_elapsed:.3f}s")
+
+
+from task_scheduling.common import set_log_level
+
+set_log_level("DEBUG")
+
+if __name__ == "__main__":
+    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.variable import *
+
+    task_creation(
+        None, None, scheduler_io, True, "task1",
+        linear_task, priority_low, "task1"
+    )
+
+    task_creation(
+        None, None, scheduler_io, True, "task2",
+        linear_task, priority_low, "task2"
+    )
+
+    task_creation(
+        None, None, scheduler_io, True, "task3",
+        linear_task, priority_low, "task3"
+    )
+
+    task_creation(
+        None, None, scheduler_io, True, "task4",
+        linear_task, priority_low, "task4"
+    )
+
+    task_creation(
+        None, None, scheduler_io, True, "task5",
+        linear_task, priority_low, "task5"
+    )
+
+    task_creation(
+        None, None, scheduler_io, True, "task6",
+        linear_task, priority_low, "task6"
+    )
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        shutdown(True)
+```
+
 
 - 修改日志等级
 
 请放在`if __name__ == "__main__":`前面
+
+### 使用示例:
 
 ```
 from task_scheduling.common import set_log_level

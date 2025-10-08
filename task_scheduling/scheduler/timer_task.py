@@ -80,7 +80,8 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
     finally:
         if _task_manager.check(task_id):
             _task_manager.remove(task_id)
-        return return_results
+
+    return return_results
 
 
 class TimerTask:
@@ -417,3 +418,6 @@ class TimerTask:
                 del self._task_results[task_id]
             return result
         return None
+
+
+timer_task = TimerTask()

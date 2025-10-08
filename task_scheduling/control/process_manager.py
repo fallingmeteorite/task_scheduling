@@ -170,6 +170,7 @@ class ProcessTaskManager:
 
                         # Delete parameters that passed the check
                         del self._task_queue[task_id]
+
                         # Perform operations in order to prevent mistakes in the steps.
                         for action in target:
                             if action == "kill":
@@ -185,6 +186,9 @@ class ProcessTaskManager:
                                         f"Worker {os.getpid()} no tasks remaining, stopping the monitor thread")
                                     break  # Stop the loop if tasks dictionary is empty
 
+            # Prevent race conditions between processes from causing the dictionary to become empty
+            except IndexError:
+                pass
             except Exception as error:
                 logger.error(f"Error in monitor thread: {error}")
             finally:

@@ -1,20 +1,29 @@
 [project]
 name = "task_scheduling"
-version = "3.2.0"
+version = "4.0.1"
 description = "It is mainly used for task scheduling"
+
 authors = [
     { name = "fallingmeteorite", email = "2327667836@qq.com" }
 ]
+
 dependencies = [
     "loguru",
-    "pyyaml",
-    "psutil"
+    "pyyaml"
 ]
+
+requires-python = ">=3.8"
 
 dynamic = ["license"]
 
 classifiers = [
-    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
@@ -29,4 +38,3 @@ content-type = "text/markdown"
 
 [tool.setuptools.packages]
 find = { }
-

@@ -3,19 +3,18 @@
 import uuid
 from typing import Callable
 
-from .common.log_config import logger
-from .scheduler import io_asyncio_task, io_liner_task, cpu_liner_task, cpu_asyncio_task, timer_task
+from .common import logger
+from .scheduler import io_asyncio_task, io_liner_task, cpu_liner_task, cpu_asyncio_task, timer_task, shared_task_info
 from .scheduler_management import TaskScheduler
 from .utils import is_async_function
 
 task_scheduler = TaskScheduler()
 
-
 def task_creation(delay: int or None, daily_time: str or None, function_type: str, timeout_processing: bool,
                   task_name: str,
                   func: Callable,
                   priority: str,
-                  *args, **kwargs) -> str or None:
+                  *args, **kwargs) -> str:
     """
     Add a task to the queue, choosing between asynchronous or linear task based on the function type.
     Generate a unique task ID and return it.
@@ -31,12 +30,6 @@ def task_creation(delay: int or None, daily_time: str or None, function_type: st
     :param kwargs: Keyword arguments for the task function.
     :return: A unique task ID.
     """
-    # Check if func is a callable function
-
-    if not callable(func):
-        logger.error("The provided func is not a callable function")
-        return None
-
     # Generate a unique task ID
     task_id = str(uuid.uuid4())
     async_function = is_async_function(func)
@@ -100,5 +93,8 @@ def shutdown(force_cleanup: bool) -> None:
     if hasattr(cpu_liner_task, "_scheduler_started") and cpu_liner_task._scheduler_started:
         logger.info("Detected Cpu linear task scheduler is running, shutting down...")
         cpu_liner_task.stop_scheduler(force_cleanup)
+
+    # Close the shared information channel
+    shared_task_info.manager.shutdown()
 
     logger.info("All scheduler has been shut down.")

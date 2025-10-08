@@ -12,10 +12,6 @@ from .manager import task_status_manager
 from .scheduler import io_asyncio_task, io_liner_task, cpu_liner_task, cpu_asyncio_task, timer_task
 
 
-def is_banana(item: Tuple, task_name: str) -> bool:
-    return item[1] == task_name
-
-
 class TaskScheduler:
     __slots__ = ['ban_task_names', 'core_task_queue', 'allocator_running', 'allocator_started', 'allocator_thread',
                  'timeout_check_interval', '_timeout_checker', '_task_event']
@@ -40,6 +36,7 @@ class TaskScheduler:
                  timeout_processing: bool,
                  task_name: str, task_id: str,
                  func: Callable, priority: str, *args, **kwargs) -> bool:
+
         # Check if the task name is in the ban list
         if task_name in self.ban_task_names:
             logger.warning(f"Task name '{task_name}' is banned, cannot add task, task ID: {task_id}")
@@ -63,6 +60,7 @@ class TaskScheduler:
                                   priority,
                                   args,
                                   kwargs))
+
         self._task_event.set()  # Wake up the allocator thread
         task_status_manager.add_task_status(task_id, task_name, "queuing", None, None, None, timeout_processing, "NAN")
 
@@ -135,7 +133,7 @@ class TaskScheduler:
     def cancel_the_queue_task_by_name(self, task_name: str) -> None:
 
         for item in self.core_task_queue.queue:
-            if is_banana(item, task_name):
+            if item[1] == task_name:
                 self.core_task_queue.queue.remove(item)
 
         logger.warning("This type of name task has been removed")
@@ -185,7 +183,8 @@ class TaskScheduler:
                     if task_status['task_type'] == "cpu_liner_task":
                         cpu_liner_task.force_stop_task(task_id)
 
-                    timer_task.force_stop_task(task_id)
+                    if task_status['task_type'] == "timer_task":
+                        timer_task.force_stop_task(task_id)
 
         self._start_timeout_checker()  # Restart the timer
 

@@ -8,15 +8,15 @@ import time
 from concurrent.futures import ProcessPoolExecutor, Future, BrokenExecutor
 from functools import partial
 from multiprocessing.managers import DictProxy
-from multiprocessing import Manager
 from typing import Callable, Dict, Tuple, Optional, Any
 
 from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
 from ..control import ThreadTerminator, ProcessTaskManager, StopException, ThreadSuspender
-
 from ..utils import worker_initializer
+
+from .share import shared_task_info
 
 _threadsuspender = ThreadSuspender()
 _threadterminator = ThreadTerminator()
@@ -124,8 +124,6 @@ class CpuAsyncioTask:
         '_scheduler_started', '_scheduler_stop_event', '_scheduler_thread',
         '_idle_timer', '_idle_timeout', '_idle_timer_lock',
         '_task_results',
-        '_manager', '_task_status_queue',
-        '_task_signal_transmission',
         '_executor', '_status_thread'
     ]
 
@@ -150,10 +148,6 @@ class CpuAsyncioTask:
 
         self._task_results: Dict[str, Any] = {}  # Store task return results, keep up to 2 results for each task ID
 
-        self._manager = Manager()
-        self._task_status_queue = self._manager.Queue()  # Queue for task status updates
-        self._task_signal_transmission = self._manager.dict()  # Dict for task status updates
-
         self._executor: Optional[ProcessPoolExecutor] = None
 
         # Start a thread to handle task status updates
@@ -163,10 +157,10 @@ class CpuAsyncioTask:
         """
         Handle task status updates from the task status queue.
         """
-        while not self._scheduler_stop_event.is_set() or not self._task_status_queue.empty():
+        while not self._scheduler_stop_event.is_set() or not shared_task_info.task_status_queue.empty():
             try:
-                if not self._task_status_queue.empty():
-                    task = self._task_status_queue.get(timeout=0.1)
+                if not shared_task_info.task_status_queue.empty():
+                    task = shared_task_info.task_status_queue.get(timeout=0.1)
                     status, task_id, task_name, start_time, end_time, error, timeout_processing = task
                     task_status_manager.add_task_status(task_id, task_name, status, start_time, end_time, error,
                                                         timeout_processing, "cpu_asyncio_task")
@@ -208,7 +202,7 @@ class CpuAsyncioTask:
                     self._join_scheduler_thread()
 
                 # Reduce the granularity of the lock
-                self._task_status_queue.put(("waiting", task_id, None, None, None, None, None))
+                shared_task_info.task_status_queue.put(("waiting", task_id, None, None, None, None, None))
 
                 self._task_queue.put((timeout_processing, task_name, task_id, func, args, kwargs))
 
@@ -275,9 +269,6 @@ class CpuAsyncioTask:
             self._join_scheduler_thread()
             self._status_thread.join()
 
-            # Ensure the manager is properly shut down
-            self._manager.shutdown()
-
             # Reset state variables
             self._scheduler_started = False
             self._scheduler_stop_event.clear()
@@ -286,13 +277,13 @@ class CpuAsyncioTask:
             self._task_results = {}
 
             logger.debug(
-                 "Scheduler and event loop have stopped, all resources have been released and parameters reset")
+                "Scheduler and event loop have stopped, all resources have been released and parameters reset")
 
     def stop_all_running_task(self):
         for task_id in self._running_tasks.keys():
-            self._task_signal_transmission[task_id] = ["kill"]
+            shared_task_info.task_signal_transmission[task_id] = ["kill"]
 
-        while not self._task_status_queue.qsize() == 0:
+        while not len(shared_task_info.task_signal_transmission.items()) == 0:
             time.sleep(0.1)
 
     def _scheduler(self) -> None:
@@ -317,8 +308,8 @@ class CpuAsyncioTask:
 
                 timeout_processing, task_name, task_id, func, args, kwargs = task
                 with self._lock:
-                    future = executor.submit(_execute_task, task, self._task_status_queue,
-                                             self._task_signal_transmission)
+                    future = executor.submit(_execute_task, task, shared_task_info.task_status_queue,
+                                             shared_task_info.task_signal_transmission)
                     self._running_tasks[task_id] = [future, task_name, ]
 
                     future.add_done_callback(partial(self._task_done, task_id))
@@ -344,7 +335,7 @@ class CpuAsyncioTask:
         except (KeyboardInterrupt, BrokenExecutor):
             # Prevent problems caused by exit errors
             logger.warning(f"task | {task_id} | cancelled, forced termination")
-            self._task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
+            shared_task_info.task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
 
         finally:
             # Make sure the Future object is deleted
@@ -408,9 +399,9 @@ class CpuAsyncioTask:
             future.cancel()
         else:
             # First ensure that the task is not paused.
-            self._task_signal_transmission[task_id] = ["resume", "kill"]
+            shared_task_info.task_signal_transmission[task_id] = ["resume", "kill"]
 
-        self._task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
+        shared_task_info.task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
 
         with self._lock:
             if task_id in self._task_results:
@@ -433,11 +424,11 @@ class CpuAsyncioTask:
 
         else:
             if action == "pause":
-                self._task_signal_transmission[task_id] = ["pause"]
-                self._task_status_queue.put(("paused", task_id, None, None, None, None, None))
+                shared_task_info.task_signal_transmission[task_id] = ["pause"]
+                shared_task_info.task_status_queue.put(("paused", task_id, None, None, None, None, None))
             elif action == "resume":
-                self._task_signal_transmission[task_id] = ["resume"]
-                self._task_status_queue.put(("running", task_id, None, None, None, None, None))
+                shared_task_info.task_signal_transmission[task_id] = ["resume"]
+                shared_task_info.task_status_queue.put(("running", task_id, None, None, None, None, None))
 
         return True
 
@@ -460,3 +451,6 @@ class CpuAsyncioTask:
 
             return result
         return None
+
+
+cpu_asyncio_task = CpuAsyncioTask()

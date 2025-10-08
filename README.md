@@ -4,7 +4,7 @@
 # Task Scheduling Library
 
 A powerful Python task scheduling library that supports asynchronous and synchronous task execution, providing robust
-task management and monitoring capabilities.
+task management and monitoring capabilities.(Supports `NO GIL`)
 
 ## Features
 
@@ -71,11 +71,80 @@ Use `ctrl + c` to exit.
 
 ## Core API Details
 
+- Support for `NO GIL`
+
+You can use Python version 3.14 or above and enable the `NO GIL` setting. If `NO GIL` is enabled, it will output `Free threaded is enabled`.
+
+Run the following example to see the speed difference between the `GIL` and `NO GIL` versions.
+
 ### Usage Examples:
+
+```
+import time
+import math
+
+def linear_task(input_info):
+    total_start_time = time.time()
+
+    for i in range(18):
+        result = 0
+        for j in range(1000000):
+            result += math.sqrt(j) * math.sin(j) * math.cos(j)
+
+    total_elapsed = time.time() - total_start_time
+    print(f"{input_info} - Total time: {total_elapsed:.3f}s")
+
+
+from task_scheduling.common import set_log_level
+
+set_log_level("DEBUG")
+
+if __name__ == "__main__":
+    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.variable import *
+
+    task_creation(
+        None, None, scheduler_io, True, "task1",
+        linear_task, priority_low, "task1"
+    )
+
+    task_creation(
+        None, None, scheduler_io, True, "task2",
+        linear_task, priority_low, "task2"
+    )
+
+    task_creation(
+        None, None, scheduler_io, True, "task3",
+        linear_task, priority_low, "task3"
+    )
+
+    task_creation(
+        None, None, scheduler_io, True, "task4",
+        linear_task, priority_low, "task4"
+    )
+
+    task_creation(
+        None, None, scheduler_io, True, "task5",
+        linear_task, priority_low, "task5"
+    )
+
+    task_creation(
+        None, None, scheduler_io, True, "task6",
+        linear_task, priority_low, "task6"
+    )
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        shutdown(True)
+```
 
 - Change log level
 
 Please place it before `if __name__ == "__main__":`
+
+### Usage Examples:
 
 ```
 from task_scheduling.common import set_log_level

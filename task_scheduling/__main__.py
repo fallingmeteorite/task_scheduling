@@ -10,31 +10,22 @@ from .common.log_config import logger
 from task_scheduling import *
 
 
-def command_creation(task_name: str,
-                     command: str) -> str:
-    def wrapper(command) -> None:
+def command_creation(task_name: str, command: str) -> str:
+    def wrapper(command):
         os.system(command)
 
     return task_creation(None, None, scheduler_io, False, task_name, wrapper, priority_high, command)
 
 
 def parse_input(user_input):
-    """Simplified input parsing"""
     parts = shlex.split(user_input)
     args = {'command': None, 'name': 'command_task'}
+    arg_map = {'-cmd': 'command', '-n': 'name', '-name': 'name'}
 
-    i = 0
-    while i < len(parts):
-        arg = parts[i]
-
-        if arg in ['-cmd']:
-            args['command'] = parts[i + 1]
-            i += 1
-        elif arg in ['-n', '-name']:
-            args['name'] = parts[i + 1]
-            i += 1
-
-        i += 1
+    it = iter(parts)
+    for arg in it:
+        if arg in arg_map:
+            args[arg_map[arg]] = next(it, None)
 
     return args
 
@@ -42,6 +33,7 @@ def parse_input(user_input):
 def main():
     logger.info("The task scheduler starts.")
     start_task_status_ui()
+
     while True:
         try:
             logger.info("Wait for the task to be added.")
@@ -50,7 +42,6 @@ def main():
             if not input_info:
                 continue
 
-            # Parse the input
             args = parse_input(input_info)
             logger.info(f"Parameter: {args}")
 
@@ -58,12 +49,7 @@ def main():
                 logger.warning("The -cmd or -n parameter must be provided")
                 continue
 
-            # Create a task
-            task_id = command_creation(
-                command=args['command'],
-                task_name=args['name']
-            )
-
+            task_id = command_creation(command=args['command'], task_name=args['name'])
             logger.info(f"Create a success. task ID: {task_id}")
 
         except KeyboardInterrupt:

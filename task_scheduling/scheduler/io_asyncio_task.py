@@ -487,3 +487,5 @@ class IoAsyncioTask:
                     self._scheduler_threads[task_name].join(timeout=1.0)  # Wait up to 1 second
             except Exception as e:
                 logger.debug(f"task | stopping event loop | error occurred: {e}")
+
+io_asyncio_task = IoAsyncioTask()

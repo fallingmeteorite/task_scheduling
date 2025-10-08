@@ -9,5 +9,3 @@ from .config import ensure_config_loaded, config
 
 # Initialize the config dict
 ensure_config_loaded()
-# Import scheduler types
-from .variable import *

@@ -7,5 +7,5 @@ task_status_manager = TaskStatusManager()
 
 from .thread_info_share import SharedTaskDict
 
-
 from .task_info_display import get_tasks_info
+

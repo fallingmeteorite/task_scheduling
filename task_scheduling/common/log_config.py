@@ -8,8 +8,8 @@ from loguru import logger
 # The log format includes the timestamp, log level, name of the file and line number where the log was generated, and the log message
 _DEFAULT_FORMAT: str = (
     "<g>{time:YYYY-MM-DD HH:mm:ss}</g> "  # Timestamp, formatted as year-month-day hour:minute:second, displayed in green
-    "[<lvl>{level}</lvl>] "  # Log level, automatically colored based on the level
     "<c><u>{name}:{line}</u></c> | "  # Name of the file and line number where the log was generated, displayed in cyan with underline
+    "[<lvl>{level}</lvl>] "  # Log level, automatically colored based on the level
     "{message}"  # Log message
 )
 
