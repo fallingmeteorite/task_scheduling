@@ -3,7 +3,7 @@
 import queue
 import threading
 import time
-from typing import Callable, List, Tuple, Optional
+from typing import Callable, List, Optional
 
 from .common import logger
 from .config import config
@@ -193,6 +193,7 @@ class TaskScheduler:
         Start a timer that will periodically check for timeout tasks.
         """
         self._timeout_checker = threading.Timer(self.timeout_check_interval, self._check_timeouts)
+        self._timeout_checker.daemon = True
         self._timeout_checker.start()
 
     def _stop_timeout_checker(self) -> None:

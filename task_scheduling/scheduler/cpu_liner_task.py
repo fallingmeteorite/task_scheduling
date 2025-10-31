@@ -18,7 +18,7 @@ from ..control import ThreadTerminator, ProcessTaskManager, StopException, Threa
 from ..utils import worker_initializer
 from ..tools import TaskCounter
 
-from .share import shared_task_info
+from ..tools import shared_task_info
 
 _task_counter = TaskCounter("cpu_liner_task")
 _threadsuspender = ThreadSuspender()
@@ -351,6 +351,7 @@ class CpuLinerTask:
             if self._idle_timer is not None:
                 self._idle_timer.cancel()
             self._idle_timer = threading.Timer(self._idle_timeout, self.stop_scheduler, args=(False, True,))
+            self._idle_timer.daemon = True
             self._idle_timer.start()
 
     def _cancel_idle_timer(self) -> None:

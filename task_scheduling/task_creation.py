@@ -4,11 +4,13 @@ import uuid
 from typing import Callable
 
 from .common import logger
-from .scheduler import io_asyncio_task, io_liner_task, cpu_liner_task, cpu_asyncio_task, timer_task, shared_task_info
+from .scheduler import io_asyncio_task, io_liner_task, cpu_liner_task, cpu_asyncio_task, timer_task
+from .tools import shared_task_info
 from .scheduler_management import TaskScheduler
 from .utils import is_async_function
 
 task_scheduler = TaskScheduler()
+
 
 def task_creation(delay: int or None, daily_time: str or None, function_type: str, timeout_processing: bool,
                   task_name: str,

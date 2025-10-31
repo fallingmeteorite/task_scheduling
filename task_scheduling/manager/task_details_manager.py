@@ -147,3 +147,7 @@ class TaskStatusManager:
 
         # Count occurrences and return as ordered dictionary
         return OrderedDict(Counter(values).most_common())
+
+
+# Shared by all schedulers, instantiating objects
+task_status_manager = TaskStatusManager()

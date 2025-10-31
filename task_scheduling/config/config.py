@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
 import os
+import json
 from functools import lru_cache
 from typing import Dict, Any
-
-import yaml
 
 from ..common import logger
 
@@ -28,22 +27,23 @@ def _load_config(_file_path: str = None) -> Any:
     Load the configuration file into the global variable `config`.
 
     Args:
-        _file_path (str): Path to the configuration file. If not provided, defaults to 'config.yaml' in the package directory.
+        _file_path (str): Path to the configuration file. If not provided, defaults to 'config.json' in the package directory.
 
     Returns:
         bool: Whether the configuration file was successfully loaded.
     """
     if _file_path is None:
-        _file_path = f'{_get_package_directory()}/config.yaml'
+        _file_path = f'{_get_package_directory()}\\config.json'
 
     try:
         with open(_file_path, 'r', encoding='utf-8') as f:
-            # Safely load the YAML file using yaml.safe_load
+            # Load the JSON file
             global config
-            config.update(yaml.safe_load(f) or {})
+            loaded_config = json.load(f)
+            config.update(loaded_config or {})
             return True  # Return True indicating successful loading
     except Exception as error:
-        return error  # Return False indicating loading failure
+        return error  # Return the error indicating loading failure
 
 
 def update_config(key: str,
@@ -65,7 +65,7 @@ def update_config(key: str,
         config[key] = value
         return True  # Return True indicating successful update
     except Exception as error:
-        return error  # Return False indicating update failure
+        return error  # Return the error indicating update failure
 
 
 def ensure_config_loaded():
@@ -74,5 +74,7 @@ def ensure_config_loaded():
     If the configuration is not loaded, attempt to load it and log a warning if loading fails.
     """
     global config
-    if not config and not _load_config():
-        logger.warning("Configuration file loading failed, the program may not run normally")
+    if not config:
+        result = _load_config()
+        if result is not True:
+            logger.warning(f"Configuration file loading failed: {result}, the program may not run normally")

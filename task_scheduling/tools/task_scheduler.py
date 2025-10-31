@@ -16,7 +16,7 @@ class TaskCounter:
         self.paused_tasks = set()  # Set of currently paused task IDs
         self.count = 0  # Limit the quantity
 
-    def add(self, max_count) -> None:
+    def add(self, max_count) -> bool:
         if self.count >= max_count:
             return False
         self.count += 1
@@ -89,7 +89,7 @@ class TaskCounter:
         Args:
             number_to_resume: Number of tasks to resume
         """
-        for task_id in random.sample(self.paused_tasks, min(number_to_resume, len(self.paused_tasks))):
+        for task_id in random.sample(list(self.paused_tasks), min(number_to_resume, len(self.paused_tasks))):
             self.resume_task(task_id)
             self.paused_tasks.remove(task_id)
 

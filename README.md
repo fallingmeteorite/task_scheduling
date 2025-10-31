@@ -16,7 +16,6 @@ task management and monitoring capabilities.(Supports `NO GIL`)
 - Task Management: Powerful task status monitoring and management capabilities
 - Flexible termination: Supports sending termination commands to executing code
 - Timeout Handling: You can enable timeout detection for tasks, and long-running tasks will be forcibly terminated.
-- Disable List: Tasks that fail to run can be added to the disable list to prevent repeated execution.
 - Status Inquiry: Directly obtain the current status of the task through the interface (completed, error, timeout, etc.)
 - Intelligent Sleep: Automatically enters sleep mode when idle to save resources
 
@@ -41,6 +40,7 @@ task management and monitoring capabilities.(Supports `NO GIL`)
   the configuration file `exception_thrown: True`.
 - The functions introduced below are applicable to all four schedulers, and special functions will be specifically
   marked.
+- Tasks with the same name will be executed in queue. If you want to avoid this, you can add a suffix to the passed `task_name`.
 
 ## Installation
 
@@ -722,11 +722,11 @@ from task_scheduling.utils import wait_branch_thread_ended, branch_thread_contro
 
 
 @wait_branch_thread_ended
-def main_task(share_info, _sharedtaskdict, task_signal_transmission, input_info):
+def main_task(share_info, sharedtaskdict, task_signal_transmission, input_info):
     task_name = "other_task"
     timeout_processing = True
 
-    @branch_thread_control(share_info, _sharedtaskdict, timeout_processing, task_name)
+    @branch_thread_control(share_info, sharedtaskdict, timeout_processing, task_name)
     def other_task(input_info):
         while True:
             time.sleep(1)

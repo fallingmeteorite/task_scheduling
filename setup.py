@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="task_scheduling",
-    version="4.0.1",
+    version="4.0.3",
     description="It is mainly used for task scheduling",
     author="fallingmeteorite",
     author_email="2327667836@qq.com",
@@ -12,10 +12,7 @@ setup(
     python_requires=">=3.8",
 
     packages=find_packages(),
-    install_requires=[
-        "loguru",
-        "pyyaml"
-    ],
+    install_requires=["loguru"],
     project_urls={
         "Bug Tracker": "https://github.com/fallingmeteorite/task_scheduling/issues",
     },

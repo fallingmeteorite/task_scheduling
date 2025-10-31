@@ -5,16 +5,71 @@ import queue
 import threading
 import time
 from typing import Dict, Tuple, Callable, Optional, Any
+from concurrent.futures import Future, CancelledError
+from functools import partial
 
 from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
-from ..control import ThreadTaskManager, ThreadSuspender, ThreadTerminator
+from ..control import ThreadTaskManager, ThreadSuspender
 
 # Create Manager instance
 _task_manager = ThreadTaskManager()
 _threadsuspender = ThreadSuspender()
-_threadterminator = ThreadTerminator()
+
+
+# A function that executes a task
+async def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
+    """
+    Execute an asynchronous task.
+
+    Args:
+        task (Tuple[bool, str, str, Callable, Tuple, Dict]): Tuple containing task details.
+            - timeout_processing (bool): Whether timeout processing is enabled.
+            - task_name (str): Name of the task.
+            - task_id (str): ID of the task.
+            - func (Callable): The function to execute.
+            - args (Tuple): Arguments to pass to the function.
+            - kwargs (Dict): Keyword arguments to pass to the function.
+
+    Returns:
+        Any: Result of the task execution or error message.
+    """
+    # Unpack task tuple into local variables
+    timeout_processing, task_name, task_id, func, args, kwargs = task
+    return_results = None
+    try:
+        with _threadsuspender.suspend_context() as pause_ctx:
+            _task_manager.add(None, None, pause_ctx, task_id)
+            # Modify the task status
+            task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None, None, None)
+
+            logger.debug(f"Start running task | {task_id} | ")
+
+            # If the task needs timeout processing, set the timeout time
+            if timeout_processing:
+                return_results = await asyncio.wait_for(func(*args, **kwargs),
+                                                        timeout=config["watch_dog_time"])
+            else:
+                return_results = await func(*args, **kwargs)
+
+            # Update task status to "completed"
+            task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None, None)
+
+    except asyncio.TimeoutError:
+        logger.warning(f"task | {task_id} | timed out, forced termination")
+        task_status_manager.add_task_status(task_id, None, "timeout", None, None, None, None, None)
+        return_results = "error happened"
+    except asyncio.CancelledError:
+        logger.warning(f"task | {task_id} | was cancelled")
+        task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None,
+                                            None, None)
+        return_results = "error happened"
+    finally:
+        if return_results == "error happened":
+            _task_manager.remove(task_id)
+
+    return return_results
 
 
 class IoAsyncioTask:
@@ -250,94 +305,58 @@ class IoAsyncioTask:
 
             # Execute the task after the lock is released
             timeout_processing, task_name, task_id, func, args, kwargs = task
-            future = asyncio.run_coroutine_threadsafe(self._execute_task(task), self._event_loops[task_name])
+            future = asyncio.run_coroutine_threadsafe(_execute_task(task), self._event_loops[task_name])
             _task_manager.add(future, None, None, task_id)
+
             with self._condition:
                 self._running_tasks[task_id] = [future, task_name]
                 self._task_counters[task_name] += 1
 
-    # A function that executes a task
-    async def _execute_task(self,
-                            task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
-        """
-        Execute an asynchronous task.
+            future.add_done_callback(partial(self._task_done, task_id, task_name))
 
-        Args:
-            task (Tuple[bool, str, str, Callable, Tuple, Dict]): Tuple containing task details.
-                - timeout_processing (bool): Whether timeout processing is enabled.
-                - task_name (str): Name of the task.
-                - task_id (str): ID of the task.
-                - func (Callable): The function to execute.
-                - args (Tuple): Arguments to pass to the function.
-                - kwargs (Dict): Keyword arguments to pass to the function.
-
-        Returns:
-            Any: Result of the task execution or error message.
+    def _task_done(self,
+                   task_id: str,
+                   task_name: str,
+                   future: Future) -> None:
         """
-        # Unpack task tuple into local variables
-        timeout_processing, task_name, task_id, func, args, kwargs = task
-        return_results = None
+            Callback function after a task is completed.
+
+            :param task_id: Task ID.
+            :param future: Future object corresponding to the task.
+        """
         try:
-            with _threadsuspender.suspend_context() as pause_ctx:
-                _task_manager.add(None, None, pause_ctx, task_id)
-                # Modify the task status
-                task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None, None, None)
-
-                logger.debug(f"Start running task | {task_id} | ")
-
-                # If the task needs timeout processing, set the timeout time
-                if timeout_processing:
-                    return_results = await asyncio.wait_for(func(*args, **kwargs),
-                                                            timeout=config["watch_dog_time"])
-                else:
-                    return_results = await func(*args, **kwargs)
-
-                # Update task status to "completed"
-                task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None, None)
-
-        except asyncio.TimeoutError:
-            logger.warning(f"task | {task_id} | timed out, forced termination")
-            task_status_manager.add_task_status(task_id, None, "timeout", None, None, None, None, None)
-            return_results = "error happened"
-        except asyncio.CancelledError:
-            logger.warning(f"task | {task_id} | was cancelled")
-            task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None,
-                                                None, None)
-            return_results = "error happened"
+            result = future.result()
+        except CancelledError:
+            result = "error happened"
         except Exception as e:
             if config["exception_thrown"]:
                 raise
 
             logger.error(f"task | {task_id} | execution failed: {e}")
             task_status_manager.add_task_status(task_id, None, "failed", None, None, e, None, None)
-            return_results = "error happened"
+            result = "error happened"
 
-        finally:
-            if return_results == "error happened":
-                _task_manager.remove(task_id)
+        with self._condition:
+            # Save the result returned by the task, and keep only one result
+            if result is not None:
+                if result != "error happened":
+                    self._task_results[task_id] = result
 
-            # Opt-out will result in the deletion of the information and the following processing will not be possible
-            with self._condition:
-                # Save the result returned by the task, and keep only one result
-                if return_results is not None:
-                    if return_results != "error happened":
-                        self._task_results[task_id] = return_results
+            # Remove the task from running tasks dictionary
+            if task_id in self._running_tasks:
+                del self._running_tasks[task_id]
 
-                # Remove the task from running tasks dictionary
-                if task_id in self._running_tasks:
-                    del self._running_tasks[task_id]
+            # Queue task counters (ensure it doesn't go below 0)
+            if task_name in self._task_counters and self._task_counters[task_name] > 0:
+                self._task_counters[task_name] -= 1
 
-                # Queue task counters (ensure it doesn't go below 0)
-                if task_name in self._task_counters and self._task_counters[task_name] > 0:
-                    self._task_counters[task_name] -= 1
+            # Check if all tasks are completed
+            if self._task_queues.get(task_name) is not None:
+                if self._task_queues[task_name].empty() and len(self._running_tasks) == 0:
+                    self._reset_idle_timer(task_name)
 
-                # Check if all tasks are completed
-                if self._task_queues.get(task_name) is not None:
-                    if self._task_queues[task_name].empty() and len(self._running_tasks) == 0:
-                        self._reset_idle_timer(task_name)
-
-                # Notify the scheduler to continue scheduling new tasks
-                self._condition.notify()
+            # Notify the scheduler to continue scheduling new tasks
+            self._condition.notify()
 
     # The task scheduler closes the countdown
     def _reset_idle_timer(self,
@@ -353,6 +372,7 @@ class IoAsyncioTask:
                 self._idle_timers[task_name].cancel()
             self._idle_timers[task_name] = threading.Timer(self._idle_timeout, self._stop_scheduler,
                                                            args=(task_name,))
+            self._idle_timers[task_name].daemon = True
             self._idle_timers[task_name].start()
 
     def _cancel_idle_timer(self,
@@ -487,5 +507,6 @@ class IoAsyncioTask:
                     self._scheduler_threads[task_name].join(timeout=1.0)  # Wait up to 1 second
             except Exception as e:
                 logger.debug(f"task | stopping event loop | error occurred: {e}")
+
 
 io_asyncio_task = IoAsyncioTask()

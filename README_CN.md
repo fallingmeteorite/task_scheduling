@@ -10,11 +10,9 @@
 ### 核心功能
 
 - 任务调度: 支持异步代码和同步代码,相同类型的任务自动排队执行
-
 - 任务管理: 强大的任务状态监控和管理能力
 - 灵活终止: 支持向执行代码发送终止命令
 - 超时处理: 可为任务启用超时检测,长时间运行的任务会被强制终止
-- 禁用列表: 运行失败的任务可加入禁用列表，避免重复执行
 - 状态查询: 通过接口直接获取任务当前状态(完成,错误,超时等)
 - 智能休眠: 无任务时自动休眠节省资源
 
@@ -33,7 +31,8 @@
   即代码还在运行而不是等待即可终止)
 - 对于time.sleep,库给出了替代的版本,当要进行长时间等待请使用`interruptible_sleep`,异步代码使用`await asyncio.sleep`
 - 如果需要检查错误和查找报错位置,请设置日志等级为`set_log_level("DEBUG")`,设置配置文件`exception_thrown: True`
-- 下面介绍的函数对于4个调度器都适用，特殊的函数的将会专门标记
+- 下面介绍的函数对于4个调度器都适用,特殊的函数的将会专门标记
+- 同名任务会排队执行,如果不希望出现,可以将传入的`task_name`添加后缀标识
 
 ## 安装
 
@@ -717,11 +716,11 @@ from task_scheduling.utils import wait_branch_thread_ended, branch_thread_contro
 
 
 @wait_branch_thread_ended
-def main_task(share_info, _sharedtaskdict, task_signal_transmission, input_info):
+def main_task(share_info, sharedtaskdict, task_signal_transmission, input_info):
     task_name = "other_task"
     timeout_processing = True
 
-    @branch_thread_control(share_info, _sharedtaskdict, timeout_processing, task_name)
+    @branch_thread_control(share_info, sharedtaskdict, timeout_processing, task_name)
     def other_task(input_info):
         while True:
             time.sleep(1)
@@ -768,19 +767,19 @@ Task status UI available at http://localhost:8000
 
 文件存储在:`task_scheduling/config/config.yaml`
 
-同一类型的 CPU 优化异步任务可以运行的最大数量
+同一类型的 CPU 密集型异步任务可以运行的最大数量
 
 `cpu_asyncio_task: 8`
 
-IO 密集型异步任务中相同类型任务的最大数量
+IO 密集型异步任务中运行任务的最大数量
 
 `io_asyncio_task: 20`
 
-可以运行的相同类型的面向 CPU 的线性任务的最大数量
+CPU 密集型线性任务中运行任务的最大数量
 
 `cpu_liner_task: 20`
 
-I-O 密集型线性任务中相同类型任务的最大数量
+IO 密集型线性任务中运行任务的最大数量
 
 `io_liner_task: 20`
 

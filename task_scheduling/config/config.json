@@ -1,0 +1,24 @@
+{
+    "cpu_asyncio_task": 8,
+
+    "io_asyncio_task": 20,
+
+    "cpu_liner_task": 20,
+
+    "io_liner_task": 20,
+
+    "timer_task": 30,
+
+    "max_idle_time": 60,
+
+    "watch_dog_time": 80,
+
+    "maximum_task_info_storage": 20,
+
+    "status_check_interval": 800,
+
+    "thread_management": false,
+
+    "exception_thrown": false
+
+}

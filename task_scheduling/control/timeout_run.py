@@ -59,6 +59,7 @@ class ThreadingTimeout(BaseTimeout):
         """Setting up the resource that interrupts the block
         """
         self._timer = threading.Timer(self._seconds, self.stop)
+        self._timer.daemon = True
         self._timer.start()
 
     def suppress_interrupt(self):
