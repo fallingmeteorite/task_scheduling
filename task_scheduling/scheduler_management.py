@@ -131,10 +131,14 @@ class TaskScheduler:
                     self._task_event.wait()  # Wait for the event to trigger
 
     def cancel_the_queue_task_by_name(self, task_name: str) -> None:
-
-        for item in self.core_task_queue.queue:
-            if item[1] == task_name:
+        count = 0
+        while count < len(self.core_task_queue.queue):
+            item = self.core_task_queue.queue[count]
+            if item[5] == task_name:
                 self.core_task_queue.queue.remove(item)
+                # Do not increase the count after deletion, because the next element will move to the current position.
+            else:
+                count += 1  # Only move to the next element if not deleting
 
         logger.warning("This type of name task has been removed")
 

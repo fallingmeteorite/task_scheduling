@@ -6,50 +6,50 @@
     <title>Task Status Monitor</title>
     <style>
         :root {
-            --primary: #4a4a4a;
-            --secondary: #757575;
+            --primary: #2c2c2c;
+            --secondary: #5a5a5a;
             --light: #f5f5f5;
-            --dark: #212121;
+            --dark: #1a1a1a;
             --white: #ffffff;
             --black: #000000;
-            --success: #00c853;
-            --warning: #ffab00;
-            --error: #ff5252;
-            --info: #448aff;
-            --bg-color: #f8fafc;
-            --text-color: #2d3748;
+            --success: #4caf50;
+            --warning: #ff9800;
+            --error: #f44336;
+            --info: #2196f3;
+            --bg-color: #f8f8f8;
+            --text-color: #333333;
             --card-bg: #ffffff;
-            --border-color: #e2e8f0;
+            --border-color: #e0e0e0;
             --waiting: #9c27b0;
-            --timeout: #ff6d00;
-            --border-radius: 6px; /* Reduced corner radius */
-            --shadow: 0 2px 4px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
-            --shadow-hover: 0 4px 6px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.05);
-            --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --gradient-success: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-            --gradient-warning: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-            --gradient-error: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+            --timeout: #ff5722;
+            --border-radius: 6px;
+            --shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            --shadow-hover: 0 4px 15px rgba(0, 0, 0, 0.08);
+            --gradient-primary: linear-gradient(135deg, #2c2c2c 0%, #5a5a5a 100%);
+            --gradient-success: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+            --gradient-warning: linear-gradient(135deg, #ff9800 0%, #ef6c00 100%);
+            --gradient-error: linear-gradient(135deg, #f44336 0%, #c62828 100%);
         }
 
         .dark-theme {
-            --primary: #e2e8f0;
-            --secondary: #a0aec0;
-            --light: #2d3748;
-            --dark: #f7fafc;
-            --white: #1a202c;
-            --black: #f7fafc;
-            --success: #68d391;
-            --warning: #faf089;
-            --error: #fc8181;
-            --info: #63b3ed;
-            --bg-color: #0f1419;
-            --text-color: #e2e8f0;
-            --card-bg: #1a202c;
-            --border-color: #2d3748;
-            --waiting: #b794f4;
-            --timeout: #f6ad55;
-            --shadow: 0 2px 4px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.1);
-            --shadow-hover: 0 4px 6px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
+            --primary: #e0e0e0;
+            --secondary: #9e9e9e;
+            --light: #424242;
+            --dark: #f5f5f5;
+            --white: #1a1a1a;
+            --black: #f5f5f5;
+            --success: #66bb6a;
+            --warning: #ffb74d;
+            --error: #ef5350;
+            --info: #42a5f5;
+            --bg-color: #121212;
+            --text-color: #e0e0e0;
+            --card-bg: #2c2c2c;
+            --border-color: #424242;
+            --waiting: #ba68c8;
+            --timeout: #ff8a65;
+            --shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            --shadow-hover: 0 4px 15px rgba(0, 0, 0, 0.4);
         }
 
         * {
@@ -290,10 +290,10 @@
         .failed .status-icon { background: var(--gradient-error); color: white; }
         .completed .status-icon { background: var(--gradient-success); color: white; }
         .queuing .status-icon { background: var(--gradient-warning); color: white; }
-        .waiting .status-icon { background: linear-gradient(135deg, #9c27b0 0%, #673ab7 100%); color: white; }
-        .paused .status-icon { background: linear-gradient(135deg, #ff9800 0%, #ff5722 100%); color: white; }
-        .cancelled .status-icon { background: linear-gradient(135deg, #9e9e9e 0%, #607d8b 100%); color: white; }
-        .timeout .status-icon { background: linear-gradient(135deg, #ff5722 0%, #e64a19 100%); color: white; }
+        .waiting .status-icon { background: linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%); color: white; }
+        .paused .status-icon { background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%); color: white; }
+        .cancelled .status-icon { background: linear-gradient(135deg, #757575 0%, #616161 100%); color: white; }
+        .timeout .status-icon { background: linear-gradient(135deg, #ff5722 0%, #d84315 100%); color: white; }
 
         .tasks-panel {
             background: var(--card-bg);
@@ -390,12 +390,60 @@
             color: var(--text-color);
             margin-bottom: 4px;
             word-break: break-word;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 200px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s;
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid transparent;
+        }
+
+        .task-name:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+            border-color: var(--border-color);
+        }
+
+        .task-name.expanded {
+            white-space: normal;
+            text-overflow: unset;
+            overflow: visible;
+            max-width: none;
+            background-color: rgba(0, 0, 0, 0.05);
+            border-color: var(--border-color);
         }
 
         .task-id {
             color: var(--secondary);
             font-size: 0.75rem;
             word-break: break-all;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 200px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s;
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid transparent;
+        }
+
+        .task-id:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+            border-color: var(--border-color);
+        }
+
+        .task-id.expanded {
+            white-space: normal;
+            text-overflow: unset;
+            overflow: visible;
+            max-width: none;
+            background-color: rgba(0, 0, 0, 0.05);
+            border-color: var(--border-color);
         }
 
         .task-type {
@@ -418,14 +466,14 @@
             font-weight: 500;
         }
 
-        .status-running { background: rgba(68, 138, 255, 0.1); color: var(--info); }
-        .status-failed { background: rgba(255, 82, 82, 0.1); color: var(--error); }
-        .status-completed { background: rgba(0, 200, 83, 0.1); color: var(--success); }
-        .status-queuing { background: rgba(255, 171, 0, 0.1); color: var(--warning); }
+        .status-running { background: rgba(76, 175, 80, 0.1); color: var(--success); }
+        .status-failed { background: rgba(244, 67, 54, 0.1); color: var(--error); }
+        .status-completed { background: rgba(76, 175, 80, 0.1); color: var(--success); }
+        .status-queuing { background: rgba(255, 152, 0, 0.1); color: var(--warning); }
         .status-waiting { background: rgba(156, 39, 176, 0.1); color: var(--waiting); }
         .status-paused { background: rgba(255, 152, 0, 0.1); color: #ff9800; }
-        .status-cancelled { background: rgba(158, 158, 158, 0.1); color: var(--secondary); }
-        .status-timeout { background: rgba(255, 109, 0, 0.1); color: var(--timeout); }
+        .status-cancelled { background: rgba(117, 117, 117, 0.1); color: var(--secondary); }
+        .status-timeout { background: rgba(255, 87, 34, 0.1); color: var(--timeout); }
 
         .status-indicator {
             display: inline-block;
@@ -492,7 +540,7 @@
             color: var(--error);
             font-size: 0.8rem;
             padding: 8px 12px;
-            background-color: rgba(255, 82, 82, 0.05);
+            background-color: rgba(244, 67, 54, 0.05);
             border-radius: var(--border-radius);
             margin-top: 6px;
             word-break: break-word;
@@ -531,7 +579,7 @@
         }
 
         .highlight {
-            background-color: rgba(255, 235, 59, 0.3);
+            background-color: rgba(33, 150, 243, 0.3);
             padding: 0 2px;
             border-radius: 2px;
         }
@@ -744,6 +792,10 @@
             .task-table th:nth-child(4),
             .task-table td:nth-child(4) {
                 display: none;
+            }
+
+            .task-name, .task-id {
+                max-width: 150px;
             }
         }
     </style>
@@ -1081,6 +1133,11 @@
         }
     }
 
+    // Toggle expanded state for task name and ID
+    function toggleExpand(element) {
+        element.classList.toggle('expanded');
+    }
+
     // Handle button click actions
     async function handleAction(taskId, action, taskType) {
         console.log(`${action} task: ${taskId}, type: ${taskType}`);
@@ -1274,8 +1331,8 @@
                     return `
                     <tr class="task-row" data-task-id="${task.id}">
                         <td class="task-info">
-                            <div class="task-name">${highlightText(task.name || 'Unnamed task', searchTerm)}</div>
-                            <div class="task-id">ID: ${task.id}</div>
+                            <div class="task-name" onclick="toggleExpand(this)">${highlightText(task.name || 'Unnamed task', searchTerm)}</div>
+                            <div class="task-id" onclick="toggleExpand(this)">ID: ${task.id}</div>
                         </td>
                         <td><span class="task-type">${task.type || 'N/A'}</span></td>
                         <td>
@@ -1478,8 +1535,8 @@
     // Initial load
     fetchData();
 
-    // Auto-refresh every 1 seconds
-    setInterval(fetchData, 1000);
+    // Auto-refresh every 4 seconds
+    setInterval(fetchData, 4000);
 </script>
 </body>
 </html>

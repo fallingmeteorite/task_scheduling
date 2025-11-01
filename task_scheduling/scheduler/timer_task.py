@@ -12,8 +12,8 @@ from typing import Callable, Dict, List, Tuple, Optional, Any
 from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
-from ..control import ThreadTaskManager, ThreadTerminator, StopException, ThreadingTimeout, TimeoutException, \
-    ThreadSuspender
+from ..control import ThreadTaskManager
+from ..handling import ThreadTerminator, StopException, ThreadingTimeout, TimeoutException, ThreadSuspender
 
 # Create Manager instance
 _task_manager = ThreadTaskManager()

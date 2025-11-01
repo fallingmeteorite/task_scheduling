@@ -11,7 +11,8 @@ from functools import partial
 from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
-from ..control import ThreadTaskManager, ThreadSuspender
+from ..control import ThreadTaskManager
+from ..handling import ThreadSuspender
 
 # Create Manager instance
 _task_manager = ThreadTaskManager()

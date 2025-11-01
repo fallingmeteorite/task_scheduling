@@ -1,1 +1,1 @@
-include task_scheduling/config/config.yaml
+include task_scheduling/config/config.json

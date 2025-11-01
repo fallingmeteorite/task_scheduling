@@ -5,34 +5,20 @@
 
 一个功能强大的Python任务调度库,支持异步和同步任务执行,提供强大的任务管理和监控功能(已支持`NO GIL`)
 
-## 功能特性
+## 核心功能
 
-### 核心功能
-
-- 任务调度: 支持异步代码和同步代码,相同类型的任务自动排队执行
+- 任务调度: 支持异步代码和同步代码,相同名称的任务自动排队执行
 - 任务管理: 强大的任务状态监控和管理能力
-- 灵活终止: 支持向执行代码发送终止命令
+- 灵活控制: 支持向执行代码发送(终止,暂停,恢复)命令
 - 超时处理: 可为任务启用超时检测,长时间运行的任务会被强制终止
-- 状态查询: 通过接口直接获取任务当前状态(完成,错误,超时等)
-- 智能休眠: 无任务时自动休眠节省资源
-
-### 高级特性
-
-- 任务优先级管理(低优先级/高优先级)
-- 任务暂停与恢复
-- 任务结果获取
-- 禁用任务管理
-- 队列任务取消
-- 线程级任务管理(实验性功能)
-
-### 警告
-
-- 代码不支持终止堵塞任务,比如写入,网络请求,请务必添加对应逻辑比如超时中断,对于运算任务和其他任务只要没有堵塞(
-  即代码还在运行而不是等待即可终止)
-- 对于time.sleep,库给出了替代的版本,当要进行长时间等待请使用`interruptible_sleep`,异步代码使用`await asyncio.sleep`
-- 如果需要检查错误和查找报错位置,请设置日志等级为`set_log_level("DEBUG")`,设置配置文件`exception_thrown: True`
-- 下面介绍的函数对于4个调度器都适用,特殊的函数的将会专门标记
-- 同名任务会排队执行,如果不希望出现,可以将传入的`task_name`添加后缀标识
+- 状态查询: 通过接口直接获取任务当前状态或者网页控制端
+- 智能休眠: 无任务时会自动休眠节省资源
+- 优先级管理: 在任务过多时高优先级的任务会优先运行
+- 结果获取: 可以获取任务返回的运行结果
+- 任务禁用管理: 可以在黑名单中添加任务名称,该名称的任务添加会被阻拦
+- 队列任务取消: 可以取消还在排队的同名称的所有任务
+- 线程级任务管理(实验性功能): 灵活的任务结构管理
+- 任务树模式管理(实验性功能): 当主任务结束,其他所有分支任务都会被销毁
 
 ## 安装
 
@@ -42,7 +28,11 @@ pip install --upgrade task_scheduling
 
 ## 命令行运行
 
-!!!不支持对于任务的精密控制!!!
+### !!!警告!!!
+
+不支持对于任务的精密控制
+
+### 使用示例:
 
 ```
 python -m task_scheduling
@@ -61,11 +51,11 @@ python -m task_scheduling
 
 使用 `ctrl + c` 退出运行
 
-## 核心API详解
+# 核心API详解
 
-- 对于`NO GIL`的支持
+### 对于`NO GIL`的支持
 
-使用python3.14以上的版本并开启`NO GIL`设置既可以使用,如果启动了`NO GIL`,则会输出`Free threaded is enabled`
+使用python3.14以上的版本开启`NO GIL`既可以使用,运行时会输出`Free threaded is enabled`
 
 运行下面示例在`GIL`和`NO GIL`版本查看速度差别
 
@@ -132,8 +122,9 @@ if __name__ == "__main__":
         shutdown(True)
 ```
 
+## 修改日志等级
 
-- 修改日志等级
+### !!!警告!!!
 
 请放在`if __name__ == "__main__":`前面
 
@@ -148,7 +139,11 @@ if __name__ == "__main__":
     ......
 ```
 
-- 开启监视页面
+## 开启监视页面
+
+网页端可以查看任务状态,运行时间,可以（暂停,终止,恢复）任务
+
+### 使用示例:
 
 ```
 from task_scheduling.web_ui import start_task_status_ui
@@ -157,16 +152,16 @@ from task_scheduling.web_ui import start_task_status_ui
 start_task_status_ui()
 ```
 
+## 创建任务
+
 - task_creation(delay: int or None, daily_time: str or None, function_type: str, timeout_processing: bool, task_name:
   str, func: Callable, *args, **kwargs) -> str or None:
 
-创建并调度任务执行
+### 参数说明:
 
-参数说明:
+**delay**: 延迟执行时间（秒），用于定时任务(不使用填写None)
 
-**delay**: 延迟执行时间（秒），用于定时任务
-
-**daily_time**: 每日执行时间，格式"HH:MM"，用于定时任务
+**daily_time**: 每日执行时间，格式"HH:MM"，用于定时任务(不使用填写None)
 
 **function_type**: 函数类型 (`scheduler_io`, `scheduler_cpu`, `scheduler_timer`)
 
@@ -178,7 +173,7 @@ start_task_status_ui()
 
 **priority**: 任务优先级 (`priority_low`, `priority_high`)
 
-*args, **kwargs: 函数参数
+**args, kwargs**: 函数参数
 
 返回值: 任务ID字符串
 
@@ -222,19 +217,21 @@ if __name__ == "__main__":
         shutdown(True)
 ```
 
+## 暂停或恢复任务运行
+
 - pause_and_resume_task(self, task_id: str, action: str) -> bool:
 
-暂停或恢复运行中的任务
+### !!!警告!!!
 
-参数说明:
+任务暂停时候,超时计时器依然在运作,如果需要使用暂停功能建议关闭超时处理,防止当任务恢复时候因为超时被终止
+
+### 参数说明:
 
 **task_id**: 要控制的任务ID
 
 **action**: (可填写`pause`, `resume`)
 
 返回值: 布尔值，表示操作是否成功
-
-!!!暂停时候,超时计时器还在运作,如果需要使用暂停功能建议关闭超时处理!!!
 
 ### 使用示例:
 
@@ -270,17 +267,21 @@ if __name__ == "__main__":
         shutdown(True)
 ```
 
+## 函数类型检查
+
 - FunctionRunner(self, func: Callable, task_name: str, *args, **kwargs) -> None:
 
-检查函数类型并记录仪(一共两个类型`scheduler_cpu`, `scheduler_io`)
+### 函数说明
 
-参数说明:
+检查函数类型并保存到文件(一共两个类型`scheduler_cpu`, `scheduler_io`)
 
-**func**:要检测的函数
+### 参数说明:
 
-**task_name**:函数名字
+**func**: 要检测的函数
 
-*args, **kwargs:函数参数
+**task_name**: 函数名字
+
+*args, **kwargs: 函数参数
 
 ### 使用示例:
 
@@ -320,19 +321,23 @@ if __name__ == "__main__":
     io_runner.run()
 ```
 
+## 读取函数类型
+
 - task_function_type.append_to_dict(task_name: str, function_type: str) -> None:
 
 - task_function_type.read_from_dict(task_name: str) -> Optional[str]:
 
-读取已存储函数的类型或写入，储存文件:`task_scheduling/function_data/task_type.pkl`
+### 函数说明
 
-参数说明:
+读取已存储函数的类型或写入，储存文件在:`task_scheduling/function_data/task_type.pkl`
 
-**task_name**:函数名字
+### 参数说明:
 
-**function_type**:要写入的函数类型(可填写为`scheduler_cpu`, `scheduler_io`)
+**task_name**: 函数名字
 
-*args, **kwargs:函数参数
+**function_type**: 要写入的函数类型(可填写为`scheduler_cpu`, `scheduler_io`)
+
+*args, **kwargs: 函数参数
 
 ### 使用示例:
 
@@ -345,15 +350,17 @@ print(task_function_type.read_from_dict("CPU_Task"))
 
 ```
 
+## 获取任务结果
+
 - get_task_result(task_id: str) -> Optional[Any]:
 
-获取已完成任务的返回值。
-
-参数说明:
-
-**task_id**: 任务ID
+### 函数说明
 
 返回值: 任务结果，如果未完成则返回None
+
+### 参数说明:
+
+**task_id**: 任务ID
 
 ### 使用示例:
 
@@ -389,11 +396,13 @@ if __name__ == "__main__":
         shutdown(True)
 ```
 
+## 获取所有任务状态
+
 - get_tasks_info() -> str:
 
-获取所有任务的信息。
+### 参数说明:
 
-返回值: 包含任务信息的格式化字符串
+返回值: 包含任务状态的字符串
 
 ### 使用示例:
 
@@ -417,15 +426,15 @@ if __name__ == "__main__":
         shutdown(True)
 ```
 
+## 获取特定任务状态
+
 - get_task_status(self, task_id: str) -> Optional[Dict[str, Optional[Union[str, float, bool]]]]:
 
-获取特定任务的详细状态信息。
+### 参数说明:
 
-参数说明:
+**task_id**: 任务ID
 
-- task_id: 任务ID
-
-返回值: 包含任务状态信息的字典
+返回值: 包含任务状态的字典
 
 ### 使用示例:
 
@@ -451,13 +460,13 @@ if __name__ == "__main__":
         shutdown(True)
 ```
 
+# 获取任务总数
+
 - get_task_count(self, task_name) -> int:
 
 - get_all_task_count(self) -> Dict[str, int]:
 
-获取任务的总存在
-
-参数说明:
+### 参数说明:
 
 **task_name**:函数名字
 
@@ -482,14 +491,7 @@ if __name__ == "__main__":
     from task_scheduling.scheduler_management import task_status_manager
     from task_scheduling.variable import *
 
-    task_id1 = task_creation(None,
-                             None,
-                             scheduler_io,
-                             True,
-                             "task1",
-                             line_task,
-                             priority_low,
-                             input_info)
+    task_id1 = task_creation(None, None, scheduler_io, True, "task1", line_task, priority_low, input_info)
 
     print(task_status_manager.get_task_count("task1"))
     print(task_status_manager.get_all_task_count())
@@ -499,14 +501,17 @@ if __name__ == "__main__":
             time.sleep(1)
     except KeyboardInterrupt:
         shutdown(True)
-
 ```
+
+## 强制终止运行任务。
 
 - force_stop_task(task_id: str) -> bool:
 
-强制终止运行中的任务。
+### !!!警告!!!
 
-参数说明:
+代码不支持终止堵塞型任务,对于`time.sleep`给出了替代的版本,当要进行长时间等待请使用`interruptible_sleep`,异步代码使用`await asyncio.sleep`
+
+### 参数说明:
 
 **task_id**: 要终止的任务ID
 
@@ -544,13 +549,17 @@ if __name__ == "__main__":
         shutdown(True)
 ```
 
+## 添加或删除禁用任务名称
+
 - task_scheduler.add_ban_task_name(task_name: str) -> None:
 
 - task_scheduler.remove_ban_task_name(task_name: str) -> None:
 
-添加和删除禁用任务名称。已添加的任务会被阻止运行
+### 函数说明
 
-参数说明:
+当添加某类任务名称之后,该类任务将会被拦截阻止运行
+
+### 参数说明:
 
 **task_name**:函数名字
 
@@ -572,26 +581,15 @@ if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation, shutdown, task_scheduler
     from task_scheduling.variable import *
 
-    task_id1 = task_creation(None,
-                             None,
-                             scheduler_io,
-                             True,
-                             "task1",
-                             line_task,
-                             priority_low,
-                             input_info)
+    task_id1 = task_creation(None, None, scheduler_io, True, "task1", line_task, priority_low, input_info)
 
     task_scheduler.add_ban_task_name("task1")
 
-    task_id2 = task_creation(None,
-                             None,
-                             scheduler_io,
-                             True,
-                             "task1",
-                             line_task,
-                             input_info)
+    task_id2 = task_creation(None, None, scheduler_io, True, "task1", line_task, input_info)
 
     task_scheduler.remove_ban_task_name("task1")
+    
+    task_id3 = task_creation(None, None, scheduler_io, True, "task1", line_task, input_info)
 
     try:
         while True:
@@ -600,11 +598,11 @@ if __name__ == "__main__":
         shutdown(True)
 ```
 
+## 取消队列中某类任务
+
 - cancel_the_queue_task_by_name(self, task_name: str) -> None:
 
-取消队列中的某类任务
-
-参数说明:
+### 参数说明:
 
 **task_name**:函数名字
 
@@ -615,7 +613,7 @@ import time
 
 
 def line_task(input_info):
-    while True:
+    for i in range(5):
         time.sleep(1)
         print(input_info)
 
@@ -626,14 +624,9 @@ if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation, shutdown, task_scheduler
     from task_scheduling.variable import *
 
-    task_id1 = task_creation(None,
-                             None,
-                             scheduler_io,
-                             True,
-                             "task1",
-                             line_task,
-                             priority_low,
-                             input_info)
+    task_id1 = task_creation(None, None, scheduler_io, True, "task1", line_task, priority_low, input_info)
+    task_id2 = task_creation(None, None, scheduler_io, True, "task1", line_task, priority_low, input_info)
+    time.sleep(1)
 
     task_scheduler.cancel_the_queue_task_by_name("task1")
 
@@ -644,11 +637,15 @@ if __name__ == "__main__":
         shutdown(True)
 ```
 
+## 关闭调度器
+
 - shutdown(force_cleanup: bool) -> None:
 
-关闭调度器，必要代码在关闭时必须运行
+### !!!警告!!!
 
-参数说明:
+在关闭运行前必须执行该函数去结束和清理运行任务
+
+### 参数说明:
 
 **force_cleanup**:是否等待剩下任务运行
 
@@ -659,11 +656,15 @@ from task_scheduling.task_creation import shutdown
 shutdown(True)
 ```
 
+## 临时更新配置文件参数
+
 - update_config(key: str, value: Any) -> Any:
 
-临时更新配置文件中参数,请放在`if __name__ == "__main__":`前面
+### !!!警告!!!
 
-参数说明:
+请放在`if __name__ == "__main__":`前面
+
+### 参数说明:
 
 **key**: 键
 
@@ -682,9 +683,13 @@ if __name__ == "__main__":
 
 ## 线程级任务管理(实验性功能)
 
+### !!!警告!!!
+
 !!!该功能只支持CPU密集型线性任务!!!
 
-当配置文件中`thread_management=True`,开启该功能`线程级任务管理(实验性功能)`默认为关闭状态
+### 功能说明:
+
+`线程级任务管理(实验性功能)`默认为关闭状态,当配置文件中`thread_management=True`开启该功能
 
 `main_task`中前三位接受参数必须为`share_info`, `_sharedtaskdict`, `task_signal_transmission`
 
@@ -702,10 +707,9 @@ if __name__ == "__main__":
 
 这里提供两个控制函数:
 
-在主线程内使用`task_signal_transmission[_sharedtaskdict.read(task_name)] = ["action"]` action可以填写为`kill`,
-`pause`, `resume`, 也可以按顺序填写几个操作
+在主线程内使用`task_signal_transmission[_sharedtaskdict.read(task_name)] = ["action"]` action可以填写为`kill`, `pause`, `resume`, 也可以按顺序填写几个操作
 
-在主线程外部可以使用`cpu_liner_task.force_stop_task()`等上面介绍的api
+在主线程外部可以使用`force_stop_task()`
 
 ### 使用示例:
 
@@ -754,60 +758,113 @@ if __name__ == "__main__":
         shutdown(True)
 ```
 
+## 任务树模式管理(实验性功能)
+
+## 功能说明
+字典中的任务名字将会以`task_group_name|task_name`显示,当名字任务为`task_group_name`被结束,所有的以`task_group_name|task_name`显示的任务都会一并结束
+
+
+### 参数说明
+
+**task_group_name**:  这个任务树中的主任务名字(该任务实际只是一个载体),所有的分支任务都会加上该主任务的名字
+
+**task_dict**: `键`存储任务名字,`值`存储要执行的函数,是否启用超时检测和强制终止 (`True`, `False`),函数需要的参数(必须按照顺序)
+
+### 使用示例:
+
+```
+import time
+
+from task_scheduling.config import update_config
+
+
+def liner_task(input_info):
+    while True:
+        time.sleep(1)
+        print(input_info)
+
+
+update_config("thread_management", True)
+if __name__ == "__main__":
+    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.utils import task_group
+    from task_scheduling.web_ui import start_task_status_ui
+    from task_scheduling.variable import *
+
+    start_task_status_ui()
+
+    task_group_name = "main_task"
+
+    task_dict = {
+        "task1": (liner_task, True, 1111),
+        "task2": (liner_task, True, 2222),
+        "task3": (liner_task, True, 3333),
+    }
+
+    task_id1 = task_creation(
+        None, None, scheduler_cpu, True, task_group_name,
+        task_group, priority_low, task_group_name, task_dict)
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        shutdown(True)
+```
+
 ## 网页控制端
+
 ![01.png](https://github.com/fallingmeteorite/task_scheduling/blob/main/img/01.png)
 
 Task status UI available at http://localhost:8000
 
-- 观察任务运行状态
-
-- 可以控制任务(`终止`,`暂停`,`恢复`)
+- 观察任务运行状态并控制任务(`终止`,`暂停`,`恢复`)
 
 ## 配置
 
 文件存储在:`task_scheduling/config/config.yaml`
 
-同一类型的 CPU 密集型异步任务可以运行的最大数量
+同名称的 CPU 密集型异步任务可以运行的最大数量
 
 `cpu_asyncio_task: 8`
 
-IO 密集型异步任务中运行任务的最大数量
+IO 密集型异步任务运行最大任务数
 
 `io_asyncio_task: 20`
 
-CPU 密集型线性任务中运行任务的最大数量
+CPU 密集型线性任务中运行最大任务数
 
 `cpu_liner_task: 20`
 
-IO 密集型线性任务中运行任务的最大数量
+IO 密集型线性任务中运行最大任务数
 
 `io_liner_task: 20`
 
-定时器执行最多的任务
+定时器执行最多任务数
 
-`timer_task: 30`
+`timer_task: 20`
 
-当长时间没有任务时，关闭任务调度器（秒）
+当多长时间没有任务时,关闭任务调度器(秒)
 
-`max_idle_time: 60`
+`max_idle_time: 600`
 
-当一个任务运行很长时间而未完成时，它会被强制结束（秒）
+当任务运行多久而未完成时,强制结束(秒)
 
-`watch_dog_time: 80`
+`watch_dog_time: 120`
 
-任务状态中可以存储的最大记录数
+任务状态存储器中最大存储任务数
 
-`maximum_task_info_storage: 20`
+`maximum_task_info_storage: 40`
 
-检查任务状态是否正确需要多少秒，建议使用较长的时间间隔（秒）
+多久检查存储器中任务状态是否正确(秒)
 
 `status_check_interval: 800`
 
-是否在进程中启用线程管理
+是否在 CPU 密集型线性任务中启用超级线程管理
 
 `thread_management: False`
 
-是否应该抛出异常以便定位错误
+是否应该抛出异常而不捕获以便定位错误
 
 `exception_thrown: False`
 

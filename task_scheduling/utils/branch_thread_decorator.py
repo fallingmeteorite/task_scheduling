@@ -3,12 +3,13 @@
 import time
 import uuid
 from functools import wraps
+from typing import Any, Callable
 
 from ..common import logger
 from ..config import config
 
 
-def branch_thread_control(share_info, _sharedtaskdict, timeout_processing, task_name):
+def branch_thread_control(share_info: Any, _sharedtaskdict: Any, timeout_processing: bool, task_name: str) -> Any:
     """
         Control part of the running function.
 
@@ -64,13 +65,12 @@ def branch_thread_control(share_info, _sharedtaskdict, timeout_processing, task_
                             task_status_queue.put(("completed", task_id, None, None, time.time(), None, None))
                         task_manager.remove(task_id)
 
-
         return wrapper
 
     return decorator
 
 
-def wait_branch_thread_ended(func):
+def wait_branch_thread_ended(func: Callable) -> Any:
     @wraps(func)
     def wrapper(*args, **kwargs):
         # Get Task Manager

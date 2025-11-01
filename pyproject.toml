@@ -1,6 +1,6 @@
 [project]
 name = "task_scheduling"
-version = "4.0.3"
+version = "4.1.0"
 description = "It is mainly used for task scheduling"
 
 authors = [
@@ -11,7 +11,7 @@ dependencies = ["loguru"]
 
 requires-python = ">=3.8"
 
-dynamic = ["license"]
+license = "MIT"
 
 classifiers = [
     "Programming Language :: Python :: 3.8",
@@ -21,7 +21,6 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 
@@ -35,3 +34,7 @@ content-type = "text/markdown"
 
 [tool.setuptools.packages]
 find = { }
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"

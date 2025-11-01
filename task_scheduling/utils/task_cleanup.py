@@ -8,7 +8,7 @@ import threading
 from ..common import logger
 
 
-def worker_initializer():
+def exit_cleanup() -> None:
     """
     Used to fix the error that occurs when ending a task after the process is recycled.
     """

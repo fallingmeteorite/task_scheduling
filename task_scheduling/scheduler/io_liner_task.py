@@ -12,13 +12,14 @@ from typing import Callable, Dict, Tuple, Optional, Any
 from ..common import logger
 from ..config import config
 from ..manager import task_status_manager
-from ..control import ThreadTaskManager, ThreadTerminator, StopException, ThreadingTimeout, TimeoutException, \
-    ThreadSuspender
+from ..control import ThreadTaskManager
+from ..handling import TimeoutException, ThreadSuspender, StopException, ThreadingTimeout, ThreadTerminator
 from ..tools import TaskCounter
 
+
 # Create Manager instance
-_task_manager = ThreadTaskManager()
 _task_counter = TaskCounter("io_liner_task")
+_task_manager = ThreadTaskManager()
 _threadsuspender = ThreadSuspender()
 _threadterminator = ThreadTerminator()
 
@@ -389,5 +390,6 @@ class IoLinerTask:
                 del self._task_results[task_id]
             return result
         return None
+
 
 io_liner_task = IoLinerTask()
