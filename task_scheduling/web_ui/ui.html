@@ -1101,7 +1101,7 @@
     // Check if task supports actions
     function canPerformActions(status) {
         const lowerStatus = status.toLowerCase();
-        return ['running', 'queuing', 'waiting', 'paused'].includes(lowerStatus);
+        return ['running', 'waiting', 'paused'].includes(lowerStatus);
     }
 
     // Check if task can be paused
@@ -1119,7 +1119,7 @@
     // Check if task can be terminated
     function canTerminate(status) {
         const lowerStatus = status.toLowerCase();
-        return ['running', 'queuing', 'waiting', 'paused'].includes(lowerStatus);
+        return ['running', 'paused'].includes(lowerStatus);
     }
 
     // Set button loading state

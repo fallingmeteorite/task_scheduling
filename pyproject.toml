@@ -1,6 +1,6 @@
 [project]
 name = "task_scheduling"
-version = "4.1.0"
+version = "4.2.0"
 description = "It is mainly used for task scheduling"
 
 authors = [

@@ -5,8 +5,6 @@ import signal
 import sys
 import threading
 
-from ..common import logger
-
 
 def exit_cleanup() -> None:
     """
@@ -16,10 +14,7 @@ def exit_cleanup() -> None:
     def signal_handler(signum, frame):
         # Ignore the monitoring thread itself.
         if threading.active_count() <= 1:
-            logger.debug(f"Worker {os.getpid()}. Perform cleaning")
             sys.exit(0)
-        else:
-            logger.debug(f"Worker {os.getpid()}. There are tasks that have not been completed, and they will be forcibly terminated.")
 
     signal.signal(signal.SIGINT, signal_handler)  # Ctrl+C
     signal.signal(signal.SIGTERM, signal_handler)  # termination signal

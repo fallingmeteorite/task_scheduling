@@ -2,11 +2,23 @@
 # Author: fallingmeteorite
 import time
 import uuid
+import threading
+
 from functools import wraps
 from typing import Any, Callable
 
-from ..common import logger
-from ..config import config
+from ..common import logger, config
+
+
+def wait_ended() -> None:
+    """
+    Blocking the main thread from ending while a child thread has not finished leads to errors.
+    """
+    # Prevent errors caused by branch threads still running after the main thread ends
+    while True:
+        if threading.active_count() <= 2:
+            break
+        time.sleep(0.1)
 
 
 def branch_thread_control(share_info: Any, _sharedtaskdict: Any, timeout_processing: bool, task_name: str) -> Any:
@@ -14,11 +26,9 @@ def branch_thread_control(share_info: Any, _sharedtaskdict: Any, timeout_process
         Control part of the running function.
 
         Args:
-            task_manager (Any): Thread manager, used for a series of operations such as stopping and pausing.
-            _threadterminator (Any): Terminate instance.
-            StopException (Any): Error handling.
+            share_info (Any): Share information
+            _sharedtaskdict (Any): Shared dictionary
             timeout_processing (bool): Enable timeout handling.
-            task_status_queue (queue.Queue): State transfer queue.
             task_name (str): task name.
         """
     task_manager, _threadterminator, StopException, ThreadingTimeout, TimeoutException, _threadsuspender, task_status_queue = share_info
@@ -76,7 +86,7 @@ def wait_branch_thread_ended(func: Callable) -> Any:
         # Get Task Manager
         task_manager = args[0][0]
         result = func(*args, **kwargs)
-        task_manager.wait()
+        wait_ended()
         return result
 
     return wrapper

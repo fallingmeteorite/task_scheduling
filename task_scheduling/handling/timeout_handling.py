@@ -11,7 +11,7 @@ or callables with a context manager or a decorator.
 import ctypes
 import threading
 
-from .utils import TimeoutException, BaseTimeout, base_timeoutable
+from .utils import BaseTimeout, base_timeoutable, TimeoutException
 
 
 def _async_raise(target_tid, exception):

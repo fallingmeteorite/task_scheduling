@@ -1,13 +1,225 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
 import os
+import time
 import json
 import threading
+
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
+from typing import Dict, Any
 
-from ..scheduler import io_asyncio_task, io_liner_task, cpu_liner_task, cpu_asyncio_task, timer_task
-from ..common import logger
+from ..common import logger, config
+from ..manager import task_status_manager
+from ..scheduler import kill_api, pause_api, resume_api
+
+
+def format_tasks_info(tasks_dict: Dict[str, Dict[str, Any]]) -> str:
+    """
+    Format task information into a readable string with statistics.
+
+    Args:
+        tasks_dict: Dictionary containing task information with task_id as keys
+                   and task details as values
+
+    Returns:
+        str: Formatted string containing task statistics and individual task details
+    """
+    # Initialize counters
+    tasks_queue_size = 0
+    running_tasks_count = 0
+    failed_tasks_count = 0
+    completed_tasks_count = 0
+
+    # Process each task and collect formatted information
+    formatted_tasks = []
+
+    for task_id, task_info in tasks_dict.items():
+        # Update counters based on task status
+        status = task_info.get('status', 'unknown')
+
+        if status == 'running':
+            running_tasks_count += 1
+        elif status == 'failed':
+            failed_tasks_count += 1
+        elif status == 'completed':
+            completed_tasks_count += 1
+        elif status in ['waiting', 'queuing']:
+            tasks_queue_size += 1
+
+        # Format individual task information
+        task_str = _format_single_task(task_id, task_info)
+        formatted_tasks.append(task_str)
+
+    # Create statistics header
+    stats_header = _create_stats_header(
+        total_tasks=len(tasks_dict),
+        queue_size=tasks_queue_size,
+        running_count=running_tasks_count,
+        failed_count=failed_tasks_count,
+        completed_count=completed_tasks_count
+    )
+
+    # Combine header and task details
+    output = stats_header
+    if formatted_tasks:
+        output += "\n\nTask Details:\n" + "\n".join(formatted_tasks)
+
+    return output
+
+
+def _format_single_task(task_id: str, task_info: Dict[str, Any]) -> str:
+    """
+    Format information for a single task.
+
+    Args:
+        task_id: Unique identifier for the task
+        task_info: Dictionary containing task details
+
+    Returns:
+        str: Formatted string for the task
+    """
+    task_name = task_info.get('task_name', 'Unknown')
+    status = task_info.get('status', 'unknown')
+    task_type = task_info.get('task_type', 'Unknown')
+
+    # Calculate elapsed time
+    elapsed_time = _calculate_elapsed_time(task_info)
+
+    # Format base task information
+    task_str = (f"name: {task_name}, id: {task_id}, "
+                f"status: {status}, elapsed time: {elapsed_time}, task_type: {task_type}")
+
+    # Add error information if present
+    error_info = task_info.get('error_info')
+    if error_info is not None:
+        task_str += f"\n  error_info: {error_info}"
+
+    return task_str
+
+
+def _calculate_elapsed_time(task_info: Dict[str, Any]) -> str:
+    """
+    Calculate and format the elapsed time for a task.
+
+    Args:
+        task_info: Dictionary containing task timing information
+
+    Returns:
+        str: Formatted elapsed time string
+    """
+    start_time = task_info.get('start_time')
+    end_time = task_info.get('end_time')
+    current_time = time.time()
+
+    # Handle cases where start time is not available
+    if start_time is None:
+        return "N/A"
+
+    # Calculate elapsed time based on task state
+    if end_time is None:
+        # Task is still running
+        elapsed = current_time - start_time
+        if elapsed > config.get("watch_dog_time", float('inf')):
+            return "timeout"
+    else:
+        # Task has completed
+        elapsed = end_time - start_time
+        if elapsed > config.get("watch_dog_time", float('inf')):
+            return "timeout"
+
+    # Format the elapsed time
+    if elapsed < 0.1:
+        return f"{elapsed * 1000:.1f}ms"
+    else:
+        return f"{elapsed:.2f}s"
+
+
+def _create_stats_header(total_tasks: int, queue_size: int, running_count: int,
+                         failed_count: int, completed_count: int) -> str:
+    """
+    Create the statistics header for the task report.
+
+    Args:
+        total_tasks: Total number of tasks
+        queue_size: Number of tasks in queue
+        running_count: Number of running tasks
+        failed_count: Number of failed tasks
+        completed_count: Number of completed tasks
+
+    Returns:
+        str: Formatted statistics header
+    """
+    return (f"Task Statistics:\n"
+            f"  Total Tasks: {total_tasks}\n"
+            f"  Queued: {queue_size}\n"
+            f"  Running: {running_count}\n"
+            f"  Completed: {completed_count}\n"
+            f"  Failed: {failed_count}")
+
+
+def get_tasks_info() -> str:
+    """
+    Get formatted information about all tasks.
+
+    Args:
+        task_status_dict: Dictionary containing task status information
+
+    Returns:
+        str: Formatted task information output with statistics and details
+    """
+    return format_tasks_info(task_status_manager._task_status_dict)
+
+
+def _terminate_task(task_id, task_type):
+    """
+    Terminate a task.
+
+    Args:
+        task_id (str): The ID of the task to terminate
+        task_type (str): The type of the task
+
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        return kill_api(task_type, task_id)
+    except:
+        return False
+
+
+def _pause_task(task_id, task_type):
+    """
+    Pause a task.
+
+    Args:
+        task_id (str): The ID of the task to pause
+        task_type (str): The type of the task
+
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        return pause_api(task_type, task_id)
+    except:
+        return False
+
+
+def _resume_task(task_id, task_type):
+    """
+    Resume a paused task.
+
+    Args:
+        task_id (str): The ID of the task to resume
+        task_type (str): The type of the task
+
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        return resume_api(task_type, task_id)
+    except:
+        return False
 
 
 def get_template_path():
@@ -141,7 +353,6 @@ class TaskControlHandler(BaseHTTPRequestHandler):
 
     def _handle_tasks(self):
         """Serve task information as JSON."""
-        from ..manager import get_tasks_info  # Import your task info function
         tasks_info = get_tasks_info()
         parsed_info = parse_task_info(tasks_info)
 
@@ -165,11 +376,11 @@ class TaskControlHandler(BaseHTTPRequestHandler):
             # Call corresponding API based on action
             result = None
             if action == 'terminate':
-                result = self._terminate_task(task_id, task_type)
+                result = _terminate_task(task_id, task_type)
             elif action == 'pause':
-                result = self._pause_task(task_id, task_type)
+                result = _pause_task(task_id, task_type)
             elif action == 'resume':
-                result = self._resume_task(task_id, task_type)
+                result = _resume_task(task_id, task_type)
             else:
                 self.send_response(404)
                 self.end_headers()
@@ -201,95 +412,6 @@ class TaskControlHandler(BaseHTTPRequestHandler):
                 'success': False,
                 'message': f'Internal server error: {str(e)}'
             }).encode('utf-8'))
-
-    def _terminate_task(self, task_id, task_type):
-        """
-        Terminate a task.
-
-        Args:
-            task_id (str): The ID of the task to terminate
-            task_type (str): The type of the task
-
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        try:
-
-            if task_type == "cpu_liner_task":
-                cpu_liner_task.force_stop_task(task_id)
-            elif task_type == "cpu_asyncio_task":
-                cpu_asyncio_task.force_stop_task(task_id)
-            elif task_type == "io_liner_task":
-                io_liner_task.force_stop_task(task_id)
-            elif task_type == "io_asyncio_task":
-                io_asyncio_task.force_stop_task(task_id)
-            elif task_type == "timer_task":
-                timer_task.force_stop_task(task_id)
-
-            # Temporary return success for testing
-            return True
-        except:
-            return False
-
-    def _pause_task(self, task_id, task_type):
-        """
-        Pause a task.
-
-        Args:
-            task_id (str): The ID of the task to pause
-            task_type (str): The type of the task
-
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        try:
-
-            if task_type == "cpu_liner_task":
-                cpu_liner_task.pause_and_resume_task(task_id, "pause")
-            elif task_type == "cpu_asyncio_task":
-                cpu_asyncio_task.pause_and_resume_task(task_id, "pause")
-            elif task_type == "io_liner_task":
-                io_liner_task.pause_and_resume_task(task_id, "pause")
-            elif task_type == "io_asyncio_task":
-                io_asyncio_task.pause_and_resume_task(task_id, "pause")
-            elif task_type == "timer_task":
-                timer_task.pause_and_resume_task(task_id, "pause")
-
-            # Temporary return success for testing
-            return True
-
-        except:
-            return False
-
-    def _resume_task(self, task_id, task_type):
-        """
-        Resume a paused task.
-
-        Args:
-            task_id (str): The ID of the task to resume
-            task_type (str): The type of the task
-
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        try:
-
-            if task_type == "cpu_liner_task":
-                cpu_liner_task.pause_and_resume_task(task_id, "resume")
-            elif task_type == "cpu_asyncio_task":
-                cpu_asyncio_task.pause_and_resume_task(task_id, "resume")
-            elif task_type == "io_liner_task":
-                io_liner_task.pause_and_resume_task(task_id, "resume")
-            elif task_type == "io_asyncio_task":
-                io_asyncio_task.pause_and_resume_task(task_id, "resume")
-            elif task_type == "timer_task":
-                timer_task.pause_and_resume_task(task_id, "resume")
-
-            # Temporary return success for testing
-            return True
-
-        except:
-            return False
 
     def log_message(self, format, *args):
         """Override to disable logging."""

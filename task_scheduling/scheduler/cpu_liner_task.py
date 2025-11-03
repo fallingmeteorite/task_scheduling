@@ -10,13 +10,11 @@ from functools import partial
 from multiprocessing.managers import DictProxy
 from typing import Callable, Dict, Tuple, Optional, Any
 
-from ..common import logger
-from ..config import config
+from ..common import logger, config
 from ..manager import task_status_manager, SharedTaskDict
 from ..control import ProcessTaskManager
 from ..handling import ThreadTerminator, StopException, ThreadSuspender, TimeoutException, ThreadingTimeout
-from ..utils import exit_cleanup
-from ..tools import TaskCounter, shared_task_info
+from .utils import exit_cleanup, TaskCounter, shared_task_info
 
 _task_counter = TaskCounter("cpu_liner_task")
 _threadsuspender = ThreadSuspender()
@@ -194,7 +192,7 @@ class CpuLinerTask:
                     if task_name in [details[1] for details in self._running_tasks.values()]:
                         return False
                 else:
-                    if not _task_counter.add(math.ceil(config["cpu_liner_task"])):
+                    if not _task_counter.add_count(math.ceil(config["cpu_liner_task"])):
                         return False
 
                 if self._scheduler_stop_event.is_set() and not self._scheduler_started:
@@ -309,7 +307,7 @@ class CpuLinerTask:
                                              shared_task_info.task_signal_transmission)
                     self._running_tasks[task_id] = [future, task_name, priority]
                     future.add_done_callback(partial(self._task_done, task_id))
-                _task_counter.schedule_tasks(self._running_tasks)
+                _task_counter.schedule_tasks(self._running_tasks, self.pause_task, self.resume_task)
 
     def _task_done(self,
                    task_id: str,
@@ -410,27 +408,37 @@ class CpuLinerTask:
 
         return True
 
-    def pause_and_resume_task(self,
-                              task_id: str, action: str) -> bool:
+    def pause_task(self,
+                   task_id: str) -> bool:
         """
-        pause and resume a task by its task ID.
+        pause a task by its task ID.
 
         :param task_id: Task ID.
-        :param action: Task action.
-        :return: bool: Whether the task was successfully pause and resume.
+        :return: bool: Whether the task was successfully pause.
         """
         if self._running_tasks.get(task_id) is None and not config["thread_management"]:
             logger.warning(f"task | {task_id} | does not exist or is already completed")
             return False
 
-        else:
-            if action == "pause":
-                # First ensure that the task is not paused.
-                shared_task_info.task_signal_transmission[task_id] = ["pause"]
-                shared_task_info.task_status_queue.put(("paused", task_id, None, None, None, None, None))
-            elif action == "resume":
-                shared_task_info.task_signal_transmission[task_id] = ["resume"]
-                shared_task_info.task_status_queue.put(("running", task_id, None, None, None, None, None))
+        shared_task_info.task_signal_transmission[task_id] = ["pause"]
+        shared_task_info.task_status_queue.put(("paused", task_id, None, None, None, None, None))
+
+        return True
+
+    def resume_task(self,
+                    task_id: str) -> bool:
+        """
+        resume a task by its task ID.
+
+        :param task_id: Task ID.
+        :return: bool: Whether the task was successfully resume.
+        """
+        if self._running_tasks.get(task_id) is None and not config["thread_management"]:
+            logger.warning(f"task | {task_id} | does not exist or is already completed")
+            return False
+
+        shared_task_info.task_signal_transmission[task_id] = ["resume"]
+        shared_task_info.task_status_queue.put(("running", task_id, None, None, None, None, None))
 
         return True
 

@@ -68,6 +68,3 @@ def configure_logger():
 
     # Mark the logger as configured
     _logger_configured = True
-
-# Example log message (only for debugging)
-# logger.info("Logger configuration completed")

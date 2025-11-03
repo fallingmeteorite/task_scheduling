@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
-
 import threading
 import ctypes
 import platform
+
 from contextlib import contextmanager
 from typing import Dict
 
@@ -76,7 +76,7 @@ class ThreadSuspender:
             del self._handles[tid]
             return True
 
-    def _pause_thread(self, tid: int) -> bool:
+    def pause_thread(self, tid: int) -> bool:
         """Internal method: Pause a thread"""
         with self._lock:
             if tid not in self._handles:
@@ -90,7 +90,7 @@ class ThreadSuspender:
                     raise RuntimeError("Failed to pause thread")
             return True
 
-    def _resume_thread(self, tid: int) -> bool:
+    def resume_thread(self, tid: int) -> bool:
         """Internal method: Resume a thread"""
         with self._lock:
             if tid not in self._handles:
@@ -103,6 +103,7 @@ class ThreadSuspender:
                 if self._libc.pthread_kill(tid, 18) != 0:  # SIGCONT
                     raise RuntimeError("Failed to resume thread")
             return True
+
 
 class _ThreadControl:
     """Thread control interface (for internal use only)"""
@@ -117,7 +118,7 @@ class _ThreadControl:
         if self._paused:
             raise RuntimeError("Thread already paused")
 
-        if self._controller._pause_thread(self._tid):
+        if self._controller.pause_thread(self._tid):
             self._paused = True
         else:
             raise RuntimeError("Failed to pause thread")
@@ -127,7 +128,7 @@ class _ThreadControl:
         if not self._paused:
             raise RuntimeError("Thread not paused")
 
-        if self._controller._resume_thread(self._tid):
+        if self._controller.resume_thread(self._tid):
             self._paused = False
         else:
             raise RuntimeError("Failed to resume thread")

@@ -19,6 +19,7 @@
 - 队列任务取消: 可以取消还在排队的同名称的所有任务
 - 线程级任务管理(实验性功能): 灵活的任务结构管理
 - 任务树模式管理(实验性功能): 当主任务结束,其他所有分支任务都会被销毁
+- 依赖型任务执行(实验性功能): 依赖于主任务返回结果运行的函数将启动并运行
 
 ## 安装
 
@@ -82,36 +83,37 @@ from task_scheduling.common import set_log_level
 set_log_level("DEBUG")
 
 if __name__ == "__main__":
-    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
     from task_scheduling.variable import *
 
     task_creation(
-        None, None, scheduler_io, True, "task1",
+        None, None, FUNCTION_TYPE_IO, True, "task1",
         linear_task, priority_low, "task1"
     )
 
     task_creation(
-        None, None, scheduler_io, True, "task2",
+        None, None, FUNCTION_TYPE_IO, True, "task2",
         linear_task, priority_low, "task2"
     )
 
     task_creation(
-        None, None, scheduler_io, True, "task3",
+        None, None, FUNCTION_TYPE_IO, True, "task3",
         linear_task, priority_low, "task3"
     )
 
     task_creation(
-        None, None, scheduler_io, True, "task4",
+        None, None, FUNCTION_TYPE_IO, True, "task4",
         linear_task, priority_low, "task4"
     )
 
     task_creation(
-        None, None, scheduler_io, True, "task5",
+        None, None, FUNCTION_TYPE_IO, True, "task5",
         linear_task, priority_low, "task5"
     )
 
     task_creation(
-        None, None, scheduler_io, True, "task6",
+        None, None, FUNCTION_TYPE_IO, True, "task6",
         linear_task, priority_low, "task6"
     )
 
@@ -119,7 +121,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        shutdown(True)
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 ## 修改日志等级
@@ -163,7 +165,7 @@ start_task_status_ui()
 
 **daily_time**: 每日执行时间，格式"HH:MM"，用于定时任务(不使用填写None)
 
-**function_type**: 函数类型 (`scheduler_io`, `scheduler_cpu`, `scheduler_timer`)
+**function_type**: 函数类型 (`FUNCTION_TYPE_IO`, `FUNCTION_TYPE_CPU`, `FUNCTION_TYPE_TIMER`)
 
 **timeout_processing**: 是否启用超时检测和强制终止 (`True`, `False`)
 
@@ -185,41 +187,69 @@ import time
 from task_scheduling.variable import *
 from task_scheduling.utils import interruptible_sleep
 
+
 def linear_task(input_info):
     for i in range(10):
         interruptible_sleep(1)
         print(f"Linear task: {input_info} - {i}")
+
 
 async def async_task(input_info):
     for i in range(10):
         await asyncio.sleep(1)
         print(f"Async task: {input_info} - {i}")
 
+
 if __name__ == "__main__":
-    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
+    from task_scheduling.web_ui import start_task_status_ui
+
+    start_task_status_ui()
 
     task_id1 = task_creation(
-        None, None, scheduler_io, True, "linear_task", 
+        None, None, FUNCTION_TYPE_IO, True, "linear_task",
         linear_task, priority_low, "Hello Linear"
     )
-    
+
     task_id2 = task_creation(
-        None, None, scheduler_io, True, "async_task",
+        None, None, FUNCTION_TYPE_IO, True, "async_task",
         async_task, priority_low, "Hello Async"
     )
-    
-    print(task_id1, task_id2)
-    
+
+    task_id3 = task_creation(
+        None, None, FUNCTION_TYPE_CPU, True, "linear_task",
+        linear_task, priority_low, "Hello Linear"
+    )
+
+    task_id4 = task_creation(
+        None, None, FUNCTION_TYPE_CPU, True, "async_task",
+        async_task, priority_low, "Hello Async"
+    )
+
+    task_id5 = task_creation(
+        10, None, FUNCTION_TYPE_TIMER, True, "timer_task",
+        linear_task, priority_low, "Hello Timer"
+    )
+
+    task_id6 = task_creation(
+        None, "16:32", FUNCTION_TYPE_TIMER, True, "timer_task",
+        linear_task, priority_low, "Hello Timer"
+    )
+
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        shutdown(True)
+        task_scheduler.shutdown_scheduler(True)
+
 ```
 
 ## 暂停或恢复任务运行
 
-- pause_and_resume_task(self, task_id: str, action: str) -> bool:
+- pause_api(task_type: str, task_id: str) -> bool:
+
+- resume_api(task_type: str, task_id: str) -> bool:
 
 ### !!!警告!!!
 
@@ -227,9 +257,9 @@ if __name__ == "__main__":
 
 ### 参数说明:
 
-**task_id**: 要控制的任务ID
+**task_type**: 任务所在的调度器 (`CPU_ASYNCIO`, `IO_ASYNCIO`, `CPU_LINER`, `IO_LINER`, `TIMER`)
 
-**action**: (可填写`pause`, `resume`)
+**task_id**: 要控制的任务ID
 
 返回值: 布尔值，表示操作是否成功
 
@@ -237,7 +267,6 @@ if __name__ == "__main__":
 
 ```
 import time
-from task_scheduling.variable import *
 from task_scheduling.utils import interruptible_sleep
 
 
@@ -248,77 +277,25 @@ def long_running_task():
 
 
 if __name__ == "__main__":
-    from task_scheduling.scheduler import io_liner_task
-    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.variable import *
+    from task_scheduling.scheduler import pause_api, resume_api
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
 
     task_id = task_creation(
-        None, None, scheduler_io, True, "long_task",
+        None, None, FUNCTION_TYPE_IO, True, "long_task",
         long_running_task, priority_low
     )
     time.sleep(2)
-    io_liner_task.pause_and_resume_task(task_id, "pause")  
+    pause_api(IO_LINER, task_id)
     time.sleep(3)
-    io_liner_task.pause_and_resume_task(task_id, "resume")  
+    resume_api(IO_LINER, task_id)
 
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        shutdown(True)
-```
-
-## 函数类型检查
-
-- FunctionRunner(self, func: Callable, task_name: str, *args, **kwargs) -> None:
-
-### 函数说明
-
-检查函数类型并保存到文件(一共两个类型`scheduler_cpu`, `scheduler_io`)
-
-### 参数说明:
-
-**func**: 要检测的函数
-
-**task_name**: 函数名字
-
-*args, **kwargs: 函数参数
-
-### 使用示例:
-
-```
-import time
-
-import numpy as np
-
-
-def example_cpu_intensive_function(size, iterations):
-    start_time = time.time()
-    for _ in range(iterations):
-        # Create two random matrices
-        matrix_a = np.random.rand(size, size)
-        matrix_b = np.random.rand(size, size)
-        # Perform matrix multiplication
-        np.dot(matrix_a, matrix_b)
-    end_time = time.time()
-    print(
-        f"It took {end_time - start_time:.2f} seconds to calculate {iterations} times {size} times {size} matrix multiplication")
-
-
-async def example_io_intensive_function():
-    for i in range(5):
-        with open(f"temp_file_{i}.txt", "w") as f:
-            f.write("Hello, World!" * 1000000)
-        time.sleep(1)
-
-
-if __name__ == "__main__":
-    from task_scheduling.check import FunctionRunner
-
-    cpu_runner = FunctionRunner(example_cpu_intensive_function, "CPU_Task", 10000, 2)
-    cpu_runner.run()
-
-    io_runner = FunctionRunner(example_io_intensive_function, "IO_Task")
-    io_runner.run()
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 ## 读取函数类型
@@ -342,23 +319,24 @@ if __name__ == "__main__":
 ### 使用示例:
 
 ```
-from task_scheduling.check task_function_type
+from task_scheduling.mark import task_function_type
 from task_scheduling.variable import *
 
-task_function_type.append_to_dict("CPU_Task", scheduler_cpu)
+task_function_type.append_to_dict("CPU_Task", FUNCTION_TYPE_CPU)
 print(task_function_type.read_from_dict("CPU_Task"))
-
 ```
 
 ## 获取任务结果
 
-- get_task_result(task_id: str) -> Optional[Any]:
+- get_result_api(task_type: str, task_id: str) -> Any:
 
 ### 函数说明
 
 返回值: 任务结果，如果未完成则返回None
 
 ### 参数说明:
+
+**task_type**: 任务类型
 
 **task_id**: 任务ID
 
@@ -374,18 +352,19 @@ def calculation_task(x, y):
 
 
 if __name__ == "__main__":
-    from task_scheduling.scheduler import io_liner_task
-    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
+    from task_scheduling.scheduler import get_result_api
 
     task_id = task_creation(
-        None, None, scheduler_io, True, "long_task",
+        None, None, FUNCTION_TYPE_IO, True, "long_task",
         calculation_task, priority_low, 5, 10
     )
 
     while True:
-        result = io_liner_task.get_task_result(task_id)
+        result = get_result_api(IO_LINER, task_id)
         if result is not None:
-            print(result) 
+            print(result)
             break
         time.sleep(1)
 
@@ -393,7 +372,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        shutdown(True)
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 ## 获取所有任务状态
@@ -411,11 +390,12 @@ import time
 from task_scheduling.variable import *
 
 if __name__ == "__main__":
-    from task_scheduling.manager import get_tasks_info
-    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.web_ui import get_tasks_info
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
 
-    task_creation(None, None, scheduler_io, True, "task1", lambda: time.sleep(2), priority_low)
-    task_creation(None, None, scheduler_io, True, "task2", lambda: time.sleep(3), priority_low)
+    task_creation(None, None, FUNCTION_TYPE_IO, True, "task1", lambda: time.sleep(2), priority_low)
+    task_creation(None, None, FUNCTION_TYPE_IO, True, "task2", lambda: time.sleep(3), priority_low)
     time.sleep(1)
     print(get_tasks_info())
 
@@ -423,7 +403,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        shutdown(True)
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 ## 获取特定任务状态
@@ -440,14 +420,14 @@ if __name__ == "__main__":
 
 ```
 import time
-from task_scheduling.variable import *
 
 if __name__ == "__main__":
-    from task_scheduling.scheduler_management import task_status_manager
-    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.manager import task_status_manager, task_scheduler
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.variable import *
 
     task_id = task_creation(
-        None, None, scheduler_io, True, "status_task",
+        None, None, FUNCTION_TYPE_IO, True, "status_task",
         lambda: time.sleep(5), priority_low
     )
     time.sleep(1)
@@ -457,7 +437,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        shutdown(True)
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 # 获取任务总数
@@ -487,11 +467,11 @@ def line_task(input_info):
 input_info = "running..."
 
 if __name__ == "__main__":
-    from task_scheduling.task_creation import task_creation, shutdown
-    from task_scheduling.scheduler_management import task_status_manager
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_status_manager, task_scheduler
     from task_scheduling.variable import *
 
-    task_id1 = task_creation(None, None, scheduler_io, True, "task1", line_task, priority_low, input_info)
+    task_id1 = task_creation(None, None, FUNCTION_TYPE_IO, True, "task1", line_task, priority_low, input_info)
 
     print(task_status_manager.get_task_count("task1"))
     print(task_status_manager.get_all_task_count())
@@ -500,18 +480,21 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        shutdown(True)
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 ## 强制终止运行任务。
 
-- force_stop_task(task_id: str) -> bool:
+- kill_api(task_type: str, task_id: str) -> bool
 
 ### !!!警告!!!
 
-代码不支持终止堵塞型任务,对于`time.sleep`给出了替代的版本,当要进行长时间等待请使用`interruptible_sleep`,异步代码使用`await asyncio.sleep`
+代码不支持终止堵塞型任务,对于`time.sleep`给出了替代的版本,当要进行长时间等待请使用`interruptible_sleep`,异步代码使用
+`await asyncio.sleep`
 
 ### 参数说明:
+
+**task_type**: 任务类型
 
 **task_id**: 要终止的任务ID
 
@@ -529,24 +512,25 @@ def infinite_task():
     while True:
         interruptible_sleep(1)
         print("running...")
-        
+
 
 if __name__ == "__main__":
-    from task_scheduling.scheduler import io_liner_task
-    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.scheduler import kill_api
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
 
     task_id = task_creation(
-        None, None, scheduler_io, True, "infinite_task",
+        None, None, FUNCTION_TYPE_IO, True, "infinite_task",
         infinite_task, priority_low
     )
     time.sleep(3)
-    io_liner_task.force_stop_task(task_id)  
+    kill_api(IO_LINER, task_id)
 
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        shutdown(True)
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 ## 添加或删除禁用任务名称
@@ -578,24 +562,24 @@ def line_task(input_info):
 input_info = "test"
 
 if __name__ == "__main__":
-    from task_scheduling.task_creation import task_creation, shutdown, task_scheduler
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
+    from task_scheduling.web_ui import start_task_status_ui
     from task_scheduling.variable import *
 
-    task_id1 = task_creation(None, None, scheduler_io, True, "task1", line_task, priority_low, input_info)
+    start_task_status_ui()
 
+    task_id1 = task_creation(None, None, FUNCTION_TYPE_IO, True, "task1", line_task, priority_low, input_info)
     task_scheduler.add_ban_task_name("task1")
-
-    task_id2 = task_creation(None, None, scheduler_io, True, "task1", line_task, input_info)
-
+    task_id2 = task_creation(None, None, FUNCTION_TYPE_IO, True, "task1", line_task, priority_low, input_info)
     task_scheduler.remove_ban_task_name("task1")
-    
-    task_id3 = task_creation(None, None, scheduler_io, True, "task1", line_task, input_info)
+    task_id3 = task_creation(None, None, FUNCTION_TYPE_IO, True, "task1", line_task, priority_low, "1111")
 
     try:
         while True:
             time.sleep(1.0)
     except KeyboardInterrupt:
-        shutdown(True)
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 ## 取消队列中某类任务
@@ -613,7 +597,7 @@ import time
 
 
 def line_task(input_info):
-    for i in range(5):
+    while True:
         time.sleep(1)
         print(input_info)
 
@@ -621,11 +605,15 @@ def line_task(input_info):
 input_info = "test"
 
 if __name__ == "__main__":
-    from task_scheduling.task_creation import task_creation, shutdown, task_scheduler
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
+    from task_scheduling.web_ui import start_task_status_ui
     from task_scheduling.variable import *
 
-    task_id1 = task_creation(None, None, scheduler_io, True, "task1", line_task, priority_low, input_info)
-    task_id2 = task_creation(None, None, scheduler_io, True, "task1", line_task, priority_low, input_info)
+    start_task_status_ui()
+
+    task_id1 = task_creation(None, None, FUNCTION_TYPE_IO, True, "task1", line_task, priority_low, input_info)
+    task_id2 = task_creation(None, None, FUNCTION_TYPE_IO, True, "task1", line_task, priority_low, input_info)
     time.sleep(1)
 
     task_scheduler.cancel_the_queue_task_by_name("task1")
@@ -634,12 +622,12 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        shutdown(True)
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 ## 关闭调度器
 
-- shutdown(force_cleanup: bool) -> None:
+- shutdown_scheduler(force_cleanup: bool) -> None:
 
 ### !!!警告!!!
 
@@ -652,8 +640,8 @@ if __name__ == "__main__":
 ### 使用示例:
 
 ```
-from task_scheduling.task_creation import shutdown
-shutdown(True)
+from task_scheduling.manager import task_scheduler
+task_scheduler.shutdown_scheduler(True)
 ```
 
 ## 临时更新配置文件参数
@@ -675,7 +663,7 @@ shutdown(True)
 ### 使用示例:
 
 ```
-from task_scheduling import update_config
+from task_scheduling.common import update_config
 update_config(key, value)
 if __name__ == "__main__":
     ...
@@ -699,17 +687,20 @@ if __name__ == "__main__":
 
 `@branch_thread_control`装饰器接收参数`share_info`, `_sharedtaskdict`, `timeout_processing`, `task_name`
 
-`task_name`必须是唯一不重复的,用于获取其他分支线程的task_id(使用`_sharedtaskdict.read(task_name)`获取task_id去终止，暂停或恢复)
+`task_name`必须是唯一不重复的,用于获取其他分支线程的task_id(使用`_sharedtaskdict.read(task_name)`
+获取task_id去终止，暂停或恢复)
 
-使用`threading.Thread`语句必须添加`daemon=True`将线程设置为守护线程(没有添加会让关闭操作时间增加,反正主线程结束,会强制终止所有分支线程)
+使用`threading.Thread`语句必须添加`daemon=True`将线程设置为守护线程(
+没有添加会让关闭操作时间增加,反正主线程结束,会强制终止所有分支线程)
 
 所有的分支线程都可以在网页端查看到运行状态(开启网页端请使用`start_task_status_ui()`)
 
 这里提供两个控制函数:
 
-在主线程内使用`task_signal_transmission[_sharedtaskdict.read(task_name)] = ["action"]` action可以填写为`kill`, `pause`, `resume`, 也可以按顺序填写几个操作
+在主线程内使用`task_signal_transmission[_sharedtaskdict.read(task_name)] = ["action"]` action可以填写为`kill`, `pause`,
+`resume`, 也可以按顺序填写几个操作
 
-在主线程外部可以使用`force_stop_task()`
+在主线程外部可以使用`kill_api()`
 
 ### 使用示例:
 
@@ -734,48 +725,49 @@ def main_task(share_info, sharedtaskdict, task_signal_transmission, input_info):
 
     # Use this statement to terminate the branch thread
     # time.sleep(4)
-    # task_signal_transmission[_sharedtaskdict.read(task_name)] = ["kill"]
+    # task_signal_transmission[sharedtaskdict.read(task_name)] = ["kill"]
 
 
-from task_scheduling.config import update_config
+from task_scheduling.common import update_config
 update_config("thread_management", True)
 
 if __name__ == "__main__":
-    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
     from task_scheduling.web_ui import start_task_status_ui
     from task_scheduling.variable import *
 
     start_task_status_ui()
 
     task_id1 = task_creation(
-        None, None, scheduler_cpu, True, "linear_task",
+        None, None, FUNCTION_TYPE_CPU, True, "linear_task",
         main_task, priority_low, "test")
 
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        shutdown(True)
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 ## 任务树模式管理(实验性功能)
 
-## 功能说明
-字典中的任务名字将会以`task_group_name|task_name`显示,当名字任务为`task_group_name`被结束,所有的以`task_group_name|task_name`显示的任务都会一并结束
+### 功能说明
 
+字典中的任务名字将会以`task_group_name|task_name`显示,当名字任务为`task_group_name`被结束,所有的以
+`task_group_name|task_name`显示的任务都会一并结束,`task_group`是这个任务树中的主任务(该任务实际只是一个载体,没有功能)
 
 ### 参数说明
 
-**task_group_name**:  这个任务树中的主任务名字(该任务实际只是一个载体),所有的分支任务都会加上该主任务的名字
+**task_group_name**:  这个任务树中的主任务名字((该任务实际只是一个载体,没有功能),所有的分支任务都会加上该主任务的名字
 
-**task_dict**: `键`存储任务名字,`值`存储要执行的函数,是否启用超时检测和强制终止 (`True`, `False`),函数需要的参数(必须按照顺序)
+**task_dict**: `键`存储任务名字,`值`存储要执行的函数,是否启用超时检测强制终止 (`True`, `False`) 和函数需要的参数 (
+必须按照顺序)
 
 ### 使用示例:
 
 ```
 import time
-
-from task_scheduling.config import update_config
 
 
 def liner_task(input_info):
@@ -784,10 +776,13 @@ def liner_task(input_info):
         print(input_info)
 
 
+from task_scheduling.common import update_config
+
 update_config("thread_management", True)
 if __name__ == "__main__":
-    from task_scheduling.task_creation import task_creation, shutdown
-    from task_scheduling.utils import task_group
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
+    from task_scheduling.quick_creation import task_group
     from task_scheduling.web_ui import start_task_status_ui
     from task_scheduling.variable import *
 
@@ -802,14 +797,85 @@ if __name__ == "__main__":
     }
 
     task_id1 = task_creation(
-        None, None, scheduler_cpu, True, task_group_name,
+        None, None, FUNCTION_TYPE_CPU, True, task_group_name,
         task_group, priority_low, task_group_name, task_dict)
 
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        shutdown(True)
+        task_scheduler.shutdown_scheduler(True)
+```
+
+## 依赖型任务执行(实验性功能)
+
+- trigger_task_condition(main_task_type: str, main_task_id: str, dependent_task: Callable, *args) -> None:
+
+### 功能说明
+
+使用`task_creation`创建完主任务后,使用`trigger_task_condition`函数设置依赖于主任务返回结果的运行函数,`main_task_type`
+填写主任务的任务类型.`main_task_id`填写主任务的任务id由task_creation传回,`dependent_task`
+填写要运行的依赖任务.后面为依赖任务需要的参数,主任务传回的参数在最后面,依赖任务参数前6位填写为`task_creation`所需要的六个参数：
+
+**delay**: 延迟执行时间（秒），用于定时任务(不使用填写None)
+
+**daily_time**: 每日执行时间，格式"HH:MM"，用于定时任务(不使用填写None)
+
+**function_type**: 函数类型 (`FUNCTION_TYPE_IO`, `FUNCTION_TYPE_CPU`, `FUNCTION_TYPE_TIMER`)
+
+**timeout_processing**: 是否启用超时检测和强制终止 (`True`, `False`)
+
+**func**: 要执行的函数
+
+**priority**: 任务优先级 (`priority_low`, `priority_high`)
+
+### 参数说明
+
+**main_task_type**:  主任务的任务类型
+
+**main_task_id**: 主任务的任务id
+
+**dependent_task**: 要运行的依赖任务
+
+**args**: 依赖任务需要的参数,主任务传回的参数在最后面.
+
+### !!!警告!!!
+
+主任务传回的参数必须为元组格式,不接受其他格式的参数.
+
+### 使用示例:
+
+```
+import time
+
+
+def mian_task(input_info):
+    time.sleep(8)
+    return input_info,
+
+
+def dependent_task(input_info, test):
+    print(input_info, test)
+
+
+if __name__ == "__main__":
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
+    from task_scheduling.followup_creation import trigger_task_condition
+    from task_scheduling.web_ui import start_task_status_ui
+    from task_scheduling.variable import *
+
+    start_task_status_ui()
+
+    task_id1 = task_creation(None, None, FUNCTION_TYPE_IO, True, "mian_task", mian_task, priority_low, "test1")
+
+    trigger_task_condition(IO_LINER, task_id1, dependent_task, None, None, FUNCTION_TYPE_IO, True, "dependent_task",
+                           priority_low, "test2")
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 ## 网页控制端

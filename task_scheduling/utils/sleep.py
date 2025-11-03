@@ -3,8 +3,10 @@
 import threading
 import time
 
+from typing import Union
 
-def interruptible_sleep(seconds: float or int) -> None:
+
+def interruptible_sleep(seconds: Union[float, int]) -> None:
     """
     Sleep for a specified number of seconds, but can be interrupted by setting an event.
 

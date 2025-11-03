@@ -8,8 +8,7 @@ from typing import Dict, Tuple, Callable, Optional, Any
 from concurrent.futures import Future, CancelledError
 from functools import partial
 
-from ..common import logger
-from ..config import config
+from ..common import logger, config
 from ..manager import task_status_manager
 from ..control import ThreadTaskManager
 from ..handling import ThreadSuspender
@@ -440,25 +439,37 @@ class IoAsyncioTask:
                 del self._task_results[task_id]
         return True
 
-    def pause_and_resume_task(self,
-                              task_id: str, action: str) -> bool:
+    def pause_task(self,
+                   task_id: str) -> bool:
         """
-        Pause and resume a task by its task ID.
+        pause a task by its task ID.
+
         :param task_id: Task ID.
-        :param action: Task action.
-        :return: bool: Whether the task was successfully pause and resume.
+        :return: bool: Whether the task was successfully pause.
         """
-        if not self._running_tasks.get(task_id, None):
-            logger.debug(f"task | {task_id} | does not exist or is already completed")
+        if self._running_tasks.get(task_id) is None and not config["thread_management"]:
+            logger.warning(f"task | {task_id} | does not exist or is already completed")
             return False
 
-        else:
-            if action == "pause":
-                _task_manager.pause_task(task_id)
-                task_status_manager.add_task_status(task_id, None, "paused", None, None, None, None, None)
-            elif action == "resume":
-                _task_manager.resume_task(task_id)
-                task_status_manager.add_task_status(task_id, None, "running", None, None, None, None, None)
+        _task_manager.pause_task(task_id)
+        task_status_manager.add_task_status(task_id, None, "paused", None, None, None, None, None)
+
+        return True
+
+    def resume_task(self,
+                    task_id: str) -> bool:
+        """
+        resume a task by its task ID.
+
+        :param task_id: Task ID.
+        :return: bool: Whether the task was successfully resume.
+        """
+        if self._running_tasks.get(task_id) is None and not config["thread_management"]:
+            logger.warning(f"task | {task_id} | does not exist or is already completed")
+            return False
+
+        _task_manager.resume_task(task_id)
+        task_status_manager.add_task_status(task_id, None, "running", None, None, None, None, None)
 
         return True
 

@@ -2,10 +2,9 @@
 # Author: fallingmeteorite
 import os
 import json
+
 from functools import lru_cache
 from typing import Dict, Any
-
-from ..common import logger
 
 # Global configuration dictionary to store loaded configurations
 config: Dict = {}
@@ -77,4 +76,4 @@ def ensure_config_loaded():
     if not config:
         result = _load_config()
         if result is not True:
-            logger.warning(f"Configuration file loading failed: {result}, the program may not run normally")
+            raise FileNotFoundError("Configuration file loading failed")

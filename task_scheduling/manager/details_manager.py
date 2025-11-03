@@ -3,7 +3,7 @@
 from collections import OrderedDict, Counter
 from typing import Dict, Optional, Union
 
-from ..config import config
+from ..common import config
 
 
 class TaskStatusManager:
@@ -72,6 +72,26 @@ class TaskStatusManager:
 
         return
 
+    def remove_task_status(self, task_name: str) -> None:
+        """
+        Remove all task status entries that are in "queuing" status and match the specified task name.
+
+        Args:
+            task_name (str): Task name to match for removal.
+        """
+        # Create a list of task IDs to remove
+        to_remove = []
+
+        for task_id, task_info in self._task_status_dict.items():
+            if (task_info.get('task_name') == task_name and
+                    task_info.get('status') == 'queuing'):
+                to_remove.append(task_id)
+
+        # Remove the identified tasks
+        for task_id in to_remove:
+            self._task_status_dict.pop(task_id, None)
+        del to_remove
+
     def _clean_up(self) -> None:
         """
         Clean up old task status entries if the dictionary exceeds the maximum storage limit.
@@ -84,6 +104,7 @@ class TaskStatusManager:
                     to_remove.append(k)
             for k in to_remove:
                 self._task_status_dict.pop(k)
+            del to_remove
 
     def get_task_status(self,
                         task_id: str) -> Optional[Dict[str, Optional[Union[str, float, bool]]]]:

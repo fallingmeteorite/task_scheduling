@@ -1,6 +1,9 @@
+# -*- coding: utf-8 -*-
+# Author: fallingmeteorite
 import threading
 import ctypes
 import platform
+
 from contextlib import contextmanager
 from typing import Dict
 
@@ -77,7 +80,7 @@ class ThreadTerminator:
             except Exception:
                 return False
 
-    def _raise_stop_exception(self, tid: int):
+    def raise_stop_exception(self, tid: int):
         """Raise StopException in target thread"""
         if self.platform == "Windows":
             # Use async exception on Windows
@@ -105,5 +108,5 @@ class TerminateController:
 
     def terminate(self):
         """Terminate the current thread by raising StopException in it"""
-        self._terminator._raise_stop_exception(self._tid)
+        self._terminator.raise_stop_exception(self._tid)
         # This line won't be reached as the thread will be terminated

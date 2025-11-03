@@ -9,13 +9,11 @@ from concurrent.futures import ThreadPoolExecutor, Future
 from functools import partial
 from typing import Callable, Dict, Tuple, Optional, Any
 
-from ..common import logger
-from ..config import config
+from ..common import logger, config
 from ..manager import task_status_manager
 from ..control import ThreadTaskManager
 from ..handling import TimeoutException, ThreadSuspender, StopException, ThreadingTimeout, ThreadTerminator
-from ..tools import TaskCounter
-
+from .utils import TaskCounter
 
 # Create Manager instance
 _task_counter = TaskCounter("io_liner_task")
@@ -151,7 +149,7 @@ class IoLinerTask:
                         return False
 
                 else:
-                    if not _task_counter.add(math.ceil(config["io_liner_task"])):
+                    if not _task_counter.add_count(math.ceil(config["io_liner_task"])):
                         return False
 
                 if self._scheduler_stop_event.is_set() and not self._scheduler_started:
@@ -257,7 +255,7 @@ class IoLinerTask:
                     self._running_tasks[task_id] = [future, task_name, priority]
 
                     future.add_done_callback(partial(self._task_done, task_id))
-                _task_counter.schedule_tasks(self._running_tasks)
+                _task_counter.schedule_tasks(self._running_tasks, self.pause_task, self.resume_task)
 
     # A function that executes a task
     def _task_done(self,
@@ -352,25 +350,37 @@ class IoLinerTask:
                 del self._task_results[task_id]
         return True
 
-    def pause_and_resume_task(self,
-                              task_id: str, action: str) -> bool:
+    def pause_task(self,
+                   task_id: str) -> bool:
         """
-        Pause and resume a task by its task ID.
+        pause a task by its task ID.
+
         :param task_id: Task ID.
-        :param action: Task action.
-        :return: bool: Whether the task was successfully pause and resume.
+        :return: bool: Whether the task was successfully pause.
         """
-        if not self._running_tasks.get(task_id, None):
+        if self._running_tasks.get(task_id) is None and not config["thread_management"]:
             logger.warning(f"task | {task_id} | does not exist or is already completed")
             return False
 
-        else:
-            if action == "pause":
-                _task_manager.pause_task(task_id)
-                task_status_manager.add_task_status(task_id, None, "paused", None, None, None, None, None)
-            elif action == "resume":
-                _task_manager.resume_task(task_id)
-                task_status_manager.add_task_status(task_id, None, "running", None, None, None, None, None)
+        _task_manager.pause_task(task_id)
+        task_status_manager.add_task_status(task_id, None, "paused", None, None, None, None, None)
+
+        return True
+
+    def resume_task(self,
+                    task_id: str) -> bool:
+        """
+        resume a task by its task ID.
+
+        :param task_id: Task ID.
+        :return: bool: Whether the task was successfully resume.
+        """
+        if self._running_tasks.get(task_id) is None and not config["thread_management"]:
+            logger.warning(f"task | {task_id} | does not exist or is already completed")
+            return False
+
+        _task_manager.resume_task(task_id)
+        task_status_manager.add_task_status(task_id, None, "running", None, None, None, None, None)
 
         return True
 

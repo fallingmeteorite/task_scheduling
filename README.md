@@ -3,11 +3,13 @@
 
 # Task Scheduling Library
 
-一个功能强大的Python任务调度库,支持异步和同步任务执行,提供强大的任务管理和监控功能(已支持`NO GIL`)
+A powerful Python task scheduling library that supports both asynchronous and synchronous task execution, providing
+robust task management and monitoring features (with `NO GIL` already supported)
 
 ## Core Features
 
-- Task Scheduling: Supports both asynchronous and synchronous code, tasks with the same name are automatically queued for execution
+- Task Scheduling: Supports both asynchronous and synchronous code, tasks with the same name are automatically queued
+  for execution
 - Task Management: Powerful task status monitoring and management capabilities
 - Flexible control: Supports sending (terminate, pause, resume) commands to the executing code
 - Timeout Handling: Timeout detection can be enabled for tasks, and long-running tasks will be forcibly terminated
@@ -19,6 +21,8 @@
 - Queue task cancellation: You can cancel all queued tasks with the same name
 - Thread-level task management (experimental feature): Flexible task structure management
 - Task tree mode management (experimental feature): When the main task ends, all other branch tasks will be terminated
+- Dependent Task Execution (Experimental Feature): Functions that rely on the results returned by the main task will be
+  triggered and executed.
 
 ## Installation
 
@@ -55,7 +59,8 @@ Use `ctrl c` to exit the program
 
 ### Support for `NO GIL`
 
-You can use it with Python version 3.14 or above by enabling `NO GIL`. During runtime, it will output `Free threaded is enabled`.
+You can use it with Python version 3.14 or above by enabling `NO GIL`. During runtime, it will output
+`Free threaded is enabled`.
 
 Run the following example to see the speed difference between the `GIL` and `NO GIL` versions
 
@@ -82,36 +87,37 @@ from task_scheduling.common import set_log_level
 set_log_level("DEBUG")
 
 if __name__ == "__main__":
-    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
     from task_scheduling.variable import *
 
     task_creation(
-        None, None, scheduler_io, True, "task1",
+        None, None, FUNCTION_TYPE_IO, True, "task1",
         linear_task, priority_low, "task1"
     )
 
     task_creation(
-        None, None, scheduler_io, True, "task2",
+        None, None, FUNCTION_TYPE_IO, True, "task2",
         linear_task, priority_low, "task2"
     )
 
     task_creation(
-        None, None, scheduler_io, True, "task3",
+        None, None, FUNCTION_TYPE_IO, True, "task3",
         linear_task, priority_low, "task3"
     )
 
     task_creation(
-        None, None, scheduler_io, True, "task4",
+        None, None, FUNCTION_TYPE_IO, True, "task4",
         linear_task, priority_low, "task4"
     )
 
     task_creation(
-        None, None, scheduler_io, True, "task5",
+        None, None, FUNCTION_TYPE_IO, True, "task5",
         linear_task, priority_low, "task5"
     )
 
     task_creation(
-        None, None, scheduler_io, True, "task6",
+        None, None, FUNCTION_TYPE_IO, True, "task6",
         linear_task, priority_low, "task6"
     )
 
@@ -119,7 +125,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        shutdown(True)
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 ## Change Log Level
@@ -163,7 +169,7 @@ start_task_status_ui()
 
 **daily_time**: Daily execution time, format "HH:MM", used for scheduled tasks (do not use None)
 
-**function_type**: Function types (`scheduler_io`, `scheduler_cpu`, `scheduler_timer`)
+**function_type**: Function types (`FUNCTION_TYPE_IO`, `FUNCTION_TYPE_CPU`, `FUNCTION_TYPE_TIMER`)
 
 **timeout_processing**: Whether to enable timeout detection and forced termination (`True`, `False`)
 
@@ -185,51 +191,80 @@ import time
 from task_scheduling.variable import *
 from task_scheduling.utils import interruptible_sleep
 
+
 def linear_task(input_info):
     for i in range(10):
         interruptible_sleep(1)
         print(f"Linear task: {input_info} - {i}")
+
 
 async def async_task(input_info):
     for i in range(10):
         await asyncio.sleep(1)
         print(f"Async task: {input_info} - {i}")
 
+
 if __name__ == "__main__":
-    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
+    from task_scheduling.web_ui import start_task_status_ui
+
+    start_task_status_ui()
 
     task_id1 = task_creation(
-        None, None, scheduler_io, True, "linear_task", 
+        None, None, FUNCTION_TYPE_IO, True, "linear_task",
         linear_task, priority_low, "Hello Linear"
     )
-    
+
     task_id2 = task_creation(
-        None, None, scheduler_io, True, "async_task",
+        None, None, FUNCTION_TYPE_IO, True, "async_task",
         async_task, priority_low, "Hello Async"
     )
-    
-    print(task_id1, task_id2)
-    
+
+    task_id3 = task_creation(
+        None, None, FUNCTION_TYPE_CPU, True, "linear_task",
+        linear_task, priority_low, "Hello Linear"
+    )
+
+    task_id4 = task_creation(
+        None, None, FUNCTION_TYPE_CPU, True, "async_task",
+        async_task, priority_low, "Hello Async"
+    )
+
+    task_id5 = task_creation(
+        10, None, FUNCTION_TYPE_TIMER, True, "timer_task",
+        linear_task, priority_low, "Hello Timer"
+    )
+
+    task_id6 = task_creation(
+        None, "16:32", FUNCTION_TYPE_TIMER, True, "timer_task",
+        linear_task, priority_low, "Hello Timer"
+    )
+
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        shutdown(True)
+        task_scheduler.shutdown_scheduler(True)
+
 ```
 
 ## Pause or Resume Task Execution
 
-- pause_and_resume_task(self, task_id: str, action: str) -> bool:
+- pause_api(task_type: str, task_id: str) -> bool:
+
+- resume_api(task_type: str, task_id: str) -> bool:
 
 ### !!!Warning!!!
 
-When a task is paused, the timeout timer still operates. If you need to use the pause function, it is recommended to disable the timeout handling to prevent the task from being terminated due to a timeout when it resumes.
+When a task is paused, the timeout timer still operates. If you need to use the pause function, it is recommended to
+disable the timeout handling to prevent the task from being terminated due to a timeout when it resumes.
 
 ### Parameter Description:
 
-**task_id**: The ID of the task to be controlled
+**task_type**: The scheduler where the task is located (`CPU_ASYNCIO`, `IO_ASYNCIO`, `CPU_LINER`, `IO_LINER`, `TIMER`)
 
-**action**: (can be filled in with `pause`, `resume`)
+**task_id**: The ID of the task to be controlled
 
 Return value: Boolean, indicating whether the operation was successful
 
@@ -237,7 +272,6 @@ Return value: Boolean, indicating whether the operation was successful
 
 ```
 import time
-from task_scheduling.variable import *
 from task_scheduling.utils import interruptible_sleep
 
 
@@ -248,77 +282,25 @@ def long_running_task():
 
 
 if __name__ == "__main__":
-    from task_scheduling.scheduler import io_liner_task
-    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.variable import *
+    from task_scheduling.scheduler import pause_api, resume_api
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
 
     task_id = task_creation(
-        None, None, scheduler_io, True, "long_task",
+        None, None, FUNCTION_TYPE_IO, True, "long_task",
         long_running_task, priority_low
     )
     time.sleep(2)
-    io_liner_task.pause_and_resume_task(task_id, "pause")  
+    pause_api(IO_LINER, task_id)
     time.sleep(3)
-    io_liner_task.pause_and_resume_task(task_id, "resume")  
+    resume_api(IO_LINER, task_id)
 
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        shutdown(True)
-```
-
-## Function Type Checking
-
-- FunctionRunner(self, func: Callable, task_name: str, *args, **kwargs) -> None:
-
-### Function Description
-
-Check the function type and save it to a file (there are two types in total: `scheduler_cpu`, `scheduler_io`)
-
-### Parameter Description:
-
-**func**: Function to be tested
-
-**task_name**: Function Name
-
-*args, **kwargs: Function parameters
-
-### Example of Use:
-
-```
-import time
-
-import numpy as np
-
-
-def example_cpu_intensive_function(size, iterations):
-    start_time = time.time()
-    for _ in range(iterations):
-        # Create two random matrices
-        matrix_a = np.random.rand(size, size)
-        matrix_b = np.random.rand(size, size)
-        # Perform matrix multiplication
-        np.dot(matrix_a, matrix_b)
-    end_time = time.time()
-    print(
-        f"It took {end_time - start_time:.2f} seconds to calculate {iterations} times {size} times {size} matrix multiplication")
-
-
-async def example_io_intensive_function():
-    for i in range(5):
-        with open(f"temp_file_{i}.txt", "w") as f:
-            f.write("Hello, World!" * 1000000)
-        time.sleep(1)
-
-
-if __name__ == "__main__":
-    from task_scheduling.check import FunctionRunner
-
-    cpu_runner = FunctionRunner(example_cpu_intensive_function, "CPU_Task", 10000, 2)
-    cpu_runner.run()
-
-    io_runner = FunctionRunner(example_io_intensive_function, "IO_Task")
-    io_runner.run()
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 ## Reading Function Types
@@ -342,23 +324,24 @@ Read the type of the stored function or write it; the storage file is: `task_sch
 ### Example of Use:
 
 ```
-from task_scheduling.check task_function_type
+from task_scheduling.mark import task_function_type
 from task_scheduling.variable import *
 
-task_function_type.append_to_dict("CPU_Task", scheduler_cpu)
+task_function_type.append_to_dict("CPU_Task", FUNCTION_TYPE_CPU)
 print(task_function_type.read_from_dict("CPU_Task"))
-
 ```
 
 ## Get Task Results
 
-- get_task_result(task_id: str) -> Optional[Any]:
+- get_result_api(task_type: str, task_id: str) -> Any:
 
 ### Function Description
 
 Return value: The result of the task, or None if not completed
 
 ### Parameter Description:
+
+**task_type**: Task Type
 
 **task_id**: Task ID
 
@@ -374,18 +357,19 @@ def calculation_task(x, y):
 
 
 if __name__ == "__main__":
-    from task_scheduling.scheduler import io_liner_task
-    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
+    from task_scheduling.scheduler import get_result_api
 
     task_id = task_creation(
-        None, None, scheduler_io, True, "long_task",
+        None, None, FUNCTION_TYPE_IO, True, "long_task",
         calculation_task, priority_low, 5, 10
     )
 
     while True:
-        result = io_liner_task.get_task_result(task_id)
+        result = get_result_api(IO_LINER, task_id)
         if result is not None:
-            print(result) 
+            print(result)
             break
         time.sleep(1)
 
@@ -393,7 +377,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        shutdown(True)
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 ## Get All Task Statuses
@@ -411,11 +395,12 @@ import time
 from task_scheduling.variable import *
 
 if __name__ == "__main__":
-    from task_scheduling.manager import get_tasks_info
-    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.web_ui import get_tasks_info
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
 
-    task_creation(None, None, scheduler_io, True, "task1", lambda: time.sleep(2), priority_low)
-    task_creation(None, None, scheduler_io, True, "task2", lambda: time.sleep(3), priority_low)
+    task_creation(None, None, FUNCTION_TYPE_IO, True, "task1", lambda: time.sleep(2), priority_low)
+    task_creation(None, None, FUNCTION_TYPE_IO, True, "task2", lambda: time.sleep(3), priority_low)
     time.sleep(1)
     print(get_tasks_info())
 
@@ -423,7 +408,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        shutdown(True)
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 ## Get Specific Task Status
@@ -440,14 +425,14 @@ Return value: A dictionary containing the task status
 
 ```
 import time
-from task_scheduling.variable import *
 
 if __name__ == "__main__":
-    from task_scheduling.scheduler_management import task_status_manager
-    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.manager import task_status_manager, task_scheduler
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.variable import *
 
     task_id = task_creation(
-        None, None, scheduler_io, True, "status_task",
+        None, None, FUNCTION_TYPE_IO, True, "status_task",
         lambda: time.sleep(5), priority_low
     )
     time.sleep(1)
@@ -457,7 +442,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        shutdown(True)
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 # Get total number of tasks
@@ -487,11 +472,11 @@ def line_task(input_info):
 input_info = "running..."
 
 if __name__ == "__main__":
-    from task_scheduling.task_creation import task_creation, shutdown
-    from task_scheduling.scheduler_management import task_status_manager
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_status_manager, task_scheduler
     from task_scheduling.variable import *
 
-    task_id1 = task_creation(None, None, scheduler_io, True, "task1", line_task, priority_low, input_info)
+    task_id1 = task_creation(None, None, FUNCTION_TYPE_IO, True, "task1", line_task, priority_low, input_info)
 
     print(task_status_manager.get_task_count("task1"))
     print(task_status_manager.get_all_task_count())
@@ -500,18 +485,21 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        shutdown(True)
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 ## Forcefully terminate the running task.
 
-- force_stop_task(task_id: str) -> bool:
+- kill_api(task_type: str, task_id: str) -> bool
 
 ### !!!Warning!!!
 
-The code does not support terminating blocking tasks. An alternative version is provided for `time.sleep`. For long waits, please use `interruptible_sleep`, and for asynchronous code, use `await asyncio.sleep`.
+The code does not support terminating blocking tasks. An alternative version is provided for `time.sleep`. For long
+waits, please use `interruptible_sleep`, and for asynchronous code, use `await asyncio.sleep`.
 
 ### Parameter Description:
+
+**task_type**: Task Type
 
 **task_id**: ID of the task to be terminated
 
@@ -529,24 +517,25 @@ def infinite_task():
     while True:
         interruptible_sleep(1)
         print("running...")
-        
+
 
 if __name__ == "__main__":
-    from task_scheduling.scheduler import io_liner_task
-    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.scheduler import kill_api
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
 
     task_id = task_creation(
-        None, None, scheduler_io, True, "infinite_task",
+        None, None, FUNCTION_TYPE_IO, True, "infinite_task",
         infinite_task, priority_low
     )
     time.sleep(3)
-    io_liner_task.force_stop_task(task_id)  
+    kill_api(IO_LINER, task_id)
 
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        shutdown(True)
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 ## Add or Remove Disabled Task Names
@@ -578,24 +567,24 @@ def line_task(input_info):
 input_info = "test"
 
 if __name__ == "__main__":
-    from task_scheduling.task_creation import task_creation, shutdown, task_scheduler
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
+    from task_scheduling.web_ui import start_task_status_ui
     from task_scheduling.variable import *
 
-    task_id1 = task_creation(None, None, scheduler_io, True, "task1", line_task, priority_low, input_info)
+    start_task_status_ui()
 
+    task_id1 = task_creation(None, None, FUNCTION_TYPE_IO, True, "task1", line_task, priority_low, input_info)
     task_scheduler.add_ban_task_name("task1")
-
-    task_id2 = task_creation(None, None, scheduler_io, True, "task1", line_task, input_info)
-
+    task_id2 = task_creation(None, None, FUNCTION_TYPE_IO, True, "task1", line_task, priority_low, input_info)
     task_scheduler.remove_ban_task_name("task1")
-    
-    task_id3 = task_creation(None, None, scheduler_io, True, "task1", line_task, input_info)
+    task_id3 = task_creation(None, None, FUNCTION_TYPE_IO, True, "task1", line_task, priority_low, "1111")
 
     try:
         while True:
             time.sleep(1.0)
     except KeyboardInterrupt:
-        shutdown(True)
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 ## Cancel a Certain Type of Task in the Queue
@@ -613,7 +602,7 @@ import time
 
 
 def line_task(input_info):
-    for i in range(5):
+    while True:
         time.sleep(1)
         print(input_info)
 
@@ -621,11 +610,15 @@ def line_task(input_info):
 input_info = "test"
 
 if __name__ == "__main__":
-    from task_scheduling.task_creation import task_creation, shutdown, task_scheduler
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
+    from task_scheduling.web_ui import start_task_status_ui
     from task_scheduling.variable import *
 
-    task_id1 = task_creation(None, None, scheduler_io, True, "task1", line_task, priority_low, input_info)
-    task_id2 = task_creation(None, None, scheduler_io, True, "task1", line_task, priority_low, input_info)
+    start_task_status_ui()
+
+    task_id1 = task_creation(None, None, FUNCTION_TYPE_IO, True, "task1", line_task, priority_low, input_info)
+    task_id2 = task_creation(None, None, FUNCTION_TYPE_IO, True, "task1", line_task, priority_low, input_info)
     time.sleep(1)
 
     task_scheduler.cancel_the_queue_task_by_name("task1")
@@ -634,12 +627,12 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        shutdown(True)
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 ## Shut Down the Scheduler
 
-- shutdown(force_cleanup: bool) -> None:
+- shutdown_scheduler(force_cleanup: bool) -> None:
 
 ### !!!Warning!!!
 
@@ -652,8 +645,8 @@ This function must be executed before shutting down to terminate and clean up th
 ### Example Usage:
 
 ```
-from task_scheduling.task_creation import shutdown
-shutdown(True)
+from task_scheduling.manager import task_scheduler
+task_scheduler.shutdown_scheduler(True)
 ```
 
 ## Temporary Update of Configuration File Parameters
@@ -675,7 +668,7 @@ Return value: True or an error message
 ### Example Usage:
 
 ```
-from task_scheduling import update_config
+from task_scheduling.common import update_config
 update_config(key, value)
 if __name__ == "__main__":
     ...
@@ -689,28 +682,36 @@ if __name__ == "__main__":
 
 ### Function Description:
 
-`Thread-level task management (experimental feature)` is disabled by default. You can enable this feature by setting `thread_management=True` in the configuration file.
+`Thread-level task management (experimental feature)` is disabled by default. You can enable this feature by setting
+`thread_management=True` in the configuration file.
 
 In `main_task`, the first three parameters must be `share_info`, `_sharedtaskdict`, and `task_signal_transmission`.
 
-`@wait_branch_thread_ended` must be placed above the main_task to prevent errors caused by the main thread ending before the branch thread has finished running.
+`@wait_branch_thread_ended` must be placed above the main_task to prevent errors caused by the main thread ending before
+the branch thread has finished running.
 
-`other_task` is the branch thread that needs to run, and the `@branch_thread_control` decorator must be added above it to control and monitor it.
+`other_task` is the branch thread that needs to run, and the `@branch_thread_control` decorator must be added above it
+to control and monitor it.
 
-The `@branch_thread_control` decorator accepts the parameters `share_info`, `_sharedtaskdict`, `timeout_processing`, and `task_name`.
+The `@branch_thread_control` decorator accepts the parameters `share_info`, `_sharedtaskdict`, `timeout_processing`, and
+`task_name`.
 
-`task_name` must be unique and not duplicated, used to obtain the task_id of other branch threads (use `_sharedtaskdict.read(task_name)` to get the task_id for terminating, pausing, or resuming them)
+`task_name` must be unique and not duplicated, used to obtain the task_id of other branch threads (use
+`_sharedtaskdict.read(task_name)` to get the task_id for terminating, pausing, or resuming them)
 
-When using `threading.Thread`, you must add `daemon=True` to set the thread as a daemon thread (if not added, closing operations will take longer; anyway, once the main thread ends, it will forcibly terminate all child threads).
+When using `threading.Thread`, you must add `daemon=True` to set the thread as a daemon thread (if not added, closing
+operations will take longer; anyway, once the main thread ends, it will forcibly terminate all child threads).
 
-All branch threads can have their running status viewed on the web interface (to open the web interface, please use `start_task_status_ui()`)
+All branch threads can have their running status viewed on the web interface (to open the web interface, please use
+`start_task_status_ui()`)
 
 Here are two control functions:
 
-Using `task_signal_transmission[_sharedtaskdict.read(task_name)] = ["action"]` in the main thread you can fill in `kill`, `pause`,
+Using `task_signal_transmission[_sharedtaskdict.read(task_name)] = ["action"]` in the main thread you can fill in
+`kill`, `pause`,
 `resume`, you can also fill in several operations in order
 
-`force_stop_task()` can be used outside the main thread
+`kill_api()` can be used outside the main thread
 
 ### Example of Use:
 
@@ -735,48 +736,50 @@ def main_task(share_info, sharedtaskdict, task_signal_transmission, input_info):
 
     # Use this statement to terminate the branch thread
     # time.sleep(4)
-    # task_signal_transmission[_sharedtaskdict.read(task_name)] = ["kill"]
+    # task_signal_transmission[sharedtaskdict.read(task_name)] = ["kill"]
 
 
-from task_scheduling.config import update_config
+from task_scheduling.common import update_config
 update_config("thread_management", True)
 
 if __name__ == "__main__":
-    from task_scheduling.task_creation import task_creation, shutdown
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
     from task_scheduling.web_ui import start_task_status_ui
     from task_scheduling.variable import *
 
     start_task_status_ui()
 
     task_id1 = task_creation(
-        None, None, scheduler_cpu, True, "linear_task",
+        None, None, FUNCTION_TYPE_CPU, True, "linear_task",
         main_task, priority_low, "test")
 
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        shutdown(True)
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 ## Task Tree Mode Management (Experimental Feature)
 
-## Function Description
+### Function Description
 
-The task names in the dictionary will be displayed as `task_group_name|task_name`. When a task named `task_group_name` is terminated, all tasks displayed as `task_group_name|task_name` will also be terminated together.
+The task names in the dictionary will be displayed as `task_group_name|task_name`. When a task named `task_group_name`
+is terminated, all tasks displayed as `task_group_name|task_name` will also be terminated together.
 
 ### Parameter Description
 
-**task_group_name**: The name of the main task in this task tree (the task itself is just a carrier), all sub-tasks will include the name of this main task
+**task_group_name**: The name of the main task in this task tree (the task itself is just a carrier), all sub-tasks will
+include the name of this main task
 
-**task_dict**: The `key` stores the task name, the `value` stores the function to be executed, whether to enable timeout detection and forced termination (`True`, `False`), and the parameters required by the function (must follow the order)
+**task_dict**: The `key` stores the task name, the `value` stores the function to be executed, whether to enable timeout
+detection and forced termination (`True`, `False`), and the parameters required by the function (must follow the order)
 
-### 使用示例:
+### Example of Use:
 
 ```
 import time
-
-from task_scheduling.config import update_config
 
 
 def liner_task(input_info):
@@ -785,10 +788,13 @@ def liner_task(input_info):
         print(input_info)
 
 
+from task_scheduling.common import update_config
+
 update_config("thread_management", True)
 if __name__ == "__main__":
-    from task_scheduling.task_creation import task_creation, shutdown
-    from task_scheduling.utils import task_group
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
+    from task_scheduling.quick_creation import task_group
     from task_scheduling.web_ui import start_task_status_ui
     from task_scheduling.variable import *
 
@@ -803,14 +809,88 @@ if __name__ == "__main__":
     }
 
     task_id1 = task_creation(
-        None, None, scheduler_cpu, True, task_group_name,
+        None, None, FUNCTION_TYPE_CPU, True, task_group_name,
         task_group, priority_low, task_group_name, task_dict)
 
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        shutdown(True)
+        task_scheduler.shutdown_scheduler(True)
+```
+
+## Dependent Task Execution (Experimental Feature)
+
+- trigger_task_condition(main_task_type: str, main_task_id: str, dependent_task: Callable, *args) -> None:
+
+### Function Description
+
+After creating the main task using `task_creation`, use the `trigger_task_condition` function to set a function that
+depends on the result returned by the main task. `main_task_type` should be filled in with the type of the main task.
+`main_task_id` should be filled in with the task ID returned by `task_creation`. `dependent_task` should be filled in
+with the dependent task that needs to be run. The following are the parameters needed for the dependent task. The
+parameters returned by the main task are placed at the end, and the first six digits of the dependent task parameters
+should be filled in with the six parameters required by `task_creation`:
+
+**delay**: Delay execution time (seconds), used for scheduled tasks (fill in None if not used)
+
+**daily_time**: Daily execution time, format "HH:MM", used for scheduled tasks (do not use None)
+
+**function_type**: Function types (`FUNCTION_TYPE_IO`, `FUNCTION_TYPE_CPU`, `FUNCTION_TYPE_TIMER`)
+
+**timeout_processing**: Whether to enable timeout detection and forced termination (`True`, `False`)
+
+**task_name**: Task name; tasks with the same name will be executed in queue
+
+**priority**: Task Priority (`priority_low`, `priority_high`)
+
+### Parameter Description
+
+**main_task_type**: The type of the main task
+
+**main_task_id**: The task ID of the main task
+
+**dependent_task**: The dependent task to run
+
+**args**: Parameters required by the dependent task; the parameters returned by the main task are at the end.
+
+### !!!Warning!!!
+
+The parameters returned by the main task must be in tuple format; other formats are not accepted.
+
+### Example of Use:
+
+```
+import time
+
+
+def mian_task(input_info):
+    time.sleep(8)
+    return input_info,
+
+
+def dependent_task(input_info, test):
+    print(input_info, test)
+
+
+if __name__ == "__main__":
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
+    from task_scheduling.followup_creation import trigger_task_condition
+    from task_scheduling.web_ui import start_task_status_ui
+    from task_scheduling.variable import *
+
+    start_task_status_ui()
+
+    task_id1 = task_creation(None, None, FUNCTION_TYPE_IO, True, "mian_task", mian_task, priority_low, "test1")
+
+    trigger_task_condition(IO_LINER, task_id1, dependent_task, None, None, FUNCTION_TYPE_IO, True, "dependent_task",
+                           priority_low, "test2")
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 ## Web control terminal
@@ -873,4 +953,5 @@ Should an exception be thrown without being caught in order to locate the error?
 
 ## Reference library:
 
-For the convenience of later modifications, some files are placed directly in the folder instead of being installed via pip, so the libraries used are explicitly stated here: https://github.com/glenfant/stopit
+For the convenience of later modifications, some files are placed directly in the folder instead of being installed via
+pip, so the libraries used are explicitly stated here: https://github.com/glenfant/stopit

@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-============
-stopit.utils
-============
+=================
+stopit.threadstop
+=================
 
-Misc utilities and common resources
+Raise asynchronous exceptions in other thread, control the timeout of blocks
+or callables with a context manager or a decorator.
 """
 
 import functools

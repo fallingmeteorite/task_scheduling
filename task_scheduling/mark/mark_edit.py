@@ -2,9 +2,8 @@
 # Author: fallingmeteorite
 import os
 import pickle
-from typing import IO, Optional, Any, Dict
 
-from ..common import logger
+from typing import IO, Optional, Any, Dict
 
 
 class TaskFunctionType:
@@ -47,15 +46,10 @@ class TaskFunctionType:
             function_type (str): The type of the function.
         """
         _tasks_dict = cls._init_dict()
-        if task_name in _tasks_dict:
-            logger.info(f"The task name {task_name} already exists, updating its function type.")
-        else:
-            logger.info(f"The task name {task_name} does not exist, adding a new task.")
         _tasks_dict[task_name] = function_type
         with open(f"{cls._get_package_directory()}/task_type.pkl", 'wb') as file:
             cls._write_to_file(file, _tasks_dict)
         cls._cache_dict[task_name] = function_type
-        logger.warning(f"The task name {task_name} and its function type {function_type} have been added.")
 
     @classmethod
     def read_from_dict(cls,
@@ -70,10 +64,8 @@ class TaskFunctionType:
             Optional[str]: The function type of the task if it exists; otherwise, return None.
         """
         if task_name in cls._cache_dict:
-            logger.info(f"Returning the function type for task name {task_name} from the cache.")
             return cls._cache_dict[task_name]
         else:
-            logger.warning(f"The task name {task_name} is not in the cache, reading from the file.")
             _tasks_dict = cls._init_dict()
             cls._cache_dict = _tasks_dict  # Update cache
             return _tasks_dict.get(task_name, None)
@@ -89,3 +81,6 @@ class TaskFunctionType:
             _data (Dict): The data to write.
         """
         pickle.dump(_data, _file)
+
+
+task_function_type = TaskFunctionType
