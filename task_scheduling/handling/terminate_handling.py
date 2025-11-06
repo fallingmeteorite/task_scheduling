@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+import sys
 import threading
 import ctypes
 import platform
@@ -22,7 +23,10 @@ class ThreadTerminator:
         self._setup_platform()
 
     def _setup_platform(self):
-        self.platform = platform.system()
+        try:
+            self.platform = platform.system()
+        except KeyboardInterrupt:
+            sys.exit(0)
         if self.platform == "Windows":
             self._kernel32 = ctypes.windll.kernel32
             self.THREAD_ACCESS = 0x0001 | 0x0002  # TERMINATE + SUSPEND

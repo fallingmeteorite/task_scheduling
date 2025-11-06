@@ -21,6 +21,12 @@
 - 任务树模式管理(实验性功能): 当主任务结束,其他所有分支任务都会被销毁
 - 依赖型任务执行(实验性功能): 依赖于主任务返回结果运行的函数将启动并运行
 
+## 未来的计划
+
+- 动态调节: 根据负载动态调整配置文件
+- 任务重试: 在对应的报错发生时重新尝试运行任务
+- 控制界面: 功能更加全面的的网页控制界面
+
 ## 安装
 
 ```
@@ -644,7 +650,7 @@ from task_scheduling.manager import task_scheduler
 task_scheduler.shutdown_scheduler(True)
 ```
 
-## 临时更新配置文件参数
+## 临时更新配置文件参数(热加载)
 
 - update_config(key: str, value: Any) -> Any:
 
@@ -679,7 +685,8 @@ if __name__ == "__main__":
 
 `线程级任务管理(实验性功能)`默认为关闭状态,当配置文件中`thread_management=True`开启该功能
 
-`main_task`中前三位接受参数必须为`share_info`, `_sharedtaskdict`, `task_signal_transmission`
+`main_task`中前三位接受参数必须为`share_info`, `_sharedtaskdict`, `task_signal_transmission`(
+如果开启了该功能,正常任务也可以使用,只需要不传入前面所说的三个参数)
 
 `@wait_branch_thread_ended`必须放在main_task上面，防止主线程结束,分支线程还没运行完导致错误
 
@@ -809,13 +816,26 @@ if __name__ == "__main__":
 
 ## 依赖型任务执行(实验性功能)
 
-- trigger_task_condition(main_task_type: str, main_task_id: str, dependent_task: Callable, *args) -> None:
+- task_dependency_manager(main_task_id: str, dependent_task: Callable, *args) -> None:
+
+### !!!警告!!!
+
+如果主任务要传回参数,必须为元组格式,不接受其他格式的参数.
 
 ### 功能说明
 
-使用`task_creation`创建完主任务后,使用`trigger_task_condition`函数设置依赖于主任务返回结果的运行函数,`main_task_type`
-填写主任务的任务类型.`main_task_id`填写主任务的任务id由task_creation传回,`dependent_task`
-填写要运行的依赖任务.后面为依赖任务需要的参数,主任务传回的参数在最后面,依赖任务参数前6位填写为`task_creation`所需要的六个参数：
+使用`task_creation`创建完主任务后,使用`task_dependency_manager`类设置依赖于主任务返回结果的运行函数.类的方法有
+`after_completion`:主任务完成后运行(返回值不必须), `after_cancel`:主任务被取消后运行, `after_timeout`:主任务超时后运行,
+`after_error`:
+主任务错误后运行
+
+`main_task_id`填写主任务的任务id由task_creation传回
+
+`dependent_task`填写要运行的依赖任务.
+
+后面为依赖任务需要的参数,主任务传回的参数在最后面,依赖任务参数前6位填写为
+
+`task_creation`所需要的六个参数：
 
 **delay**: 延迟执行时间（秒），用于定时任务(不使用填写None)
 
@@ -831,17 +851,11 @@ if __name__ == "__main__":
 
 ### 参数说明
 
-**main_task_type**:  主任务的任务类型
-
 **main_task_id**: 主任务的任务id
 
 **dependent_task**: 要运行的依赖任务
 
-**args**: 依赖任务需要的参数,主任务传回的参数在最后面.
-
-### !!!警告!!!
-
-主任务传回的参数必须为元组格式,不接受其他格式的参数.
+**args**: 依赖任务需要的参数,主任务传回的参数会在最后面.
 
 ### 使用示例:
 
@@ -850,18 +864,18 @@ import time
 
 
 def mian_task(input_info):
-    time.sleep(8)
+    time.sleep(2.0)
     return input_info,
 
 
-def dependent_task(input_info, test):
-    print(input_info, test)
+def dependent_task(input_info, return_value=None):
+    print(input_info, return_value)
 
 
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
-    from task_scheduling.followup_creation import trigger_task_condition
+    from task_scheduling.followup_creation import task_dependency_manager
     from task_scheduling.web_ui import start_task_status_ui
     from task_scheduling.variable import *
 
@@ -869,8 +883,9 @@ if __name__ == "__main__":
 
     task_id1 = task_creation(None, None, FUNCTION_TYPE_IO, True, "mian_task", mian_task, priority_low, "test1")
 
-    trigger_task_condition(IO_LINER, task_id1, dependent_task, None, None, FUNCTION_TYPE_IO, True, "dependent_task",
-                           priority_low, "test2")
+    task_dependency_manager.after_completion(task_id1, dependent_task,
+                                             None, None, FUNCTION_TYPE_IO, True, "dependent_task", priority_low,
+                                             "test2")
     try:
         while True:
             time.sleep(1)
@@ -925,6 +940,14 @@ IO 密集型线性任务中运行最大任务数
 多久检查存储器中任务状态是否正确(秒)
 
 `status_check_interval: 800`
+
+单个调度器最大储存返回结果数量Maximum number of returned results that a single scheduler can store
+
+`maximum_result_storage`: 20,
+
+多久清理一次返回结果储存(秒)How often to clear the return result storage (seconds)
+
+`maximum_result_time_storage`: 16,
 
 是否在 CPU 密集型线性任务中启用超级线程管理
 

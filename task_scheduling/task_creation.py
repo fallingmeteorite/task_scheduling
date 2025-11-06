@@ -25,7 +25,7 @@ def task_creation(delay: Union[int, None], daily_time: Union[str, None], functio
                   task_name: str,
                   func: Callable,
                   priority: str,
-                  *args, **kwargs) -> str:
+                  *args, **kwargs) -> Union[str, None]:
     """
     Add a task to the queue, choosing between asynchronous or linear task based on the function type.
     Generate a unique task ID and return it.

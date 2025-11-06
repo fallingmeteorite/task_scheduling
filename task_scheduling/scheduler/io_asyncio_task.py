@@ -24,16 +24,16 @@ async def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> A
     Execute an asynchronous task.
 
     Args:
-        task (Tuple[bool, str, str, Callable, Tuple, Dict]): Tuple containing task details.
-            - timeout_processing (bool): Whether timeout processing is enabled.
-            - task_name (str): Name of the task.
-            - task_id (str): ID of the task.
-            - func (Callable): The function to execute.
-            - args (Tuple): Arguments to pass to the function.
-            - kwargs (Dict): Keyword arguments to pass to the function.
+        task: Tuple containing task details.
+            - timeout_processing: Whether timeout processing is enabled.
+            - task_name: Name of the task.
+            - task_id: ID of the task.
+            - func: The function to execute.
+            - args: Arguments to pass to the function.
+            - kwargs: Keyword arguments to pass to the function.
 
     Returns:
-        Any: Result of the task execution or error message.
+        Result of the task execution or error message.
     """
     # Unpack task tuple into local variables
     timeout_processing, task_name, task_id, func, args, kwargs = task
@@ -48,25 +48,22 @@ async def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> A
 
             # If the task needs timeout processing, set the timeout time
             if timeout_processing:
-                return_results = await asyncio.wait_for(func(*args, **kwargs),
-                                                        timeout=config["watch_dog_time"])
+                return_results = await asyncio.wait_for(func(*args, **kwargs), timeout=config["watch_dog_time"])
             else:
                 return_results = await func(*args, **kwargs)
 
-            # Update task status to "completed"
-            task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None, None)
-
+        _task_manager.remove(task_id)
     except asyncio.TimeoutError:
         logger.warning(f"task | {task_id} | timed out, forced termination")
         task_status_manager.add_task_status(task_id, None, "timeout", None, None, None, None, None)
-        return_results = "error happened"
+        return_results = "timeout action"
     except asyncio.CancelledError:
         logger.warning(f"task | {task_id} | was cancelled")
         task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None,
                                             None, None)
-        return_results = "error happened"
+        return_results = "cancelled action"
     finally:
-        if return_results == "error happened":
+        if _task_manager.check(task_id):
             _task_manager.remove(task_id)
 
     return return_results
@@ -78,7 +75,7 @@ class IoAsyncioTask:
     """
     __slots__ = [
         '_task_queues', '_running_tasks',
-        '_condition', '_scheduler_lock',
+        '_lock', '_scheduler_lock',
         '_scheduler_started', '_scheduler_stop_event', '_scheduler_threads',
         '_event_loops',
         '_idle_timers', '_idle_timeout', '_idle_timer_lock',
@@ -92,7 +89,7 @@ class IoAsyncioTask:
         self._task_queues: Dict[str, queue.Queue] = {}  # Task queues for each task name
         self._running_tasks: Dict[str, list[Any]] = {}  # Running tasks
 
-        self._condition = threading.Condition()  # Condition variable for thread synchronization
+        self._lock = threading.Condition()  # Condition variable for thread synchronization
         self._scheduler_lock = threading.RLock()  # Reentrant lock for scheduler operations
 
         self._scheduler_started = False  # Whether the scheduler thread has started
@@ -120,18 +117,19 @@ class IoAsyncioTask:
         Add a task to the task queue.
 
         Args:
-            timeout_processing (bool): Whether to enable timeout processing.
-            task_name (str): Task name (can be repeated).
-            task_id (str): Task ID (must be unique).
-            func (Callable): Task function.
+            timeout_processing: Whether to enable timeout processing.
+            task_name: Task name (can be repeated).
+            task_id: Task ID (must be unique).
+            func: Task function.
             *args: Positional arguments for the task function.
             **kwargs: Keyword arguments for the task function.
 
         Returns:
-            bool: Whether the task was successfully added.
+            Whether the task was successfully added.
         """
         try:
             with self._scheduler_lock:
+                task_status_manager.add_task_status(task_id, None, "queuing", None, None, None, None, "io_asyncio_task")
                 if task_name not in self._task_queues:
                     self._task_queues[task_name] = queue.Queue()
 
@@ -151,8 +149,8 @@ class IoAsyncioTask:
                 # Cancel the idle timer
                 self._cancel_idle_timer(task_name)
 
-                with self._condition:
-                    self._condition.notify()  # Notify the scheduler thread that a new task is available
+                with self._lock:
+                    self._lock.notify()  # Notify the scheduler thread that a new task is available
 
                 return True
         except Exception as e:
@@ -166,9 +164,9 @@ class IoAsyncioTask:
         Start the scheduler thread and the event loop thread for a specific task name.
 
         Args:
-            task_name (str): Task name.
+            task_name: Task name.
         """
-        with self._condition:
+        with self._lock:
             if task_name not in self._scheduler_threads or not self._scheduler_threads[task_name].is_alive():
                 self._scheduler_started = True
                 self._scheduler_threads[task_name] = threading.Thread(target=self._scheduler, args=(task_name,),
@@ -185,7 +183,7 @@ class IoAsyncioTask:
         Stop the scheduler and event loop for a specific task name.
 
         Args:
-            task_name (str): Task name.
+            task_name: Task name.
         """
         with self._scheduler_lock:
             # Check if all tasks are completed
@@ -195,9 +193,9 @@ class IoAsyncioTask:
 
             self._scheduler_stop_event.set()
 
-            with self._condition:
+            with self._lock:
                 self._scheduler_started = False
-                self._condition.notify_all()
+                self._lock.notify_all()
 
             # Clear the task queue
             self._clear_task_queue(task_name)
@@ -230,8 +228,8 @@ class IoAsyncioTask:
         Stop all schedulers and event loops, and forcibly kill all tasks if force_cleanup is True.
 
         Args:
-            force_cleanup (bool): Force the end of all running tasks.
-            system_operations (bool): System execution metrics.
+            force_cleanup: Force the end of all running tasks.
+            system_operations: System execution metrics.
         """
         with self._scheduler_lock:
             # Check if all tasks are completed
@@ -248,9 +246,9 @@ class IoAsyncioTask:
             else:
                 self._scheduler_stop_event.set()
 
-            with self._condition:
+            with self._lock:
                 self._scheduler_started = False
-                self._condition.notify_all()
+                self._lock.notify_all()
 
             # Clear all task queues
             for task_name in list(self._task_queues.keys()):
@@ -265,7 +263,7 @@ class IoAsyncioTask:
                 self._join_scheduler_thread(task_name)
 
             # Clean up all task return results
-            with self._condition:
+            with self._lock:
                 self._task_results.clear()
 
             # Reset parameters for scheduler restart
@@ -285,15 +283,15 @@ class IoAsyncioTask:
         Scheduler function, fetch tasks from the task queue and submit them to the event loop for execution.
 
         Args:
-            task_name (str): Task name.
+            task_name: Task name.
         """
         asyncio.set_event_loop(self._event_loops[task_name])
 
         while not self._scheduler_stop_event.is_set():
-            with self._condition:
+            with self._lock:
                 while (self._task_queues[task_name].empty() or self._task_counters[
                     task_name] >= config["io_asyncio_task"]) and not self._scheduler_stop_event.is_set():
-                    self._condition.wait()
+                    self._lock.wait()
 
                 if self._scheduler_stop_event.is_set():
                     break
@@ -308,7 +306,7 @@ class IoAsyncioTask:
             future = asyncio.run_coroutine_threadsafe(_execute_task(task), self._event_loops[task_name])
             _task_manager.add(future, None, None, task_id)
 
-            with self._condition:
+            with self._lock:
                 self._running_tasks[task_id] = [future, task_name]
                 self._task_counters[task_name] += 1
 
@@ -319,29 +317,39 @@ class IoAsyncioTask:
                    task_name: str,
                    future: Future) -> None:
         """
-            Callback function after a task is completed.
+        Callback function after a task is completed.
 
-            :param task_id: Task ID.
-            :param future: Future object corresponding to the task.
+        Args:
+            task_id: Task ID.
+            task_name: Task name.
+            future: Future object corresponding to the task.
         """
         try:
             result = future.result()
         except CancelledError:
-            result = "error happened"
+            result = "cancelled action"
         except Exception as e:
             if config["exception_thrown"]:
                 raise
 
             logger.error(f"task | {task_id} | execution failed: {e}")
             task_status_manager.add_task_status(task_id, None, "failed", None, None, e, None, None)
-            result = "error happened"
+            result = "failed action"
 
-        with self._condition:
-            # Save the result returned by the task, and keep only one result
+        # Save the result returned by the task, and keep only one result
+        if result not in ["timeout action", "cancelled action", "failed action"]:
             if result is not None:
-                if result != "error happened":
-                    self._task_results[task_id] = result
+                with self._lock:
+                    self._task_results[task_id] = [result, time.time()]
+            else:
+                with self._lock:
+                    self._task_results[task_id] = ["completed action", time.time()]
+            task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None, None)
+        else:
+            with self._lock:
+                self._task_results[task_id] = [result, time.time()]
 
+        with self._lock:
             # Remove the task from running tasks dictionary
             if task_id in self._running_tasks:
                 del self._running_tasks[task_id]
@@ -356,7 +364,7 @@ class IoAsyncioTask:
                     self._reset_idle_timer(task_name)
 
             # Notify the scheduler to continue scheduling new tasks
-            self._condition.notify()
+            self._lock.notify()
 
     # The task scheduler closes the countdown
     def _reset_idle_timer(self,
@@ -365,7 +373,7 @@ class IoAsyncioTask:
         Reset the idle timer for a specific task name.
 
         Args:
-            task_name (str): Task name.
+            task_name: Task name.
         """
         with self._idle_timer_lock:
             if task_name in self._idle_timers and self._idle_timers[task_name] is not None:
@@ -381,7 +389,7 @@ class IoAsyncioTask:
         Cancel the idle timer for a specific task name.
 
         Args:
-            task_name (str): Task name.
+            task_name: Task name.
         """
         with self._idle_timer_lock:
             if task_name in self._idle_timers and self._idle_timers[task_name] is not None:
@@ -394,7 +402,7 @@ class IoAsyncioTask:
         Clear the task queue for a specific task name.
 
         Args:
-            task_name (str): Task name.
+            task_name: Task name.
         """
         while not self._task_queues[task_name].empty():
             self._task_queues[task_name].get(timeout=1.0)
@@ -405,7 +413,7 @@ class IoAsyncioTask:
         Wait for the scheduler thread to finish for a specific task name.
 
         Args:
-            task_name (str): Task name.
+            task_name: Task name.
         """
         if task_name in self._scheduler_threads and self._scheduler_threads[task_name].is_alive():
             self._scheduler_threads[task_name].join()
@@ -416,36 +424,35 @@ class IoAsyncioTask:
         Force stop a task by its task ID.
 
         Args:
-            task_id (str): Task ID.
+            task_id: Task ID.
 
         Returns:
-            bool: Whether the task was successfully force stopped.
+            Whether the task was successfully force stopped.
         """
         # Read operation, no need to hold a lock
-        if self._running_tasks.get(task_id, None):
+        if not self._running_tasks.get(task_id, None):
             logger.debug(f"task | {task_id} | does not exist or is already completed")
             return False
 
         future = self._running_tasks[task_id][0]
-        if not future.running():
+        if not future._state in ["PENDING", "RUNNING"]:
             future.cancel()
         else:
             # First ensure that the task is not paused.
             _task_manager.resume_task(task_id)
-            _task_manager.terminate_task(task_id)
-
-        with self._condition:
-            if task_id in self._task_results:
-                del self._task_results[task_id]
+            _task_manager.cancel_task(task_id)
         return True
 
     def pause_task(self,
                    task_id: str) -> bool:
         """
-        pause a task by its task ID.
+        Pause a task by its task ID.
 
-        :param task_id: Task ID.
-        :return: bool: Whether the task was successfully pause.
+        Args:
+            task_id: Task ID.
+
+        Returns:
+            Whether the task was successfully paused.
         """
         if self._running_tasks.get(task_id) is None and not config["thread_management"]:
             logger.warning(f"task | {task_id} | does not exist or is already completed")
@@ -459,10 +466,13 @@ class IoAsyncioTask:
     def resume_task(self,
                     task_id: str) -> bool:
         """
-        resume a task by its task ID.
+        Resume a task by its task ID.
 
-        :param task_id: Task ID.
-        :return: bool: Whether the task was successfully resume.
+        Args:
+            task_id: Task ID.
+
+        Returns:
+            Whether the task was successfully resumed.
         """
         if self._running_tasks.get(task_id) is None and not config["thread_management"]:
             logger.warning(f"task | {task_id} | does not exist or is already completed")
@@ -480,14 +490,15 @@ class IoAsyncioTask:
         Get the result of a task. If there is a result, return and delete the oldest result; if no result, return None.
 
         Args:
-            task_id (str): Task ID.
+            task_id: Task ID.
 
         Returns:
-            Optional[Any]: Task return result, or None if the task is not completed or does not exist.
+            Task return result, or None if the task is not completed or does not exist.
         """
         if task_id in self._task_results:
-            result = self._task_results[task_id]
-            del self._task_results[task_id]  # Delete the results
+            result = self._task_results[task_id][0]
+            with self._lock:
+                del self._task_results[task_id]  # Delete the results
             return result
         return None
 
@@ -497,7 +508,7 @@ class IoAsyncioTask:
         Run the event loop for a specific task name.
 
         Args:
-            task_name (str): Task name.
+            task_name: Task name.
         """
         asyncio.set_event_loop(self._event_loops[task_name])
         self._event_loops[task_name].run_forever()
@@ -508,7 +519,7 @@ class IoAsyncioTask:
         Stop the event loop for a specific task name.
 
         Args:
-            task_name (str): Task name.
+            task_name: Task name.
         """
         if task_name in self._event_loops and self._event_loops[
             task_name].is_running():  # Ensure the event loop is running

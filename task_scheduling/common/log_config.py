@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
-import sys, os
+import sys
+import os
 
 from loguru import logger
 

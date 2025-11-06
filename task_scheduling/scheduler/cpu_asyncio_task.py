@@ -14,7 +14,7 @@ from ..common import logger, config
 from ..manager import task_status_manager
 from ..control import ProcessTaskManager
 from ..handling import ThreadTerminator, StopException, ThreadSuspender
-from .utils import exit_cleanup, shared_task_info
+from .utils import exit_cleanup_asyncio, shared_task_info
 
 _threadsuspender = ThreadSuspender()
 _threadterminator = ThreadTerminator()
@@ -26,17 +26,17 @@ async def _execute_task_async(task: Tuple[bool, str, str, Callable, Tuple, Dict]
     Execute a task asynchronously and handle its status.
 
     Args:
-        task (Tuple[bool, str, str, Callable, Tuple, Dict]): A tuple containing task details.
-            - timeout_processing (bool): Whether timeout processing is enabled.
-            - task_name (str): Name of the task.
-            - task_id (str): ID of the task.
-            - func (Callable): The function to execute.
-            - args (Tuple): Arguments to pass to the function.
-            - kwargs (Dict): Keyword arguments to pass to the function.
-        task_status_queue (queue.Queue): Queue to update task status.
+        task: A tuple containing task details.
+            - timeout_processing: Whether timeout processing is enabled.
+            - task_name: Name of the task.
+            - task_id: ID of the task.
+            - func: The function to execute.
+            - args: Arguments to pass to the function.
+            - kwargs: Keyword arguments to pass to the function.
+        task_status_queue: Queue to update task status.
 
     Returns:
-        Any: Result of the task execution or error message.
+        Result of the task execution or error message.
     """
     timeout_processing, task_name, task_id, func, args, kwargs = task
 
@@ -63,34 +63,34 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
     Execute a task using an asyncio event loop.
 
     Args:
-        task (Tuple[bool, str, str, Callable, Tuple, Dict]): A tuple containing task details.
-            - timeout_processing (bool): Whether timeout processing is enabled.
-            - task_name (str): Name of the task.
-            - task_id (str): ID of the task.
-            - func (Callable): The function to execute.
-            - args (Tuple): Arguments to pass to the function.
-            - kwargs (Dict): Keyword arguments to pass to the function.
-        task_status_queue (queue.Queue): Queue to update task status.
-        task_signal_transmission (DictProxy): Dict to transmission signal.
+        task: A tuple containing task details.
+            - timeout_processing: Whether timeout processing is enabled.
+            - task_name: Name of the task.
+            - task_id: ID of the task.
+            - func: The function to execute.
+            - args: Arguments to pass to the function.
+            - kwargs: Keyword arguments to pass to the function.
+        task_status_queue: Queue to update task status.
+        task_signal_transmission: Dict to transmission signal.
 
     Returns:
-        Any: Result of the task execution or error message.
+        Result of the task execution or error message.
     """
     _, _, task_id, _, _, _ = task
     task_manager = ProcessTaskManager(task_signal_transmission)
-    return_results = None
+    result = None
     try:
-        return_results = asyncio.run(_execute_task_async(task, task_status_queue, task_manager))
-
+        result = asyncio.run(_execute_task_async(task, task_status_queue, task_manager))
+        task_manager.remove(task_id)
     except StopException:
         logger.warning(f"task | {task_id} | cancelled, forced termination")
         task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
-        return_results = "error happened"
+        result = "cancelled action"
 
     except asyncio.TimeoutError:
         logger.warning(f"task | {task_id} | timed out, forced termination")
         task_status_queue.put(("timeout", task_id, None, None, None, None, None))
-        return_results = "error happened"
+        result = "timeout action"
 
     except Exception as e:
         if config["exception_thrown"]:
@@ -99,17 +99,14 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
         # if not "Cannot close a running event loop" in str(e):
         logger.error(f"task | {task_id} | execution failed: {e}")
         task_status_queue.put(("failed", task_id, None, None, None, e, None))
-        return_results = "error happened"
+        result = "failed action"
 
     finally:
-        if return_results != "error happened":
-            try:
-                task_status_queue.put(("completed", task_id, None, None, time.time(), None, None))
-            except BrokenPipeError:
-                pass
-        task_manager.remove(task_id)
+        # Remove main thread logging
+        if task_manager.check(task_id):
+            task_manager.remove(task_id)
 
-    return return_results
+    return result
 
 
 class CpuAsyncioTask:
@@ -165,7 +162,10 @@ class CpuAsyncioTask:
             except (queue.Empty, ValueError):
                 pass  # Ignore empty queue exceptions
             finally:
-                time.sleep(0.1)
+                try:
+                    time.sleep(0.1)
+                except KeyboardInterrupt:
+                    pass
 
     def add_task(self,
                  timeout_processing: bool,
@@ -178,18 +178,19 @@ class CpuAsyncioTask:
         Add the task to the scheduler.
 
         Args:
-            timeout_processing (bool): Whether timeout processing is enabled.
-            task_name (str): Task name.
-            task_id (str): Task ID.
-            func (Callable): The function to execute.
+            timeout_processing: Whether timeout processing is enabled.
+            task_name: Task name.
+            task_id: Task ID.
+            func: The function to execute.
             *args: Arguments to pass to the function.
             **kwargs: Keyword arguments to pass to the function.
 
         Returns:
-            bool: Whether the task was successfully added.
+            Whether the task was successfully added.
         """
         try:
             with self._scheduler_lock:
+                shared_task_info.task_status_queue.put(("queuing", task_id, None, None, None, None, None))
                 if self._task_queue.qsize() >= config["cpu_asyncio_task"]:
                     return False
 
@@ -234,9 +235,10 @@ class CpuAsyncioTask:
         """
         Stop the scheduler thread.
 
-        :param force_cleanup: If True, force stop all tasks and clear the queue.
-                              If False, gracefully stop the scheduler (e.g., due to idle timeout).
-        :param system_operations: Boolean indicating if this stop is due to system operations.
+        Args:
+            force_cleanup: If True, force stop all tasks and clear the queue.
+                          If False, gracefully stop the scheduler (e.g., due to idle timeout).
+            system_operations: Boolean indicating if this stop is due to system operations.
         """
         with self._scheduler_lock:
             # Check if there are any running tasks
@@ -282,14 +284,17 @@ class CpuAsyncioTask:
             shared_task_info.task_signal_transmission[task_id] = ["kill"]
 
         while not len(shared_task_info.task_signal_transmission.items()) == 0:
-            time.sleep(0.1)
+            try:
+                time.sleep(0.1)
+            except KeyboardInterrupt:
+                pass
 
     def _scheduler(self) -> None:
         """
         Scheduler function, fetch tasks from the task queue and submit them to the process pool for execution.
         """
         with ProcessPoolExecutor(max_workers=int(config["cpu_asyncio_task"]),
-                                 initializer=exit_cleanup) as executor:
+                                 initializer=exit_cleanup_asyncio) as executor:
             self._executor = executor
             while not self._scheduler_stop_event.is_set():
                 with self._condition:
@@ -319,23 +324,42 @@ class CpuAsyncioTask:
         Callback function after a task is completed.
 
         Args:
-            task_id (str): Task ID.
-            future (Future): Future object corresponding to the task.
+            task_id: Task ID.
+            future: Future object corresponding to the task.
         """
+        result = None
         try:
             result = future.result()  # Get the task result, where the exception will be thrown
 
-            # The results returned by the storage task can be retained for a maximum of two results
-            if result is not None:
-                if result != "error happened":
-                    with self._lock:
-                        self._task_results[task_id] = result
         except (KeyboardInterrupt, BrokenExecutor):
             # Prevent problems caused by exit errors
             logger.warning(f"task | {task_id} | cancelled, forced termination")
             shared_task_info.task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
+            result = "cancelled action"
+
+        except Exception as e:
+            if config["exception_thrown"]:
+                raise
+
+            # if not "Cannot close a running event loop" in str(e):
+            logger.error(f"task | {task_id} | execution failed: {e}")
+            shared_task_info.task_status_queue.put(("failed", task_id, None, None, None, e, None))
+            result = "failed action"
 
         finally:
+            # The results returned by the storage task can be retained for a maximum of two results
+            if result not in ["timeout action", "cancelled action", "failed action"]:
+                shared_task_info.task_status_queue.put(("completed", task_id, None, None, None, None, None))
+                if result is not None:
+                    with self._lock:
+                        self._task_results[task_id] = [result, time.time()]
+                else:
+                    with self._lock:
+                        self._task_results[task_id] = ["completed action", time.time()]
+            else:
+                with self._lock:
+                    self._task_results[task_id] = [result, time.time()]
+
             # Make sure the Future object is deleted
             with self._lock:
                 if task_id in self._running_tasks:
@@ -384,10 +408,10 @@ class CpuAsyncioTask:
         Force stop a task by its task ID.
 
         Args:
-            task_id (str): Task ID.
+            task_id: Task ID.
 
         Returns:
-            bool: Whether the task was successfully force stopped.
+            Whether the task was successfully force stopped.
         """
         if self._running_tasks.get(task_id) is None:
             logger.warning(f"task | {task_id} | does not exist or is already completed")
@@ -401,21 +425,18 @@ class CpuAsyncioTask:
             shared_task_info.task_signal_transmission[task_id] = ["resume", "kill"]
 
         shared_task_info.task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
-
-        with self._lock:
-            if task_id in self._task_results:
-                del self._task_results[task_id]
-
         return True
 
     def pause_task(self,
-                   task_id: str, action: str) -> bool:
+                   task_id: str) -> bool:
         """
-        pause a task by its task ID.
+        Pause a task by its task ID.
 
-        :param task_id: Task ID.
-        :param action: Task action.
-        :return: bool: Whether the task was successfully pause.
+        Args:
+            task_id: Task ID.
+
+        Returns:
+            Whether the task was successfully paused.
         """
         if self._running_tasks.get(task_id) is None and not config["thread_management"]:
             logger.warning(f"task | {task_id} | does not exist or is already completed")
@@ -427,13 +448,15 @@ class CpuAsyncioTask:
         return True
 
     def resume_task(self,
-                    task_id: str, action: str) -> bool:
+                    task_id: str) -> bool:
         """
-        resume a task by its task ID.
+        Resume a task by its task ID.
 
-        :param task_id: Task ID.
-        :param action: Task action.
-        :return: bool: Whether the task was successfully resume.
+        Args:
+            task_id: Task ID.
+
+        Returns:
+            Whether the task was successfully resumed.
         """
         if self._running_tasks.get(task_id) is None and not config["thread_management"]:
             logger.warning(f"task | {task_id} | does not exist or is already completed")
@@ -444,23 +467,21 @@ class CpuAsyncioTask:
 
         return True
 
-    # Obtain the information returned by the corresponding task
     def get_task_result(self,
                         task_id: str) -> Optional[Any]:
         """
         Get the result of a task. If there is a result, return and delete the oldest result; if no result, return None.
 
         Args:
-            task_id (str): Task ID.
+            task_id: Task ID.
 
         Returns:
-            Optional[Any]: Task return result, or None if the task is not completed or does not exist.
+            Task return result, or None if the task is not completed or does not exist.
         """
         if task_id in self._task_results:
+            result = self._task_results[task_id][0]
             with self._lock:
-                result = self._task_results[task_id]
                 del self._task_results[task_id]
-
             return result
         return None
 

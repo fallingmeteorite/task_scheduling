@@ -24,6 +24,12 @@ robust task management and monitoring features (with `NO GIL` already supported)
 - Dependent Task Execution (Experimental Feature): Functions that rely on the results returned by the main task will be
   triggered and executed.
 
+## Future plans
+
+- Dynamic Adjustment: Adjust profiles dynamically based on load
+- Task Retry: Retry running the task when the corresponding error occurs
+- Control Interface: A more comprehensive web control interface
+
 ## Installation
 
 ```
@@ -649,7 +655,7 @@ from task_scheduling.manager import task_scheduler
 task_scheduler.shutdown_scheduler(True)
 ```
 
-## Temporary Update of Configuration File Parameters
+## Temporary Update of Configuration File Parameters (Hot Reload)
 
 - update_config(key: str, value: Any) -> Any:
 
@@ -685,7 +691,9 @@ if __name__ == "__main__":
 `Thread-level task management (experimental feature)` is disabled by default. You can enable this feature by setting
 `thread_management=True` in the configuration file.
 
-In `main_task`, the first three parameters must be `share_info`, `_sharedtaskdict`, and `task_signal_transmission`.
+In `main_task`, the first three parameters must be `share_info`, `_sharedtaskdict`, and `task_signal_transmission`.(If
+this feature is enabled, normal tasks can also be used, you just need not to provide the three parameters mentioned
+above)
 
 `@wait_branch_thread_ended` must be placed above the main_task to prevent errors caused by the main thread ending before
 the branch thread has finished running.
@@ -821,16 +829,27 @@ if __name__ == "__main__":
 
 ## Dependent Task Execution (Experimental Feature)
 
-- trigger_task_condition(main_task_type: str, main_task_id: str, dependent_task: Callable, *args) -> None:
+- task_dependency_manager(main_task_id: str, dependent_task: Callable, *args) -> None:
+
+### !!!Warning!!!
+
+If the main task needs to return parameters, they must be in tuple format; other formats are not accepted.
 
 ### Function Description
 
-After creating the main task using `task_creation`, use the `trigger_task_condition` function to set a function that
-depends on the result returned by the main task. `main_task_type` should be filled in with the type of the main task.
-`main_task_id` should be filled in with the task ID returned by `task_creation`. `dependent_task` should be filled in
-with the dependent task that needs to be run. The following are the parameters needed for the dependent task. The
-parameters returned by the main task are placed at the end, and the first six digits of the dependent task parameters
-should be filled in with the six parameters required by `task_creation`:
+After creating the main task using `task_creation`, use the `task_dependency_manager` class to set functions that run
+depending on the result returned by the main task. The class methods include `after_completion`: runs after the main
+task is completed (return value not required), `after_cancel`: runs after the main task is canceled, `after_timeout`:
+runs after the main task times out, `after_error`: runs after the main task encounters an error.
+
+`main_task_id` should be filled in with the task id of the main task returned by task_creation
+
+`dependent_task` specifies the dependent task to be executed.
+
+The following are the parameters required by dependent tasks. The parameters returned by the main task are at the end,
+and the first six digits before the dependent task parameters should be filled in as
+
+The six parameters required for `task_creation`:
 
 **delay**: Delay execution time (seconds), used for scheduled tasks (fill in None if not used)
 
@@ -846,17 +865,11 @@ should be filled in with the six parameters required by `task_creation`:
 
 ### Parameter Description
 
-**main_task_type**: The type of the main task
-
 **main_task_id**: The task ID of the main task
 
 **dependent_task**: The dependent task to run
 
 **args**: Parameters required by the dependent task; the parameters returned by the main task are at the end.
-
-### !!!Warning!!!
-
-The parameters returned by the main task must be in tuple format; other formats are not accepted.
 
 ### Example of Use:
 
@@ -865,18 +878,18 @@ import time
 
 
 def mian_task(input_info):
-    time.sleep(8)
+    time.sleep(2.0)
     return input_info,
 
 
-def dependent_task(input_info, test):
-    print(input_info, test)
+def dependent_task(input_info, return_value=None):
+    print(input_info, return_value)
 
 
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
-    from task_scheduling.followup_creation import trigger_task_condition
+    from task_scheduling.followup_creation import task_dependency_manager
     from task_scheduling.web_ui import start_task_status_ui
     from task_scheduling.variable import *
 
@@ -884,8 +897,9 @@ if __name__ == "__main__":
 
     task_id1 = task_creation(None, None, FUNCTION_TYPE_IO, True, "mian_task", mian_task, priority_low, "test1")
 
-    trigger_task_condition(IO_LINER, task_id1, dependent_task, None, None, FUNCTION_TYPE_IO, True, "dependent_task",
-                           priority_low, "test2")
+    task_dependency_manager.after_completion(task_id1, dependent_task,
+                                             None, None, FUNCTION_TYPE_IO, True, "dependent_task", priority_low,
+                                             "test2")
     try:
         while True:
             time.sleep(1)
@@ -940,6 +954,16 @@ Maximum number of tasks stored in the task status memory
 How often to check if the task status in memory is correct (seconds)
 
 `status_check_interval: 800`
+
+`status_check_interval: 800`
+
+Maximum number of returned results that a single scheduler can store
+
+`maximum_result_storage`: 20,
+
+How often to clear the return result storage (seconds)
+
+`maximum_result_time_storage`: 16,
 
 Whether to enable hyper-threading management in CPU-intensive linear tasks
 

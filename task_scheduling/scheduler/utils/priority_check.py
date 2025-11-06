@@ -32,7 +32,7 @@ class TaskCounter:
             max_count: Maximum allowed task count
 
         Returns:
-            bool: True if count was successfully added, False if limit reached
+            True if count was successfully added, False if limit reached
         """
         if self.count >= max_count:
             return False
@@ -54,7 +54,7 @@ class TaskCounter:
             priority: Priority string to check
 
         Returns:
-            bool: True if priority matches target priority
+            True if priority matches target priority
         """
         return priority == self.target_priority
 
@@ -202,7 +202,7 @@ class TaskCounter:
         Get the number of currently paused tasks.
 
         Returns:
-            int: Count of paused tasks
+            Count of paused tasks
         """
         return len(self.paused_tasks)
 

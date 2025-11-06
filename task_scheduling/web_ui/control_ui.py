@@ -7,35 +7,24 @@ import threading
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
-from typing import Dict, Any
 
 from ..common import logger, config
 from ..manager import task_status_manager
 from ..scheduler import kill_api, pause_api, resume_api
 
 
-def format_tasks_info(tasks_dict: Dict[str, Dict[str, Any]]) -> str:
+def format_tasks_info(tasks_dict):
     """
     Format task information into a readable string with statistics.
-
-    Args:
-        tasks_dict: Dictionary containing task information with task_id as keys
-                   and task details as values
-
-    Returns:
-        str: Formatted string containing task statistics and individual task details
     """
-    # Initialize counters
     tasks_queue_size = 0
     running_tasks_count = 0
     failed_tasks_count = 0
     completed_tasks_count = 0
 
-    # Process each task and collect formatted information
     formatted_tasks = []
 
     for task_id, task_info in tasks_dict.items():
-        # Update counters based on task status
         status = task_info.get('status', 'unknown')
 
         if status == 'running':
@@ -47,11 +36,9 @@ def format_tasks_info(tasks_dict: Dict[str, Dict[str, Any]]) -> str:
         elif status in ['waiting', 'queuing']:
             tasks_queue_size += 1
 
-        # Format individual task information
         task_str = _format_single_task(task_id, task_info)
         formatted_tasks.append(task_str)
 
-    # Create statistics header
     stats_header = _create_stats_header(
         total_tasks=len(tasks_dict),
         queue_size=tasks_queue_size,
@@ -60,7 +47,6 @@ def format_tasks_info(tasks_dict: Dict[str, Dict[str, Any]]) -> str:
         completed_count=completed_tasks_count
     )
 
-    # Combine header and task details
     output = stats_header
     if formatted_tasks:
         output += "\n\nTask Details:\n" + "\n".join(formatted_tasks)
@@ -68,29 +54,19 @@ def format_tasks_info(tasks_dict: Dict[str, Dict[str, Any]]) -> str:
     return output
 
 
-def _format_single_task(task_id: str, task_info: Dict[str, Any]) -> str:
+def _format_single_task(task_id, task_info):
     """
     Format information for a single task.
-
-    Args:
-        task_id: Unique identifier for the task
-        task_info: Dictionary containing task details
-
-    Returns:
-        str: Formatted string for the task
     """
     task_name = task_info.get('task_name', 'Unknown')
     status = task_info.get('status', 'unknown')
     task_type = task_info.get('task_type', 'Unknown')
 
-    # Calculate elapsed time
     elapsed_time = _calculate_elapsed_time(task_info)
 
-    # Format base task information
     task_str = (f"name: {task_name}, id: {task_id}, "
                 f"status: {status}, elapsed time: {elapsed_time}, task_type: {task_type}")
 
-    # Add error information if present
     error_info = task_info.get('error_info')
     if error_info is not None:
         task_str += f"\n  error_info: {error_info}"
@@ -98,57 +74,35 @@ def _format_single_task(task_id: str, task_info: Dict[str, Any]) -> str:
     return task_str
 
 
-def _calculate_elapsed_time(task_info: Dict[str, Any]) -> str:
+def _calculate_elapsed_time(task_info):
     """
     Calculate and format the elapsed time for a task.
-
-    Args:
-        task_info: Dictionary containing task timing information
-
-    Returns:
-        str: Formatted elapsed time string
     """
     start_time = task_info.get('start_time')
     end_time = task_info.get('end_time')
     current_time = time.time()
 
-    # Handle cases where start time is not available
     if start_time is None:
         return "N/A"
 
-    # Calculate elapsed time based on task state
     if end_time is None:
-        # Task is still running
         elapsed = current_time - start_time
         if elapsed > config.get("watch_dog_time", float('inf')):
             return "timeout"
     else:
-        # Task has completed
         elapsed = end_time - start_time
         if elapsed > config.get("watch_dog_time", float('inf')):
             return "timeout"
 
-    # Format the elapsed time
     if elapsed < 0.1:
         return f"{elapsed * 1000:.1f}ms"
     else:
         return f"{elapsed:.2f}s"
 
 
-def _create_stats_header(total_tasks: int, queue_size: int, running_count: int,
-                         failed_count: int, completed_count: int) -> str:
+def _create_stats_header(total_tasks, queue_size, running_count, failed_count, completed_count):
     """
     Create the statistics header for the task report.
-
-    Args:
-        total_tasks: Total number of tasks
-        queue_size: Number of tasks in queue
-        running_count: Number of running tasks
-        failed_count: Number of failed tasks
-        completed_count: Number of completed tasks
-
-    Returns:
-        str: Formatted statistics header
     """
     return (f"Task Statistics:\n"
             f"  Total Tasks: {total_tasks}\n"
@@ -158,29 +112,9 @@ def _create_stats_header(total_tasks: int, queue_size: int, running_count: int,
             f"  Failed: {failed_count}")
 
 
-def get_tasks_info() -> str:
-    """
-    Get formatted information about all tasks.
-
-    Args:
-        task_status_dict: Dictionary containing task status information
-
-    Returns:
-        str: Formatted task information output with statistics and details
-    """
-    return format_tasks_info(task_status_manager._task_status_dict)
-
-
 def _terminate_task(task_id, task_type):
     """
     Terminate a task.
-
-    Args:
-        task_id (str): The ID of the task to terminate
-        task_type (str): The type of the task
-
-    Returns:
-        bool: True if successful, False otherwise
     """
     try:
         return kill_api(task_type, task_id)
@@ -191,13 +125,6 @@ def _terminate_task(task_id, task_type):
 def _pause_task(task_id, task_type):
     """
     Pause a task.
-
-    Args:
-        task_id (str): The ID of the task to pause
-        task_type (str): The type of the task
-
-    Returns:
-        bool: True if successful, False otherwise
     """
     try:
         return pause_api(task_type, task_id)
@@ -208,13 +135,6 @@ def _pause_task(task_id, task_type):
 def _resume_task(task_id, task_type):
     """
     Resume a paused task.
-
-    Args:
-        task_id (str): The ID of the task to resume
-        task_type (str): The type of the task
-
-    Returns:
-        bool: True if successful, False otherwise
     """
     try:
         return resume_api(task_type, task_id)
@@ -227,87 +147,91 @@ def get_template_path():
     return os.path.join(os.path.dirname(__file__), 'ui.html')
 
 
-def parse_task_info(tasks_info_str):
+def get_tasks_info():
     """
-    Parse the task info string into a structured dictionary.
-
-    Args:
-        tasks_info_str (str): Raw task information string
-
-    Returns:
-        dict: Structured task information with:
-            - queue_size (int)
-            - running_count (int)
-            - failed_count (int)
-            - completed_count (int)
-            - tasks (list): List of task dictionaries
+    Get task information as structured data.
     """
-    lines = tasks_info_str.split('\n')
-    if not lines:
-        return {
-            'queue_size': 0,
-            'running_count': 0,
-            'failed_count': 0,
-            'completed_count': 0,
-            'tasks': []
+    tasks_dict = task_status_manager._task_status_dict
+
+    # Directly Build Structured Data
+    tasks_queue_size = 0
+    running_tasks_count = 0
+    failed_tasks_count = 0
+    completed_tasks_count = 0
+
+    tasks = []
+
+    for task_id, task_info in tasks_dict.items():
+        status = task_info.get('status', 'unknown')
+
+        if status == 'running':
+            running_tasks_count += 1
+        elif status == 'failed':
+            failed_tasks_count += 1
+        elif status == 'completed':
+            completed_tasks_count += 1
+        elif status in ['waiting', 'queuing']:
+            tasks_queue_size += 1
+
+        # Construct Task Object
+        task_obj = {
+            'id': task_id,
+            'name': task_info.get('task_name', 'Unknown'),
+            'status': status.upper(),
+            'type': task_info.get('task_type', 'Unknown'),
+            'duration': _calculate_elapsed_time_seconds(task_info)
         }
 
-    # Parse summary line
-    summary_line = lines[0]
-    parts = summary_line.split(',')
+        # Add error message
+        error_info = task_info.get('error_info')
+        if error_info is not None:
+            task_obj['error_info'] = str(error_info)
 
-    try:
-        queue_size = int(parts[0].split(':')[1].strip())
-        running_count = int(parts[1].split(':')[1].strip())
-        failed_count = int(parts[2].split(':')[1].strip())
-        completed_count = int(parts[3].split(':')[1].strip()) if len(parts) > 3 else 0
-    except (IndexError, ValueError):
-        queue_size = running_count = failed_count = completed_count = 0
-
-    # Parse individual tasks
-    tasks = []
-    current_task = {}
-
-    for line in lines[1:]:
-        if line.startswith('name:'):
-            if current_task:
-                tasks.append(current_task)
-                current_task = {}
-
-            parts = line.split(',')
-            current_task = {
-                'name': parts[0].split(':')[1].strip(),
-                'id': parts[1].split(':')[1].strip(),
-                'status': parts[2].split(':')[1].strip().upper(),
-                'type': "unknown",
-                'duration': 0
-            }
-
-            # Extract task type and duration
-            for part in parts[3:]:
-                if 'task_type:' in part:
-                    current_task['type'] = part.split(':')[1].strip()
-                elif 'elapsed time:' in part:
-                    try:
-                        time_str = part.split(':')[1].strip().split()[0]
-                        if time_str != "nan":
-                            current_task['duration'] = float(time_str)
-                    except (ValueError, IndexError):
-                        pass
-
-        elif line.startswith('error_info:'):
-            current_task['error_info'] = line.split('error_info:')[1].strip()
-
-    if current_task:
-        tasks.append(current_task)
+        tasks.append(task_obj)
 
     return {
-        'queue_size': queue_size,
-        'running_count': running_count,
-        'failed_count': failed_count,
-        'completed_count': completed_count,
+        'queue_size': tasks_queue_size,
+        'running_count': running_tasks_count,
+        'failed_count': failed_tasks_count,
+        'completed_count': completed_tasks_count,
         'tasks': tasks
     }
+
+
+def _calculate_elapsed_time_seconds(task_info):
+    """
+    Calculate elapsed time in seconds for JSON output.
+    """
+    start_time = task_info.get('start_time')
+    end_time = task_info.get('end_time')
+    current_time = time.time()
+
+    if start_time is None:
+        return 0
+
+    if end_time is None:
+        elapsed = current_time - start_time
+    else:
+        elapsed = end_time - start_time
+
+    # Check Timeout
+    if elapsed > config.get("watch_dog_time", float('inf')):
+        return -1  # Special value indicates timeout
+
+    return elapsed
+
+
+def _handle_tasks(self):
+    """Serve task information as JSON."""
+    tasks_info = get_tasks_info()  # Now directly return structured data
+
+    self.send_response(200)
+    self.send_header('Content-type', 'application/json')
+    self.end_headers()
+    try:
+        self.wfile.write(json.dumps(tasks_info).encode('utf-8'))
+    except ConnectionAbortedError:
+        pass
 
 
 class TaskControlHandler(BaseHTTPRequestHandler):
@@ -353,18 +277,19 @@ class TaskControlHandler(BaseHTTPRequestHandler):
 
     def _handle_tasks(self):
         """Serve task information as JSON."""
-        tasks_info = get_tasks_info()
-        parsed_info = parse_task_info(tasks_info)
+        parsed_info = get_tasks_info()
 
         self.send_response(200)
         self.send_header('Content-type', 'application/json')
         self.end_headers()
-        self.wfile.write(json.dumps(parsed_info).encode('utf-8'))
+        try:
+            self.wfile.write(json.dumps(parsed_info).encode('utf-8'))
+        except ConnectionAbortedError:
+            pass
 
     def _handle_task_action(self, task_id, action):
         """Handle task control actions (terminate, pause, resume)."""
         try:
-            # Get request body data
             content_length = int(self.headers.get('Content-Length', 0))
             if content_length > 0:
                 post_data = self.rfile.read(content_length)
@@ -373,7 +298,6 @@ class TaskControlHandler(BaseHTTPRequestHandler):
             else:
                 task_type = 'unknown'
 
-            # Call corresponding API based on action
             result = None
             if action == 'terminate':
                 result = _terminate_task(task_id, task_type)
@@ -450,12 +374,6 @@ class TaskStatusServer:
 def start_task_status_ui(port=8000):
     """
     Start the task status web UI in a daemon thread.
-
-    Args:
-        port (int): Port number to serve the UI on (default: 8000)
-
-    Returns:
-        TaskStatusServer: The server instance which can be used to stop it manually
     """
     server = TaskStatusServer(port)
     server.start()

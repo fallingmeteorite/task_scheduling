@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+import time
 from collections import OrderedDict, Counter
 from typing import Dict, Optional, Union
 
@@ -25,14 +26,14 @@ class TaskStatusManager:
         Add or update task status information in the dictionary.
 
         Args:
-            task_id (str): Task ID.
-            task_name (str): Task Name.
-            status (Optional[str]): Task status. If not provided, it is not updated.
-            start_time (Optional[float]): The start time of the task in seconds. If not provided, the current time is used.
-            end_time (Optional[float]): The end time of the task in seconds. If not provided, it is not updated.
-            error_info (Optional[str]): Error information. If not provided, it is not updated.
-            is_timeout_enabled (Optional[bool]): Boolean indicating if timeout processing is enabled. If not provided, it is not updated.
-            task_type (Optional[str]): Task type. If not provided, it is not updated.
+            task_id: Task ID.
+            task_name: Task Name.
+            status: Task status. If not provided, it is not updated.
+            start_time: The start time of the task in seconds. If not provided, the current time is used.
+            end_time: The end time of the task in seconds. If not provided, it is not updated.
+            error_info: Error information. If not provided, it is not updated.
+            is_timeout_enabled: Boolean indicating if timeout processing is enabled. If not provided, it is not updated.
+            task_type: Task type. If not provided, it is not updated.
         """
         if task_id not in self._task_status_dict:
             if status not in ["failed", "completed", "timeout", "cancelled"]:
@@ -77,7 +78,7 @@ class TaskStatusManager:
         Remove all task status entries that are in "queuing" status and match the specified task name.
 
         Args:
-            task_name (str): Task name to match for removal.
+            task_name: Task name to match for removal.
         """
         # Create a list of task IDs to remove
         to_remove = []
@@ -112,32 +113,52 @@ class TaskStatusManager:
         Retrieve task status information by task ID.
 
         Args:
-            task_id (str): Task ID.
+            task_id: Task ID.
 
         Returns:
-            Optional[Dict[str, Optional[Union[str, float, bool]]]]: Task status information as a dictionary, or None if the task ID is not found.
+            Task status information as a dictionary, or None if the task ID is not found.
         """
         return self._task_status_dict.get(task_id)
+
+    def get_task_type(self,
+                      task_id: str) -> Optional[Dict[str, Optional[Union[str, float, bool]]]]:
+        """
+        Retrieve task status information by task ID.
+
+        Args:
+            task_id: Task ID.
+
+        Returns:
+            Task Type
+        """
+        while True:
+            try:
+                time.sleep(0.5)
+            except KeyboardInterrupt:
+                pass
+            if not self._task_status_dict.get(task_id)["task_type"] == "NAN":
+                return self._task_status_dict.get(task_id)["task_type"]
 
     def get_all_task_statuses(self) -> Dict[str, Dict[str, Optional[Union[str, float, bool]]]]:
         """
         Retrieve all task status information.
 
         Returns:
-            Dict[str, Dict[str, Optional[Union[str, float, bool]]]]: A copy of the dictionary containing all task status information.
+            A copy of the dictionary containing all task status information.
         """
         return self._task_status_dict.copy()
 
     def get_task_count(self, task_name) -> int:
         """
+        Get the count of tasks with the specified task name.
+
         Args:
-            task_name(str): Task name.
+            task_name: Task name.
 
         Returns:
-            int: The total number of tasks that exist
-
+            The total number of tasks that exist with the specified name.
         """
-        # initialize
+        # Initialize counter
         task_count = 0
 
         # Copy the dictionary to prevent the dictionary from being occupied
@@ -150,12 +171,11 @@ class TaskStatusManager:
         return task_count
 
     def get_all_task_count(self) -> Dict[str, int]:
-
         """
+        Get the count of all tasks grouped by task name.
 
         Returns:
-            Dict[str, int]: The total amount of existence per task
-
+            The total count of tasks per task name.
         """
         # Copy the dictionary to prevent the dictionary from being occupied
         _task_status_dict = self._task_status_dict.copy()

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+import gc
 import queue
 import threading
 import time
@@ -23,7 +24,7 @@ class TaskScheduler:
         self.allocator_thread: Optional[threading.Thread] = None
         self.timeout_check_interval: int = config["status_check_interval"]
         self._timeout_checker: Optional[threading.Timer] = None
-        self._task_event = threading.Event()  # Add an event
+        self._task_event = threading.Event()  # Add an event for task notification
         if self._timeout_checker is not None:
             self._start_timeout_checker()
 
@@ -35,7 +36,25 @@ class TaskScheduler:
                  timeout_processing: bool,
                  task_name: str, task_id: str,
                  func: Callable, priority: str, *args, **kwargs) -> bool:
+        """
+        Add a task to the scheduler.
 
+        Args:
+            delay: Delay time for timer tasks
+            daily_time: Daily execution time for timer tasks
+            async_function: Whether the function is asynchronous
+            function_type: Type of function ("io", "cpu", "timer")
+            timeout_processing: Whether timeout processing is enabled
+            task_name: Name of the task
+            task_id: Unique identifier for the task
+            func: The function to execute
+            priority: Task priority
+            *args: Arguments for the function
+            **kwargs: Keyword arguments for the function
+
+        Returns:
+            bool: True if task was added successfully, False otherwise
+        """
         # Check if the task name is in the ban list
         if task_name in self.ban_task_names:
             logger.warning(f"Task name '{task_name}' is banned, cannot add task, task ID: {task_id}")
@@ -71,7 +90,8 @@ class TaskScheduler:
         return True
 
     def _allocator(self) -> None:
-        from ..scheduler import io_asyncio_task, io_liner_task, cpu_asyncio_task, cpu_liner_task, timer_task
+        from ..scheduler import add_api, cleanup_results_api
+        threading.Thread(target=cleanup_results_api, daemon=True).start()
         while self.allocator_running:
             if not self.core_task_queue.empty():
                 (delay, daily_time, async_function, function_type, timeout_processing, task_name, task_id, func,
@@ -82,27 +102,29 @@ class TaskScheduler:
                 if async_function:
 
                     if function_type == "io":
-                        state = io_asyncio_task.add_task(timeout_processing, task_name, task_id, func, *args, **kwargs)
+                        state = add_api("io_asyncio_task", None, None, timeout_processing, task_name, task_id, func,
+                                        priority, *args, **kwargs)
                     if function_type == "cpu":
-                        state = cpu_asyncio_task.add_task(timeout_processing, task_name, task_id, func, *args, **kwargs)
+                        state = add_api("cpu_asyncio_task", None, None, timeout_processing, task_name, task_id, func,
+                                        priority, *args, **kwargs)
 
                 if not async_function:
 
                     if function_type == "io":
-                        state = io_liner_task.add_task(timeout_processing, task_name, task_id, func, priority, *args,
-                                                       **kwargs)
+                        state = add_api("io_liner_task", None, None, timeout_processing, task_name, task_id, func,
+                                        priority, *args, **kwargs)
                     if function_type == "cpu":
-                        state = cpu_liner_task.add_task(timeout_processing, task_name, task_id, func, priority, *args,
-                                                        **kwargs)
+                        state = add_api("cpu_liner_task", None, None, timeout_processing, task_name, task_id, func,
+                                        priority, *args, **kwargs)
 
                 if function_type == "timer":
 
                     if not async_function:
-                        state = timer_task.add_task(delay, daily_time, timeout_processing, task_name, task_id, func,
-                                                    *args, **kwargs)
+                        state = add_api("timer_task", delay, daily_time, timeout_processing, task_name, task_id, func,
+                                        priority, *args, **kwargs)
                     else:
                         logger.error("The timer function cannot be asynchronous code!")
-                        state = True
+                        state = "The timer function cannot be asynchronous code!"
 
                 if state == False:
                     self.core_task_queue.put((delay,
@@ -119,9 +141,11 @@ class TaskScheduler:
 
                 if not state == False and not state == True:
                     task_status_manager.add_task_status(task_id, None, "failed", None, None, state,
-                                                        timeout_processing, "NAN")
-
-                time.sleep(0.1)
+                                                        timeout_processing, state)
+                try:
+                    time.sleep(0.1)
+                except KeyboardInterrupt:
+                    pass
 
             else:
                 self._task_event.clear()
@@ -129,6 +153,12 @@ class TaskScheduler:
                     self._task_event.wait()  # Wait for the event to trigger
 
     def cancel_the_queue_task_by_name(self, task_name: str) -> None:
+        """
+        Cancel all queued tasks with the specified name.
+
+        Args:
+            task_name: The task name to be removed from the queue.
+        """
         count = 0
         while count < len(self.core_task_queue.queue):
             item = self.core_task_queue.queue[count]
@@ -146,7 +176,8 @@ class TaskScheduler:
         """
         Add a task name to the ban list.
 
-        :param task_name: The task name to be added to the ban list.
+        Args:
+            task_name: The task name to be added to the ban list.
         """
         if task_name not in self.ban_task_names:
             self.ban_task_names.append(task_name)
@@ -158,7 +189,8 @@ class TaskScheduler:
         """
         Remove a task name from the ban list.
 
-        :param task_name: The task name to be removed from the ban list.
+        Args:
+            task_name: The task name to be removed from the ban list.
         """
         if task_name in self.ban_task_names:
             self.ban_task_names.remove(task_name)
@@ -178,7 +210,8 @@ class TaskScheduler:
                 if current_time - task_status['start_time'] > config["watch_dog_time"]:
                     # Stop task
                     kill_api(task_id, task_status['task_type'])
-
+        # Clean up unnecessary data along the way
+        logger.warning(f"GC collected {gc.collect()} objects")
         self._start_timeout_checker()  # Restart the timer
 
     def _start_timeout_checker(self) -> None:
@@ -199,10 +232,10 @@ class TaskScheduler:
 
     def shutdown_scheduler(self, force_cleanup: bool) -> None:
         """
-        :param force_cleanup: Force the end of a running task
-
         Shutdown the scheduler, stop all tasks, and release resources.
-        Only checks if the scheduler is running and forces a shutdown if necessary.
+
+        Args:
+            force_cleanup: Force the end of running tasks
         """
         from ..scheduler import shutdown_api
         logger.info("Starting shutdown TaskScheduler.")

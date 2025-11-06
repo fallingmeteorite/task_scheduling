@@ -16,7 +16,7 @@ class TaskFunctionType:
         Get the directory path containing the __init__.py file.
 
         Returns:
-            str: The path to the package directory.
+            The path to the package directory.
         """
         return os.path.dirname(os.path.abspath(__file__))
 
@@ -26,7 +26,7 @@ class TaskFunctionType:
         Initialize the dictionary by reading the pickle file.
 
         Returns:
-            Dict: A dictionary containing task types.
+            A dictionary containing task types.
         """
         try:
             with open(f"{cls._get_package_directory()}/task_type.pkl", 'rb') as _file:
@@ -42,8 +42,8 @@ class TaskFunctionType:
         Append a task and its type to the dictionary and update the pickle file.
 
         Args:
-            task_name (str): The name of the task.
-            function_type (str): The type of the function.
+            task_name: The name of the task.
+            function_type: The type of the function.
         """
         _tasks_dict = cls._init_dict()
         _tasks_dict[task_name] = function_type
@@ -58,10 +58,10 @@ class TaskFunctionType:
         Read the function type of specified task name from the cache or pickle file.
 
         Args:
-            task_name (str): The name of the task.
+            task_name: The name of the task.
 
         Returns:
-            Optional[str]: The function type of the task if it exists; otherwise, return None.
+            Optional: The function type of the task if it exists; otherwise, return None.
         """
         if task_name in cls._cache_dict:
             return cls._cache_dict[task_name]
@@ -77,8 +77,8 @@ class TaskFunctionType:
         Write data to a file in pickle format.
 
         Args:
-            _file (IO[Any]): The file object to write to.
-            _data (Dict): The data to write.
+            _file: The file object to write to.
+            _data: The data to write.
         """
         pickle.dump(_data, _file)
 

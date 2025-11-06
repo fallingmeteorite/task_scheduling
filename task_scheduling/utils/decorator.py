@@ -18,19 +18,22 @@ def wait_ended() -> None:
     while True:
         if threading.active_count() <= 2:
             break
-        time.sleep(0.1)
+        try:
+            time.sleep(0.1)
+        except KeyboardInterrupt:
+            pass
 
 
 def branch_thread_control(share_info: Any, _sharedtaskdict: Any, timeout_processing: bool, task_name: str) -> Any:
     """
-        Control part of the running function.
+    Control part of the running function.
 
-        Args:
-            share_info (Any): Share information
-            _sharedtaskdict (Any): Shared dictionary
-            timeout_processing (bool): Enable timeout handling.
-            task_name (str): task name.
-        """
+    Args:
+        share_info: Share information
+        _sharedtaskdict: Shared dictionary
+        timeout_processing: Enable timeout handling
+        task_name: Task name
+    """
     task_manager, _threadterminator, StopException, ThreadingTimeout, TimeoutException, _threadsuspender, task_status_queue = share_info
 
     def decorator(func):
@@ -81,6 +84,15 @@ def branch_thread_control(share_info: Any, _sharedtaskdict: Any, timeout_process
 
 
 def wait_branch_thread_ended(func: Callable) -> Any:
+    """
+    Decorator to wait for branch threads to end before returning.
+
+    Args:
+        func: Function to decorate
+
+    Returns:
+        Decorated function
+    """
     @wraps(func)
     def wrapper(*args, **kwargs):
         # Get Task Manager

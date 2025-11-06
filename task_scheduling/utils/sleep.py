@@ -11,7 +11,7 @@ def interruptible_sleep(seconds: Union[float, int]) -> None:
     Sleep for a specified number of seconds, but can be interrupted by setting an event.
 
     Args:
-        seconds (float or int): Number of seconds to sleep.
+        seconds: Number of seconds to sleep.
     """
     _event = threading.Event()
 

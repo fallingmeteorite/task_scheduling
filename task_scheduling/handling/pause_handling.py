@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+import sys
 import threading
 import ctypes
 import platform
@@ -18,7 +19,10 @@ class ThreadSuspender:
 
     def _setup_platform(self):
         """Initialize platform-specific settings"""
-        self.platform = platform.system()
+        try:
+            self.platform = platform.system()
+        except KeyboardInterrupt:
+            sys.exit(0)
 
         if self.platform == "Windows":
             self._kernel32 = ctypes.windll.kernel32

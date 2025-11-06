@@ -10,6 +10,19 @@ from .utils import wait_branch_thread_ended, branch_thread_control
 
 # Decorator
 def decorator_func(func, share_info, sharedtaskdict, timeout_processing, task_name):
+    """
+    Decorator function to wrap task functions with thread control.
+
+    Args:
+        func: The function to decorate
+        share_info: Shared information for thread control
+        sharedtaskdict: Shared dictionary for task data
+        timeout_processing: Whether to enable timeout processing
+        task_name: Name of the task
+
+    Returns:
+        Decorated function
+    """
     @wraps(func)
     @branch_thread_control(share_info, sharedtaskdict, timeout_processing, task_name)
     def wrapper(*args, **kwargs):
@@ -23,6 +36,17 @@ def decorator_func(func, share_info, sharedtaskdict, timeout_processing, task_na
 @wait_branch_thread_ended
 def task_group(share_info: Any, sharedtaskdict: Any, task_signal_transmission: Any, task_group_name: str,
                task_dict: Dict) -> None:
+    """
+    Execute a group of tasks concurrently in separate threads.
+
+    Args:
+        share_info: Shared information for thread control
+        sharedtaskdict: Shared dictionary for task data
+        task_signal_transmission: Task signal transmission object
+        task_group_name: Name of the task group
+        task_dict: Dictionary mapping task names to their arguments
+                   Format: {task_name: (function, timeout_processing, *args)}
+    """
     threads = []
 
     # Create and start a thread

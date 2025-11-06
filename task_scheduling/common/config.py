@@ -16,7 +16,7 @@ def _get_package_directory() -> str:
     Get the path of the directory containing the __init__.py file.
 
     Returns:
-        str: Path of the package directory.
+        Path of the package directory.
     """
     return os.path.dirname(os.path.abspath(__file__))
 
@@ -26,10 +26,10 @@ def _load_config(_file_path: str = None) -> Any:
     Load the configuration file into the global variable `config`.
 
     Args:
-        _file_path (str): Path to the configuration file. If not provided, defaults to 'config.json' in the package directory.
+        _file_path: Path to the configuration file. If not provided, defaults to 'config.json' in the package directory.
 
     Returns:
-        bool: Whether the configuration file was successfully loaded.
+        Whether the configuration file was successfully loaded.
     """
     if _file_path is None:
         _file_path = f'{_get_package_directory()}\\config.json'
@@ -52,11 +52,11 @@ def update_config(key: str,
     Changes are only applied in memory and do not persist to the file.
 
     Args:
-        key (str): The key to update in the configuration dictionary.
+        key: The key to update in the configuration dictionary.
         value: The new value to set for the specified key.
 
     Returns:
-        bool: Whether the configuration was successfully updated in memory.
+        Whether the configuration was successfully updated in memory.
     """
     try:
         # Update the global config directly

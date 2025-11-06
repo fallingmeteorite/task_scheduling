@@ -25,16 +25,16 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
     Execute a task and handle its status.
 
     Args:
-        task (Tuple[bool, str, str, Callable, Tuple, Dict]): A tuple containing task details.
-            - timeout_processing (bool): Whether timeout processing is enabled.
-            - task_name (str): Name of the task.
-            - task_id (str): ID of the task.
-            - func (Callable): The function to execute.
-            - args (Tuple): Arguments to pass to the function.
-            - kwargs (Dict): Keyword arguments to pass to the function.
+        task: A tuple containing task details.
+            - timeout_processing: Whether timeout processing is enabled.
+            - task_name: Name of the task.
+            - task_id: ID of the task.
+            - func: The function to execute.
+            - args: Arguments to pass to the function.
+            - kwargs: Keyword arguments to pass to the function.
 
     Returns:
-        Any: Result of the task execution or error message.
+        Result of the task execution or error message.
     """
     timeout_processing, task_name, task_id, func, args, kwargs = task
 
@@ -61,12 +61,12 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
         logger.warning(f"task | {task_id} | timed out, forced termination")
         task_status_manager.add_task_status(task_id, None, "timeout", None, None, None,
                                             None, None)
-        return_results = "error happened"
+        return_results = "timeout action"
     except StopException:
         logger.warning(f"task | {task_id} | cancelled, forced termination")
         task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None,
                                             None, None)
-        return_results = "error happened"
+        return_results = "cancelled action"
     except Exception as e:
         if config["exception_thrown"]:
             raise
@@ -74,7 +74,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
         logger.error(f"task | {task_id} | execution failed: {e}")
         task_status_manager.add_task_status(task_id, None, "failed", None, None, e,
                                             None, None)
-        return_results = "error happened"
+        return_results = "failed action"
 
     finally:
         if _task_manager.check(task_id):
@@ -131,20 +131,21 @@ class TimerTask:
         Add a task to the task queue.
 
         Args:
-            delay (Optional[int]): Delay in seconds before the task should be executed (only once).
-            daily_time (Optional[str]): Specific time in "HH:MM" format for daily task execution.
-            timeout_processing (bool): Whether to enable timeout processing.
-            task_name (str): Task name (can be repeated).
-            task_id (str): Task ID (must be unique).
-            func (Callable): Task function.
+            delay: Delay in seconds before the task should be executed (only once).
+            daily_time: Specific time in "HH:MM" format for daily task execution.
+            timeout_processing: Whether to enable timeout processing.
+            task_name: Task name (can be repeated).
+            task_id: Task ID (must be unique).
+            func: Task function.
             *args: Positional arguments for the task function.
             **kwargs: Keyword arguments for the task function.
 
         Returns:
-            bool: Whether the task was successfully added.
+            Whether the task was successfully added.
         """
         try:
             with self._scheduler_lock:
+                task_status_manager.add_task_status(task_id, None, "queuing", None, None, None, None, "timer_task")
                 if self._scheduler_stop_event.is_set() and not self._scheduler_started:
                     self._join_scheduler_thread()
 
@@ -164,7 +165,7 @@ class TimerTask:
                     return False
                 # Reduce the granularity of the lock
                 task_status_manager.add_task_status(task_id, None, "waiting", None, None, None,
-                                                    None, "timer_task")
+                                                    None, None)
 
                 self._task_queue.put((execution_time, timeout_processing, task_name, task_id, func, args, kwargs))
 
@@ -197,9 +198,10 @@ class TimerTask:
         """
         Stop the scheduler thread.
 
-        :param force_cleanup: If True, force stop all tasks and clear the queue.
-                              If False, gracefully stop the scheduler (e.g., due to idle timeout).
-        :param system_operations: System execution metrics.
+        Args:
+            force_cleanup: If True, force stop all tasks and clear the queue.
+                          If False, gracefully stop the scheduler (e.g., due to idle timeout).
+            system_operations: System execution metrics.
         """
         with self._scheduler_lock:
             # Check if all tasks are completed
@@ -281,18 +283,28 @@ class TimerTask:
         """
         Callback function after a task is completed.
 
-        :param task_id: Task ID.
-        :param timeout_processing: Whether timeout processing is enabled.
-        :param task_name: Task name.
-        :param func: Task function.
-        :param args: Positional arguments for the task function.
-        :param kwargs: Keyword arguments for the task function.
-        :param future: Future object corresponding to the task.
+        Args:
+            task_id: Task ID.
+            timeout_processing: Whether timeout processing is enabled.
+            task_name: Task name.
+            func: Task function.
+            args: Positional arguments for the task function.
+            kwargs: Keyword arguments for the task function.
+            future: Future object corresponding to the task.
         """
         try:
             result = future.result()  # Get task result, exceptions will be raised here
-            if result != "error happened":
+            if result not in ["timeout action", "cancelled action", "failed action"]:
+                if result is not None:
+                    with self._lock:
+                        self._task_results[task_id] = [result, time.time()]
+                else:
+                    with self._lock:
+                        self._task_results[task_id] = ["completed action", time.time()]
                 task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None, None)
+            else:
+                with self._lock:
+                    self._task_results[task_id] = [result, time.time()]
         finally:
             # Ensure the Future object is deleted
             with self._lock:
@@ -359,9 +371,11 @@ class TimerTask:
         """
         Force stop a task by its task ID.
 
-        :param task_id: Task ID.
+        Args:
+            task_id: Task ID.
 
-        :return: bool: Whether the task was successfully force stopped.
+        Returns:
+            Whether the task was successfully force stopped.
         """
         if self._running_tasks.get(task_id, None):
             logger.warning(f"task | {task_id} | does not exist or is already completed")
@@ -375,18 +389,18 @@ class TimerTask:
             _task_manager.terminate_task(task_id)
 
         task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None, None)
-        with self._lock:
-            if task_id in self._task_results:
-                del self._task_results[task_id]
         return True
 
     def pause_task(self,
                    task_id: str) -> bool:
         """
-        pause a task by its task ID.
+        Pause a task by its task ID.
 
-        :param task_id: Task ID.
-        :return: bool: Whether the task was successfully pause.
+        Args:
+            task_id: Task ID.
+
+        Returns:
+            Whether the task was successfully paused.
         """
         if self._running_tasks.get(task_id) is None and not config["thread_management"]:
             logger.warning(f"task | {task_id} | does not exist or is already completed")
@@ -400,10 +414,13 @@ class TimerTask:
     def resume_task(self,
                     task_id: str) -> bool:
         """
-        resume a task by its task ID.
+        Resume a task by its task ID.
 
-        :param task_id: Task ID.
-        :return: bool: Whether the task was successfully resume.
+        Args:
+            task_id: Task ID.
+
+        Returns:
+            Whether the task was successfully resumed.
         """
         if self._running_tasks.get(task_id) is None and not config["thread_management"]:
             logger.warning(f"task | {task_id} | does not exist or is already completed")
@@ -420,12 +437,14 @@ class TimerTask:
         """
         Get the result of a task. If there is a result, return and delete the oldest result; if no result, return None.
 
-        :param task_id: Task ID.
+        Args:
+            task_id: Task ID.
 
-        :return: Optional[Any]: Task return result, or None if the task is not completed or does not exist.
+        Returns:
+            Task return result, or None if the task is not completed or does not exist.
         """
         if task_id in self._task_results:
-            result = self._task_results[task_id]
+            result = self._task_results[task_id][0]
             with self._lock:
                 del self._task_results[task_id]
             return result

@@ -226,7 +226,10 @@ class ProcessTaskManager:
         while self._start:
             try:
                 if not self._task_queue:
-                    time.sleep(0.1)
+                    try:
+                        time.sleep(0.1)
+                    except KeyboardInterrupt:
+                        pass
                     continue
 
                 # Create a copy of items to avoid modification during iteration
@@ -254,7 +257,10 @@ class ProcessTaskManager:
                 pass
             except Exception as error:
                 logger.error(f"Error in monitor thread: {error}")
-                time.sleep(0.1)  # Prevent tight error loop
+                try:
+                    time.sleep(0.1)  # Prevent tight error loop
+                except KeyboardInterrupt:
+                    pass
 
     def _process_actions(self, task_id: str, actions: List[str]) -> None:
         """
