@@ -7,7 +7,7 @@
   "max_idle_time": 300,
   "watch_dog_time": 80,
   "maximum_task_info_storage": 60,
-  "status_check_interval": 800,
+  "status_check_interval": 9,
   "maximum_result_storage": 20,
   "maximum_result_time_storage": 16,
   "thread_management": false,

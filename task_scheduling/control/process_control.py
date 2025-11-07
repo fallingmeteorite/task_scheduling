@@ -215,9 +215,7 @@ class ProcessTaskManager:
         """Start the monitor thread for processing task control commands."""
         monitor_thread = threading.Thread(
             target=self._monitor_task_queue,
-            daemon=True,
-            name=f"TaskMonitor-{os.getpid()}"
-        )
+            daemon=True)
         monitor_thread.start()
         logger.debug("Task monitor thread started")
 

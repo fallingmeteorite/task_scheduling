@@ -8,7 +8,7 @@ from .cpu_liner_task import cpu_liner_task
 from .io_asyncio_task import io_asyncio_task
 from .io_liner_task import io_liner_task
 from .timer_task import timer_task
-from .utils import shared_task_info
+from .utils import shared_status_info
 from ..common import logger, config
 
 # Define mapping from task types to processors
@@ -22,7 +22,7 @@ _TASK_HANDLERS = {
 
 
 def _get_handler(task_type: str):
-    "Get Task Processor"
+    """Get Task Processor"""
     return _TASK_HANDLERS.get(task_type)
 
 
@@ -144,7 +144,6 @@ def cleanup_results_api() -> None:
                 # Lock
                 with handler._lock:
                     handler._task_results = cache_task_results
-                del cache_task_results, del_task_results
         try:
             time.sleep(2.0)
         except KeyboardInterrupt:
@@ -177,4 +176,5 @@ def shutdown_api(force_cleanup: bool) -> None:
                 scheduler.stop_scheduler(force_cleanup)
 
     # Close the shared information channel
-    shared_task_info.manager.shutdown()
+    shared_status_info.manager.shutdown()
+    shared_status_info.channel_shutdown()

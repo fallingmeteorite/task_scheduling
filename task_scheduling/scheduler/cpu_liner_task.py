@@ -14,7 +14,7 @@ from ..common import logger, config
 from ..manager import task_status_manager, SharedTaskDict
 from ..control import ProcessTaskManager
 from ..handling import ThreadTerminator, StopException, ThreadSuspender, TimeoutException, ThreadingTimeout
-from .utils import exit_cleanup_liner, TaskCounter, shared_task_info, get_param_count
+from .utils import exit_cleanup_liner, TaskCounter, shared_status_info, get_param_count
 
 _task_counter = TaskCounter("cpu_liner_task")
 _threadsuspender = ThreadSuspender()
@@ -97,7 +97,6 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
         # Remove main thread logging
         if task_manager.check(task_id):
             task_manager.remove(task_id)
-
     return result
 
 
@@ -144,10 +143,10 @@ class CpuLinerTask:
         """
         Handle task status updates from the task status queue.
         """
-        while not self._scheduler_stop_event.is_set() or not shared_task_info.task_status_queue.empty():
+        while not self._scheduler_stop_event.is_set() or not shared_status_info.task_status_queue.empty():
             try:
-                if not shared_task_info.task_status_queue.empty():
-                    task = shared_task_info.task_status_queue.get(timeout=0.1)
+                if not shared_status_info.task_status_queue.empty():
+                    task = shared_status_info.task_status_queue.get(timeout=0.1)
                     status, task_id, task_name, start_time, end_time, error, timeout_processing = task
                     task_status_manager.add_task_status(task_id, task_name, status, start_time, end_time, error,
                                                         timeout_processing, "cpu_liner_task")
@@ -184,7 +183,7 @@ class CpuLinerTask:
         """
         try:
             with self._scheduler_lock:
-                shared_task_info.task_status_queue.put(("queuing", task_id, None, None, None, None, None))
+                shared_status_info.task_status_queue.put(("queuing", task_id, None, None, None, None, None))
                 if not _task_counter.is_high_priority(priority):
                     if self._task_queue.qsize() >= config["cpu_liner_task"]:
                         return False
@@ -199,7 +198,7 @@ class CpuLinerTask:
                     self._join_scheduler_thread()
 
                 # Reduce the granularity of the lock
-                shared_task_info.task_status_queue.put(("waiting", task_id, None, None, None, None, None))
+                shared_status_info.task_status_queue.put(("waiting", task_id, None, None, None, None, None))
 
                 self._task_queue.put((timeout_processing, task_name, task_id, func, priority, args, kwargs))
 
@@ -277,9 +276,9 @@ class CpuLinerTask:
 
     def stop_all_running_task(self):
         for task_id in self._running_tasks.keys():
-            shared_task_info.task_signal_transmission[task_id] = ["kill"]
+            shared_status_info.task_signal_transmission[task_id] = ["kill"]
 
-        while not len(shared_task_info.task_signal_transmission.items()) == 0:
+        while not len(shared_status_info.task_signal_transmission.items()) == 0:
             try:
                 time.sleep(0.1)
             except KeyboardInterrupt:
@@ -307,8 +306,8 @@ class CpuLinerTask:
 
                 timeout_processing, task_name, task_id, func, priority, args, kwargs = task
                 with self._lock:
-                    future = executor.submit(_execute_task, task, shared_task_info.task_status_queue,
-                                             shared_task_info.task_signal_transmission)
+                    future = executor.submit(_execute_task, task, shared_status_info.task_status_queue,
+                                             shared_status_info.task_signal_transmission)
                     self._running_tasks[task_id] = [future, task_name, priority]
                     future.add_done_callback(partial(self._task_done, task_id))
                 _task_counter.schedule_tasks(self._running_tasks, self.pause_task, self.resume_task)
@@ -330,7 +329,7 @@ class CpuLinerTask:
         except (KeyboardInterrupt, BrokenExecutor):
             # Prevent problems caused by exit errors
             logger.warning(f"task | {task_id} | cancelled, forced termination")
-            shared_task_info.task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
+            shared_status_info.task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
             result = "cancelled action"
 
         except Exception as e:
@@ -338,13 +337,13 @@ class CpuLinerTask:
                 raise
 
             logger.error(f"task | {task_id} | execution failed: {e}")
-            shared_task_info.task_status_queue.put(("failed", task_id, None, None, None, e, None))
+            shared_status_info.task_status_queue.put(("failed", task_id, None, None, None, e, None))
             result = "failed action"
 
         finally:
             # The storage task returns a result, and a maximum of two results are retained
             if result not in ["timeout action", "cancelled action", "failed action"]:
-                shared_task_info.task_status_queue.put(("completed", task_id, None, None, None, None, None))
+                shared_status_info.task_status_queue.put(("completed", task_id, None, None, None, None, None))
                 if result is not None:
                     with self._lock:
                         self._task_results[task_id] = [result, time.time()]
@@ -416,7 +415,7 @@ class CpuLinerTask:
 
         if self._running_tasks.get(task_id) is None:
             # First ensure that the task is not paused.
-            shared_task_info.task_signal_transmission[task_id] = ["resume", "kill"]
+            shared_status_info.task_signal_transmission[task_id] = ["resume", "kill"]
 
         else:
             # Handling situations on non-main threads
@@ -425,9 +424,9 @@ class CpuLinerTask:
                 future.cancel()
             else:
                 # First ensure that the task is not paused.
-                shared_task_info.task_signal_transmission[task_id] = ["resume", "kill"]
+                shared_status_info.task_signal_transmission[task_id] = ["resume", "kill"]
 
-        shared_task_info.task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
+        shared_status_info.task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
         return True
 
     def pause_task(self,
@@ -445,8 +444,8 @@ class CpuLinerTask:
             logger.warning(f"task | {task_id} | does not exist or is already completed")
             return False
 
-        shared_task_info.task_signal_transmission[task_id] = ["pause"]
-        shared_task_info.task_status_queue.put(("paused", task_id, None, None, None, None, None))
+        shared_status_info.task_signal_transmission[task_id] = ["pause"]
+        shared_status_info.task_status_queue.put(("paused", task_id, None, None, None, None, None))
 
         return True
 
@@ -465,8 +464,8 @@ class CpuLinerTask:
             logger.warning(f"task | {task_id} | does not exist or is already completed")
             return False
 
-        shared_task_info.task_signal_transmission[task_id] = ["resume"]
-        shared_task_info.task_status_queue.put(("running", task_id, None, None, None, None, None))
+        shared_status_info.task_signal_transmission[task_id] = ["resume"]
+        shared_status_info.task_status_queue.put(("running", task_id, None, None, None, None, None))
 
         return True
 

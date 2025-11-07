@@ -29,7 +29,7 @@
 
 ## 安装
 
-```
+```commandline
 pip install --upgrade task_scheduling
 ```
 
@@ -41,7 +41,7 @@ pip install --upgrade task_scheduling
 
 ### 使用示例:
 
-```
+```commandline
 python -m task_scheduling
 
 #  The task scheduler starts.
@@ -68,9 +68,10 @@ python -m task_scheduling
 
 ### 使用示例:
 
-```
+```python
 import time
 import math
+
 
 def linear_task(input_info):
     total_start_time = time.time()
@@ -138,13 +139,13 @@ if __name__ == "__main__":
 
 ### 使用示例:
 
-```
+```python
 from task_scheduling.common import set_log_level
 
-set_log_level("DEBUG") # INFO, DEBUG, ERROR, WARNING
+set_log_level("DEBUG")  # INFO, DEBUG, ERROR, WARNING
 
 if __name__ == "__main__":
-    ......
+    ...
 ```
 
 ## 开启监视页面
@@ -153,8 +154,8 @@ if __name__ == "__main__":
 
 ### 使用示例:
 
-```
-from task_scheduling.web_ui import start_task_status_ui
+```python
+from task_scheduling.webui import start_task_status_ui
 
 # Launch the web interface and visit: http://localhost:8000
 start_task_status_ui()
@@ -187,7 +188,7 @@ start_task_status_ui()
 
 ### 使用示例:
 
-```
+```python
 import asyncio
 import time
 from task_scheduling.variable import *
@@ -209,7 +210,7 @@ async def async_task(input_info):
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
-    from task_scheduling.web_ui import start_task_status_ui
+    from task_scheduling.webui import start_task_status_ui
 
     start_task_status_ui()
 
@@ -271,7 +272,7 @@ if __name__ == "__main__":
 
 ### 使用示例:
 
-```
+```python
 import time
 from task_scheduling.utils import interruptible_sleep
 
@@ -324,7 +325,7 @@ if __name__ == "__main__":
 
 ### 使用示例:
 
-```
+```python
 from task_scheduling.mark import task_function_type
 from task_scheduling.variable import *
 
@@ -348,7 +349,7 @@ print(task_function_type.read_from_dict("CPU_Task"))
 
 ### 使用示例:
 
-```
+```python
 import time
 from task_scheduling.variable import *
 
@@ -391,12 +392,12 @@ if __name__ == "__main__":
 
 ### 使用示例:
 
-```
+```python
 import time
 from task_scheduling.variable import *
 
 if __name__ == "__main__":
-    from task_scheduling.web_ui import get_tasks_info
+    from task_scheduling.webui import get_tasks_info
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
 
@@ -424,7 +425,7 @@ if __name__ == "__main__":
 
 ### 使用示例:
 
-```
+```python
 import time
 
 if __name__ == "__main__":
@@ -460,7 +461,7 @@ if __name__ == "__main__":
 
 ### 使用示例:
 
-```
+```python
 import time
 
 
@@ -508,7 +509,7 @@ if __name__ == "__main__":
 
 ### 使用示例:
 
-```
+```python
 import time
 from task_scheduling.variable import *
 from task_scheduling.utils import interruptible_sleep
@@ -555,7 +556,7 @@ if __name__ == "__main__":
 
 ### 使用示例:
 
-```
+```python
 import time
 
 
@@ -570,7 +571,7 @@ input_info = "test"
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
-    from task_scheduling.web_ui import start_task_status_ui
+    from task_scheduling.webui import start_task_status_ui
     from task_scheduling.variable import *
 
     start_task_status_ui()
@@ -598,7 +599,7 @@ if __name__ == "__main__":
 
 ### 使用示例:
 
-```
+```python
 import time
 
 
@@ -613,7 +614,7 @@ input_info = "test"
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
-    from task_scheduling.web_ui import start_task_status_ui
+    from task_scheduling.webui import start_task_status_ui
     from task_scheduling.variable import *
 
     start_task_status_ui()
@@ -645,8 +646,9 @@ if __name__ == "__main__":
 
 ### 使用示例:
 
-```
+```python
 from task_scheduling.manager import task_scheduler
+
 task_scheduler.shutdown_scheduler(True)
 ```
 
@@ -668,8 +670,10 @@ task_scheduler.shutdown_scheduler(True)
 
 ### 使用示例:
 
-```
+```python
 from task_scheduling.common import update_config
+
+key, value = None
 update_config(key, value)
 if __name__ == "__main__":
     ...
@@ -711,7 +715,7 @@ if __name__ == "__main__":
 
 ### 使用示例:
 
-```
+```python
 import threading
 import time
 from task_scheduling.utils import wait_branch_thread_ended, branch_thread_control
@@ -736,12 +740,13 @@ def main_task(share_info, sharedtaskdict, task_signal_transmission, input_info):
 
 
 from task_scheduling.common import update_config
+
 update_config("thread_management", True)
 
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
-    from task_scheduling.web_ui import start_task_status_ui
+    from task_scheduling.webui import start_task_status_ui
     from task_scheduling.variable import *
 
     start_task_status_ui()
@@ -773,7 +778,7 @@ if __name__ == "__main__":
 
 ### 使用示例:
 
-```
+```python
 import time
 
 
@@ -790,7 +795,7 @@ if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
     from task_scheduling.quick_creation import task_group
-    from task_scheduling.web_ui import start_task_status_ui
+    from task_scheduling.webui import start_task_status_ui
     from task_scheduling.variable import *
 
     start_task_status_ui()
@@ -859,7 +864,7 @@ if __name__ == "__main__":
 
 ### 使用示例:
 
-```
+```python
 import time
 
 
@@ -876,7 +881,7 @@ if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
     from task_scheduling.followup_creation import task_dependency_manager
-    from task_scheduling.web_ui import start_task_status_ui
+    from task_scheduling.webui import start_task_status_ui
     from task_scheduling.variable import *
 
     start_task_status_ui()
@@ -895,7 +900,7 @@ if __name__ == "__main__":
 
 ## 网页控制端
 
-![01.png](https://github.com/fallingmeteorite/task_scheduling/blob/main/img/01.png)
+![01.png](./img/01.png)
 
 Task status UI available at http://localhost:8000
 

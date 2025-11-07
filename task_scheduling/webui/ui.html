@@ -4,52 +4,54 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Task Status Monitor</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
-            --primary: #2c2c2c;
-            --secondary: #5a5a5a;
-            --light: #f5f5f5;
-            --dark: #1a1a1a;
+            --primary: #3a3a4e;
+            --secondary: #6c6c8a;
+            --light: #f8f9fa;
+            --dark: #2a2a3a;
             --white: #ffffff;
-            --black: #000000;
+            --black: #1a1a2e;
             --success: #4caf50;
             --warning: #ff9800;
             --error: #f44336;
             --info: #2196f3;
-            --bg-color: #f8f8f8;
-            --text-color: #333333;
+            --bg-color: #f5f7fa;
+            --text-color: #333344;
             --card-bg: #ffffff;
-            --border-color: #e0e0e0;
+            --border-color: #e8eaf0;
             --waiting: #9c27b0;
             --timeout: #ff5722;
-            --border-radius: 6px;
-            --shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-            --shadow-hover: 0 4px 15px rgba(0, 0, 0, 0.08);
-            --gradient-primary: linear-gradient(135deg, #2c2c2c 0%, #5a5a5a 100%);
+            --border-radius: 8px;
+            --shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+            --shadow-hover: 0 4px 20px rgba(0, 0, 0, 0.08);
+            --gradient-primary: linear-gradient(135deg, #3a3a4e 0%, #5a5a7a 100%);
             --gradient-success: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
             --gradient-warning: linear-gradient(135deg, #ff9800 0%, #ef6c00 100%);
             --gradient-error: linear-gradient(135deg, #f44336 0%, #c62828 100%);
+            --transition: all 0.25s ease;
         }
 
         .dark-theme {
             --primary: #e0e0e0;
-            --secondary: #9e9e9e;
-            --light: #424242;
+            --secondary: #a0a0b0;
+            --light: #2a2a3a;
             --dark: #f5f5f5;
-            --white: #1a1a1a;
-            --black: #f5f5f5;
+            --white: #1e1e2e;
+            --black: #f0f0f5;
             --success: #66bb6a;
             --warning: #ffb74d;
             --error: #ef5350;
             --info: #42a5f5;
-            --bg-color: #121212;
-            --text-color: #e0e0e0;
-            --card-bg: #2c2c2c;
-            --border-color: #424242;
+            --bg-color: #121220;
+            --text-color: #e0e0f0;
+            --card-bg: #252540;
+            --border-color: #3a3a5a;
             --waiting: #ba68c8;
             --timeout: #ff8a65;
-            --shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-            --shadow-hover: 0 4px 15px rgba(0, 0, 0, 0.4);
+            --shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+            --shadow-hover: 0 4px 20px rgba(0, 0, 0, 0.3);
         }
 
         * {
@@ -63,7 +65,7 @@
             line-height: 1.6;
             color: var(--text-color);
             background-color: var(--bg-color);
-            transition: background-color 0.3s, color 0.3s;
+            transition: var(--transition);
             padding: 20px;
             min-height: 100vh;
         }
@@ -83,12 +85,9 @@
 
         h1 {
             color: var(--text-color);
-            font-weight: 700;
-            font-size: 2.2rem;
-            background: var(--gradient-primary);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            font-weight: 600;
+            font-size: 1.8rem;
+            letter-spacing: -0.5px;
         }
 
         .header-controls {
@@ -104,11 +103,13 @@
             border-radius: var(--border-radius);
             padding: 6px 6px 6px 15px;
             box-shadow: var(--shadow);
-            transition: all 0.3s;
+            transition: var(--transition);
+            border: 1px solid var(--border-color);
         }
 
         .search-container:focus-within {
             box-shadow: var(--shadow-hover);
+            border-color: var(--primary);
         }
 
         .search-input {
@@ -132,9 +133,8 @@
             color: white;
             font-size: 0.9rem;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: var(--transition);
             font-weight: 500;
-            box-shadow: var(--shadow);
         }
 
         .search-button:hover {
@@ -149,7 +149,8 @@
             display: flex;
             cursor: pointer;
             box-shadow: var(--shadow);
-            transition: all 0.3s;
+            transition: var(--transition);
+            border: 1px solid var(--border-color);
         }
 
         .theme-toggle:hover {
@@ -160,7 +161,7 @@
             padding: 6px 12px;
             border-radius: var(--border-radius);
             font-size: 0.75rem;
-            transition: all 0.3s;
+            transition: var(--transition);
             font-weight: 500;
         }
 
@@ -189,9 +190,10 @@
         .stats-panel {
             background: var(--card-bg);
             border-radius: var(--border-radius);
-            padding: 20px;
+            padding: 25px;
             box-shadow: var(--shadow);
-            transition: all 0.3s;
+            transition: var(--transition);
+            border: 1px solid var(--border-color);
         }
 
         .stats-panel:hover {
@@ -206,7 +208,7 @@
         }
 
         .stats-title {
-            font-size: 1.3rem;
+            font-size: 1.2rem;
             font-weight: 600;
             color: var(--text-color);
         }
@@ -219,7 +221,7 @@
             text-align: center;
             margin-bottom: 25px;
             box-shadow: var(--shadow);
-            transition: all 0.3s;
+            transition: var(--transition);
         }
 
         .total-tasks:hover {
@@ -234,7 +236,7 @@
         }
 
         .total-value {
-            font-size: 2.5rem;
+            font-size: 2.2rem;
             font-weight: 700;
         }
 
@@ -250,8 +252,9 @@
             padding: 15px;
             border-radius: var(--border-radius);
             background: var(--bg-color);
-            transition: all 0.3s;
+            transition: var(--transition);
             cursor: pointer;
+            border: 1px solid var(--border-color);
         }
 
         .status-item:hover {
@@ -260,15 +263,15 @@
         }
 
         .status-icon {
-            width: 40px;
-            height: 40px;
+            width: 36px;
+            height: 36px;
             border-radius: var(--border-radius);
             display: flex;
             align-items: center;
             justify-content: center;
             margin-right: 12px;
             flex-shrink: 0;
-            font-size: 1.1rem;
+            font-size: 1rem;
         }
 
         .status-info {
@@ -276,13 +279,13 @@
         }
 
         .status-name {
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             color: var(--secondary);
             margin-bottom: 4px;
         }
 
         .status-count {
-            font-size: 1.4rem;
+            font-size: 1.3rem;
             font-weight: 700;
         }
 
@@ -299,8 +302,9 @@
             background: var(--card-bg);
             border-radius: var(--border-radius);
             box-shadow: var(--shadow);
-            transition: all 0.3s;
+            transition: var(--transition);
             overflow: hidden;
+            border: 1px solid var(--border-color);
         }
 
         .tasks-panel:hover {
@@ -316,7 +320,7 @@
         }
 
         .tasks-title {
-            font-size: 1.3rem;
+            font-size: 1.2rem;
             font-weight: 600;
             color: var(--text-color);
         }
@@ -329,11 +333,10 @@
             padding: 8px 16px;
             font-size: 0.85rem;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: var(--transition);
             display: flex;
             align-items: center;
             gap: 6px;
-            box-shadow: var(--shadow);
         }
 
         .refresh-btn:hover {
@@ -496,7 +499,7 @@
             font-size: 0.75rem;
             font-weight: 500;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: var(--transition);
             min-width: 70px;
         }
 
@@ -832,7 +835,7 @@
 
             <div class="status-grid">
                 <div class="status-item running">
-                    <div class="status-icon">▶</div>
+                    <div class="status-icon"><i class="fas fa-play"></i></div>
                     <div class="status-info">
                         <div class="status-name">Running</div>
                         <div class="status-count" id="running-count">0</div>
@@ -840,7 +843,7 @@
                 </div>
 
                 <div class="status-item failed">
-                    <div class="status-icon">✕</div>
+                    <div class="status-icon"><i class="fas fa-times"></i></div>
                     <div class="status-info">
                         <div class="status-name">Failed</div>
                         <div class="status-count" id="failed-count">0</div>
@@ -848,7 +851,7 @@
                 </div>
 
                 <div class="status-item completed">
-                    <div class="status-icon">✓</div>
+                    <div class="status-icon"><i class="fas fa-check"></i></div>
                     <div class="status-info">
                         <div class="status-name">Completed</div>
                         <div class="status-count" id="completed-count">0</div>
@@ -856,7 +859,7 @@
                 </div>
 
                 <div class="status-item queuing">
-                    <div class="status-icon">⏳</div>
+                    <div class="status-icon"><i class="fas fa-list-ol"></i></div>
                     <div class="status-info">
                         <div class="status-name">Queuing</div>
                         <div class="status-count" id="queuing-count">0</div>
@@ -864,7 +867,7 @@
                 </div>
 
                 <div class="status-item waiting">
-                    <div class="status-icon">⏸</div>
+                    <div class="status-icon"><i class="fas fa-hourglass-start"></i></div>
                     <div class="status-info">
                         <div class="status-name">Waiting</div>
                         <div class="status-count" id="waiting-count">0</div>
@@ -872,7 +875,7 @@
                 </div>
 
                 <div class="status-item paused">
-                    <div class="status-icon">⏸</div>
+                    <div class="status-icon"><i class="fas fa-pause"></i></div>
                     <div class="status-info">
                         <div class="status-name">Paused</div>
                         <div class="status-count" id="paused-count">0</div>
@@ -880,7 +883,7 @@
                 </div>
 
                 <div class="status-item cancelled">
-                    <div class="status-icon">◼</div>
+                    <div class="status-icon"><i class="fas fa-stop"></i></div>
                     <div class="status-info">
                         <div class="status-name">Cancelled</div>
                         <div class="status-count" id="cancelled-count">0</div>
@@ -888,7 +891,7 @@
                 </div>
 
                 <div class="status-item timeout">
-                    <div class="status-icon">⏰</div>
+                    <div class="status-icon"><i class="fas fa-hourglass-end"></i></div>
                     <div class="status-info">
                         <div class="status-name">Timeout</div>
                         <div class="status-count" id="timeout-count">0</div>

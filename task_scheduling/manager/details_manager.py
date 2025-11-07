@@ -189,6 +189,11 @@ class TaskStatusManager:
         # Count occurrences and return as ordered dictionary
         return OrderedDict(Counter(values).most_common())
 
+    def details_manager_shutdown(self) -> None:
+        """Reset all variables"""
+        self._task_status_dict = OrderedDict()
+        self._max_storage = config["maximum_task_info_storage"]
+
 
 # Shared by all schedulers, instantiating objects
 task_status_manager = TaskStatusManager()

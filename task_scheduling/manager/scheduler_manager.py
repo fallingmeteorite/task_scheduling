@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
-import gc
 import queue
 import threading
 import time
+import gc
 
 from typing import Callable, List, Optional, Union
 
@@ -19,14 +19,12 @@ class TaskScheduler:
     def __init__(self) -> None:
         self.ban_task_names: List[str] = []
         self.core_task_queue: Optional[queue.Queue] = queue.Queue()
-        self.allocator_running: bool = True
+        self.allocator_running: bool = False
         self.allocator_started: bool = False
         self.allocator_thread: Optional[threading.Thread] = None
         self.timeout_check_interval: int = config["status_check_interval"]
         self._timeout_checker: Optional[threading.Timer] = None
         self._task_event = threading.Event()  # Add an event for task notification
-        if self._timeout_checker is not None:
-            self._start_timeout_checker()
 
     def add_task(self,
                  delay: Union[int, None],
@@ -84,6 +82,7 @@ class TaskScheduler:
 
         if not self.allocator_started:
             self.allocator_started = True
+            self.allocator_running = True
             self.allocator_thread = threading.Thread(target=self._allocator, daemon=True)
             self.allocator_thread.start()
 
@@ -92,6 +91,10 @@ class TaskScheduler:
     def _allocator(self) -> None:
         from ..scheduler import add_api, cleanup_results_api
         threading.Thread(target=cleanup_results_api, daemon=True).start()
+
+        if self._timeout_checker is None:
+            self._start_timeout_checker()
+
         while self.allocator_running:
             if not self.core_task_queue.empty():
                 (delay, daily_time, async_function, function_type, timeout_processing, task_name, task_id, func,
@@ -205,13 +208,15 @@ class TaskScheduler:
         from ..scheduler import kill_api
         logger.info("Start checking the status of all tasks and fix them")
         current_time = time.time()
-        for task_id, task_status in task_status_manager.task_status_dict.items():
+        for task_id, task_status in task_status_manager._task_status_dict.items():
             if task_status['status'] == "running" and task_status['is_timeout_enabled']:
                 if current_time - task_status['start_time'] > config["watch_dog_time"]:
                     # Stop task
                     kill_api(task_id, task_status['task_type'])
-        # Clean up unnecessary data along the way
-        logger.warning(f"GC collected {gc.collect()} objects")
+
+        # Memory Cleanup
+        logger.warning(f"Garbage collection performed. A total of <{gc.collect()}> objects were recycled.")
+
         self._start_timeout_checker()  # Restart the timer
 
     def _start_timeout_checker(self) -> None:
@@ -242,7 +247,6 @@ class TaskScheduler:
 
         # Clean up all resources in the task scheduler, stop running tasks, and empty the task queue.
         # Stop the task allocator
-        self.allocator_running = False
         if self.allocator_thread and self.allocator_thread.is_alive():
             self.allocator_thread.join(timeout=0.1)
 
@@ -253,8 +257,21 @@ class TaskScheduler:
         with self.core_task_queue.mutex:
             self.core_task_queue.queue.clear()
 
+        # Reset status
+        self.ban_task_names = []
+        self.core_task_queue = queue.Queue()
+        self.allocator_running = False
+        self.allocator_started = False
+        self.allocator_thread = None
+        self.timeout_check_interval = config["status_check_interval"]
+        self._timeout_checker = None
+        self._task_event = threading.Event()  # Add an event for task notification
+
         # Turn off the scheduler
         shutdown_api(force_cleanup)
+
+        # Clear task status
+        task_status_manager.details_manager_shutdown()
 
         logger.info("All scheduler has been shut down.")
 

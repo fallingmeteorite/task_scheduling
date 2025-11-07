@@ -11,7 +11,7 @@ def exit_cleanup_liner() -> None:
     Used to fix the error that occurs when ending a task after the process is recycled.
     """
 
-    def signal_handler(signum, frame):
+    def signal_handler(signum, frame) -> None:
         """
         Signal handler for graceful process termination.
 
@@ -32,7 +32,7 @@ def exit_cleanup_asyncio() -> None:
     Used to fix the error that occurs when ending a task after the process is recycled.
     """
 
-    def signal_handler(signum, frame):
+    def signal_handler(signum, frame) -> None:
         """
         Signal handler for graceful process termination.
 

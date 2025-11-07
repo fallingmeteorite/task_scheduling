@@ -14,5 +14,4 @@ def get_param_count(func: Callable, *args, **kwargs) -> bool:
     Returns: Are the parameters consistent?
 
     """
-    sig = inspect.signature(func)
-    return not len(sig.parameters) == len(args) + len(kwargs)
+    return not len(inspect.signature(func).parameters) == len(args) + len(kwargs)

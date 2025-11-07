@@ -32,7 +32,7 @@ robust task management and monitoring features (with `NO GIL` already supported)
 
 ## Installation
 
-```
+```commandline
 pip install --upgrade task_scheduling
 ```
 
@@ -44,7 +44,7 @@ Does not support precise control over tasks
 
 ### Example of Use:
 
-```
+```commandline
 python -m task_scheduling
 
 #  The task scheduler starts.
@@ -72,7 +72,7 @@ Run the following example to see the speed difference between the `GIL` and `NO 
 
 ### Example of Use:
 
-```
+```python
 import time
 import math
 
@@ -142,13 +142,13 @@ Please place it before `if __name__ == "__main__":`
 
 ### Example of Use:
 
-```
+```python
 from task_scheduling.common import set_log_level
 
 set_log_level("DEBUG") # INFO, DEBUG, ERROR, WARNING
 
 if __name__ == "__main__":
-    ......
+    ...
 ```
 
 ## Open Monitoring Page
@@ -157,8 +157,8 @@ The web interface allows you to view task status and runtime, and you can pause,
 
 ### Example of Use:
 
-```
-from task_scheduling.web_ui import start_task_status_ui
+```python
+from task_scheduling.webui import start_task_status_ui
 
 # Launch the web interface and visit: http://localhost:8000
 start_task_status_ui()
@@ -191,7 +191,7 @@ Return value: Task ID string
 
 ### Example of Use:
 
-```
+```python
 import asyncio
 import time
 from task_scheduling.variable import *
@@ -213,7 +213,7 @@ async def async_task(input_info):
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
-    from task_scheduling.web_ui import start_task_status_ui
+    from task_scheduling.webui import start_task_status_ui
 
     start_task_status_ui()
 
@@ -276,7 +276,7 @@ Return value: Boolean, indicating whether the operation was successful
 
 ### Example of Use:
 
-```
+```python
 import time
 from task_scheduling.utils import interruptible_sleep
 
@@ -329,7 +329,7 @@ Read the type of the stored function or write it; the storage file is: `task_sch
 
 ### Example of Use:
 
-```
+```python
 from task_scheduling.mark import task_function_type
 from task_scheduling.variable import *
 
@@ -353,7 +353,7 @@ Return value: The result of the task, or None if not completed
 
 ### Example of Use:
 
-```
+```python
 import time
 from task_scheduling.variable import *
 
@@ -396,12 +396,12 @@ Return value: a string containing the task status
 
 ### Example of Use:
 
-```
+```python
 import time
 from task_scheduling.variable import *
 
 if __name__ == "__main__":
-    from task_scheduling.web_ui import get_tasks_info
+    from task_scheduling.webui import get_tasks_info
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
 
@@ -429,7 +429,7 @@ Return value: A dictionary containing the task status
 
 ### Example Usage:
 
-```
+```python
 import time
 
 if __name__ == "__main__":
@@ -465,7 +465,7 @@ Return value: dictionary or integer
 
 ### Example of Use:
 
-```
+```python
 import time
 
 
@@ -513,7 +513,7 @@ Return value: Boolean, indicating whether the termination was successful
 
 ### Example of Use:
 
-```
+```python
 import time
 from task_scheduling.variable import *
 from task_scheduling.utils import interruptible_sleep
@@ -560,7 +560,7 @@ After adding the name of a certain type of task, this type of task will be inter
 
 ### Example of Use:
 
-```
+```python
 import time
 
 
@@ -575,7 +575,7 @@ input_info = "test"
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
-    from task_scheduling.web_ui import start_task_status_ui
+    from task_scheduling.webui import start_task_status_ui
     from task_scheduling.variable import *
 
     start_task_status_ui()
@@ -603,7 +603,7 @@ if __name__ == "__main__":
 
 ### Example of Use:
 
-```
+```python
 import time
 
 
@@ -618,7 +618,7 @@ input_info = "test"
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
-    from task_scheduling.web_ui import start_task_status_ui
+    from task_scheduling.webui import start_task_status_ui
     from task_scheduling.variable import *
 
     start_task_status_ui()
@@ -650,7 +650,7 @@ This function must be executed before shutting down to terminate and clean up th
 
 ### Example Usage:
 
-```
+```python
 from task_scheduling.manager import task_scheduler
 task_scheduler.shutdown_scheduler(True)
 ```
@@ -673,8 +673,10 @@ Return value: True or an error message
 
 ### Example Usage:
 
-```
+```python
 from task_scheduling.common import update_config
+
+key, value = None
 update_config(key, value)
 if __name__ == "__main__":
     ...
@@ -723,7 +725,7 @@ Using `task_signal_transmission[_sharedtaskdict.read(task_name)] = ["action"]` i
 
 ### Example of Use:
 
-```
+```python
 import threading
 import time
 from task_scheduling.utils import wait_branch_thread_ended, branch_thread_control
@@ -748,12 +750,13 @@ def main_task(share_info, sharedtaskdict, task_signal_transmission, input_info):
 
 
 from task_scheduling.common import update_config
+
 update_config("thread_management", True)
 
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
-    from task_scheduling.web_ui import start_task_status_ui
+    from task_scheduling.webui import start_task_status_ui
     from task_scheduling.variable import *
 
     start_task_status_ui()
@@ -786,7 +789,7 @@ detection and forced termination (`True`, `False`), and the parameters required 
 
 ### Example of Use:
 
-```
+```python
 import time
 
 
@@ -803,7 +806,7 @@ if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
     from task_scheduling.quick_creation import task_group
-    from task_scheduling.web_ui import start_task_status_ui
+    from task_scheduling.webui import start_task_status_ui
     from task_scheduling.variable import *
 
     start_task_status_ui()
@@ -873,7 +876,7 @@ The six parameters required for `task_creation`:
 
 ### Example of Use:
 
-```
+```python
 import time
 
 
@@ -890,7 +893,7 @@ if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
     from task_scheduling.followup_creation import task_dependency_manager
-    from task_scheduling.web_ui import start_task_status_ui
+    from task_scheduling.webui import start_task_status_ui
     from task_scheduling.variable import *
 
     start_task_status_ui()
@@ -909,7 +912,7 @@ if __name__ == "__main__":
 
 ## Web control terminal
 
-![01.png](https://github.com/fallingmeteorite/task_scheduling/blob/main/img/01.png)
+![01.png](./img/01.png)
 
 Task status UI available at http://localhost:8000
 
