@@ -51,9 +51,9 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
             if timeout_processing:
                 with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
 
-                    return_results = func(*args, **kwargs)
+                    return_results = func(task_id, *args, **kwargs)
             else:
-                return_results = func(*args, **kwargs)
+                return_results = func(task_id, *args, **kwargs)
 
             _task_manager.remove(task_id)
 

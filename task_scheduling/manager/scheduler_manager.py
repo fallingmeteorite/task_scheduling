@@ -13,8 +13,10 @@ from ..manager import task_status_manager
 
 
 class TaskScheduler:
-    __slots__ = ['ban_task_names', 'core_task_queue', 'allocator_running', 'allocator_started', 'allocator_thread',
-                 'timeout_check_interval', '_timeout_checker', '_task_event']
+    __slots__ = ['ban_task_names', 'core_task_queue',
+                 'allocator_running', 'allocator_started', 'allocator_thread',
+                 'timeout_check_interval', '_timeout_checker',
+                 '_task_event']
 
     def __init__(self) -> None:
         self.ban_task_names: List[str] = []

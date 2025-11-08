@@ -62,10 +62,10 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
                         if config["thread_management"] and get_param_count(func, *args, **kwargs):
                             share_info = (task_manager, _threadterminator, StopException, ThreadingTimeout,
                                           TimeoutException, _threadsuspender, task_status_queue)
-                            result = func(share_info, _sharedtaskdict, task_signal_transmission, *args,
+                            result = func(task_id, share_info, _sharedtaskdict, task_signal_transmission, *args,
                                           **kwargs)
                         else:
-                            result = func(*args, **kwargs)
+                            result = func(task_id, *args, **kwargs)
                 else:
                     result = func(*args, **kwargs)
 

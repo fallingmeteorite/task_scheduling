@@ -20,12 +20,11 @@
 - 线程级任务管理(实验性功能): 灵活的任务结构管理
 - 任务树模式管理(实验性功能): 当主任务结束,其他所有分支任务都会被销毁
 - 依赖型任务执行(实验性功能): 依赖于主任务返回结果运行的函数将启动并运行
+- 任务重试: 在对应的报错发生时重新尝试运行任务
 
 ## 未来的计划
 
-- 动态调节: 根据负载动态调整配置文件
-- 任务重试: 在对应的报错发生时重新尝试运行任务
-- 控制界面: 功能更加全面的的网页控制界面
+暂时没有
 
 ## 安装
 
@@ -250,6 +249,54 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         task_scheduler.shutdown_scheduler(True)
 
+```
+
+## 任务重试
+
+- retry_on_error(exceptions: Union[Type[Exception], Tuple[Type[Exception], ...], None], max_attempts: int, delay:
+  Union[float, int]) -> Any:
+
+### 参数说明:
+
+**exceptions**: 当什么错误类型发生才开始重试
+
+**max_attempts**: 最大尝试次数
+
+**delay**: 每次重试的间隔时间
+
+### 使用示例:
+
+```python
+import time
+from task_scheduling.utils import retry_on_error
+
+
+@retry_on_error(exceptions=(TypeError), max_attempts=3, delay=1.0)
+def linear_task(input_info):
+    while True:
+        print(input_info)
+        time.sleep(input_info)
+
+
+from task_scheduling.common import set_log_level
+
+set_log_level("DEBUG")
+
+if __name__ == "__main__":
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
+    from task_scheduling.variable import *
+
+    task_creation(
+        None, None, FUNCTION_TYPE_CPU, True, "task1",
+        linear_task, priority_low, "test"
+    )
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 ## 暂停或恢复任务运行
@@ -912,27 +959,27 @@ Task status UI available at http://localhost:8000
 
 同名称的 CPU 密集型异步任务可以运行的最大数量
 
-`cpu_asyncio_task: 8`
+`cpu_asyncio_task: 30`
 
 IO 密集型异步任务运行最大任务数
 
-`io_asyncio_task: 20`
+`io_asyncio_task: 15`
 
 CPU 密集型线性任务中运行最大任务数
 
-`cpu_liner_task: 20`
+`cpu_liner_task: 30`
 
 IO 密集型线性任务中运行最大任务数
 
-`io_liner_task: 20`
+`io_liner_task: 100`
 
 定时器执行最多任务数
 
-`timer_task: 20`
+`timer_task: 100`
 
 当多长时间没有任务时,关闭任务调度器(秒)
 
-`max_idle_time: 600`
+`max_idle_time: 300`
 
 当任务运行多久而未完成时,强制结束(秒)
 
@@ -940,19 +987,19 @@ IO 密集型线性任务中运行最大任务数
 
 任务状态存储器中最大存储任务数
 
-`maximum_task_info_storage: 40`
+`maximum_task_info_storage: 60`
 
 多久检查存储器中任务状态是否正确(秒)
 
-`status_check_interval: 800`
+`status_check_interval: 400`
 
 单个调度器最大储存返回结果数量Maximum number of returned results that a single scheduler can store
 
-`maximum_result_storage`: 20,
+`maximum_result_storage: 20`,
 
 多久清理一次返回结果储存(秒)How often to clear the return result storage (seconds)
 
-`maximum_result_time_storage`: 16,
+`maximum_result_time_storage: 16`,
 
 是否在 CPU 密集型线性任务中启用超级线程管理
 

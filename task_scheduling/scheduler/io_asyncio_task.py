@@ -48,9 +48,9 @@ async def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> A
 
             # If the task needs timeout processing, set the timeout time
             if timeout_processing:
-                return_results = await asyncio.wait_for(func(*args, **kwargs), timeout=config["watch_dog_time"])
+                return_results = await asyncio.wait_for(func(task_id, *args, **kwargs), timeout=config["watch_dog_time"])
             else:
-                return_results = await func(*args, **kwargs)
+                return_results = await func(task_id, *args, **kwargs)
 
         _task_manager.remove(task_id)
     except asyncio.TimeoutError:

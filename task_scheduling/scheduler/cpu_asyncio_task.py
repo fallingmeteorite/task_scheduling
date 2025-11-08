@@ -48,10 +48,10 @@ async def _execute_task_async(task: Tuple[bool, str, str, Callable, Tuple, Dict]
             logger.debug(f"Start running task, task ID: {task_id}")
 
             if timeout_processing:
-                return_results = await asyncio.wait_for(func(*args, **kwargs),
+                return_results = await asyncio.wait_for(func(task_id, *args, **kwargs),
                                                         timeout=config["watch_dog_time"])
             else:
-                return_results = await func(*args, **kwargs)
+                return_results = await func(task_id, *args, **kwargs)
 
     return return_results
 

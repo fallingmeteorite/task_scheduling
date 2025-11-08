@@ -23,12 +23,11 @@ robust task management and monitoring features (with `NO GIL` already supported)
 - Task tree mode management (experimental feature): When the main task ends, all other branch tasks will be terminated
 - Dependent Task Execution (Experimental Feature): Functions that rely on the results returned by the main task will be
   triggered and executed.
+- Task Retry: Retry running the task when the corresponding error occurs
 
 ## Future plans
 
-- Dynamic Adjustment: Adjust profiles dynamically based on load
-- Task Retry: Retry running the task when the corresponding error occurs
-- Control Interface: A more comprehensive web control interface
+Not available at the moment
 
 ## Installation
 
@@ -75,6 +74,7 @@ Run the following example to see the speed difference between the `GIL` and `NO 
 ```python
 import time
 import math
+
 
 def linear_task(input_info):
     total_start_time = time.time()
@@ -145,7 +145,7 @@ Please place it before `if __name__ == "__main__":`
 ```python
 from task_scheduling.common import set_log_level
 
-set_log_level("DEBUG") # INFO, DEBUG, ERROR, WARNING
+set_log_level("DEBUG")  # INFO, DEBUG, ERROR, WARNING
 
 if __name__ == "__main__":
     ...
@@ -253,6 +253,54 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         task_scheduler.shutdown_scheduler(True)
 
+```
+
+## Task Retry
+
+- retry_on_error(exceptions: Union[Type[Exception], Tuple[Type[Exception], ...], None], max_attempts: int, delay:
+  Union[float, int]) -> Any:
+
+### Parameter Description:
+
+**exceptions**: When should retries start based on the type of error?
+
+**max_attempts**: Maximum number of attempts
+
+**delay**: Interval time between each retry
+
+### Usage example:
+
+```python
+import time
+from task_scheduling.utils import retry_on_error
+
+
+@retry_on_error(exceptions=(TypeError), max_attempts=3, delay=1.0)
+def linear_task(input_info):
+    while True:
+        print(input_info)
+        time.sleep(input_info)
+
+
+from task_scheduling.common import set_log_level
+
+set_log_level("DEBUG")
+
+if __name__ == "__main__":
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
+    from task_scheduling.variable import *
+
+    task_creation(
+        None, None, FUNCTION_TYPE_CPU, True, "task1",
+        linear_task, priority_low, "test"
+    )
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        task_scheduler.shutdown_scheduler(True)
 ```
 
 ## Pause or Resume Task Execution
@@ -652,6 +700,7 @@ This function must be executed before shutting down to terminate and clean up th
 
 ```python
 from task_scheduling.manager import task_scheduler
+
 task_scheduler.shutdown_scheduler(True)
 ```
 
@@ -924,27 +973,27 @@ The file is stored in: `task_scheduling/config/config.yaml`
 
 The maximum number of CPU-intensive asynchronous tasks with the same name that can run
 
-`cpu_asyncio_task: 8`
+`cpu_asyncio_task: 30`
 
 Maximum Number of IO-Intensive Asynchronous Tasks
 
-`io_asyncio_task: 20`
+`io_asyncio_task: 15`
 
 Maximum number of tasks running in CPU-intensive linear tasks
 
-`cpu_liner_task: 20`
+`cpu_liner_task: 30`
 
 Maximum number of tasks running in IO-intensive linear tasks
 
-`io_liner_task: 20`
+`io_liner_task: 100`
 
 Maximum number of tasks executed by the timer
 
-`timer_task: 20`
+`timer_task: 100`
 
 Time to wait without tasks before shutting down the task scheduler (seconds)
 
-`max_idle_time: 600`
+`max_idle_time: 300`
 
 Force stop if the task runs for too long without completion (seconds)
 
@@ -952,21 +1001,19 @@ Force stop if the task runs for too long without completion (seconds)
 
 Maximum number of tasks stored in the task status memory
 
-`maximum_task_info_storage: 40`
+`maximum_task_info_storage: 60`
 
 How often to check if the task status in memory is correct (seconds)
 
-`status_check_interval: 800`
-
-`status_check_interval: 800`
+`status_check_interval: 400`
 
 Maximum number of returned results that a single scheduler can store
 
-`maximum_result_storage`: 20,
+`maximum_result_storage: 20`,
 
 How often to clear the return result storage (seconds)
 
-`maximum_result_time_storage`: 16,
+`maximum_result_time_storage: 16`,
 
 Whether to enable hyper-threading management in CPU-intensive linear tasks
 
