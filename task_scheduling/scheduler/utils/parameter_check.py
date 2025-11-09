@@ -15,3 +15,16 @@ def get_param_count(func: Callable, *args, **kwargs) -> bool:
 
     """
     return not len(inspect.signature(func).parameters) == len(args) + len(kwargs)
+
+
+def retry_on_error_decorator_check(func: Callable) -> bool:
+    """
+
+    Args:
+        func: function
+
+    Returns: Add retry decorator?
+
+    """
+    return (hasattr(func, '_decorated_by') and
+            getattr(func, '_decorated_by') == 'retry_on_error_decorator')

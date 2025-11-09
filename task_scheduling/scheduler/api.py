@@ -3,12 +3,11 @@
 import time
 from typing import Any, Union, Callable
 
-from .cpu_asyncio_task import cpu_asyncio_task
-from .cpu_liner_task import cpu_liner_task
+from .cpu_asyncio_task import cpu_asyncio_task, shared_status_info_asyncio
+from .cpu_liner_task import cpu_liner_task, shared_status_info_liner
 from .io_asyncio_task import io_asyncio_task
 from .io_liner_task import io_liner_task
 from .timer_task import timer_task
-from .utils import shared_status_info
 from ..common import logger, config
 
 # Define mapping from task types to processors
@@ -150,12 +149,9 @@ def cleanup_results_api() -> None:
             pass
 
 
-def shutdown_api(force_cleanup: bool) -> None:
+def shutdown_api() -> None:
     """
     Shutdown all task schedulers and clean up resources.
-
-    Args:
-        force_cleanup: Force stop running tasks
     """
     # Define the list of schedulers to be shut down
     schedulers = [
@@ -168,13 +164,15 @@ def shutdown_api(force_cleanup: bool) -> None:
 
     for scheduler, name, attr_name in schedulers:
         if getattr(scheduler, attr_name, False):
-            logger.info(f"Detected {name} scheduler is running, shutting down...")
+            logger.debug(f"Detected {name} scheduler is running, shutting down...")
             # Call the corresponding shutdown method according to the different schedulers
             if hasattr(scheduler, 'stop_all_schedulers'):
-                scheduler.stop_all_schedulers(force_cleanup)
+                scheduler.stop_all_schedulers()
             elif hasattr(scheduler, 'stop_scheduler'):
-                scheduler.stop_scheduler(force_cleanup)
+                scheduler.stop_scheduler()
 
-    # Close the shared information channel
-    shared_status_info.manager.shutdown()
-    shared_status_info.channel_shutdown()
+    stop_spinner = True
+
+    # Close the shared channel
+    shared_status_info_asyncio.channel_shutdown()
+    shared_status_info_liner.channel_shutdown()

@@ -1,12 +1,16 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
 import os
+import sys
 import time
 import json
 import threading
 
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import urlparse
+try:
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from urllib.parse import urlparse
+except KeyboardInterrupt:
+    sys.exit(0)
 
 from ..common import logger, config
 from ..manager import task_status_manager

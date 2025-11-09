@@ -19,7 +19,7 @@ def wait_ended() -> None:
         if threading.active_count() <= 2:
             break
         try:
-            time.sleep(0.1)
+            time.sleep(0.01)
         except KeyboardInterrupt:
             pass
 

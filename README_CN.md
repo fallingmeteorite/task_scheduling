@@ -1,5 +1,5 @@
-- [English version](./README.md)
-- [中文版本](./README_CN.md)
+- [English version](https://github.com/fallingmeteorite/task_scheduling/blob/main/README.md)
+- [中文版本](https://github.com/fallingmeteorite/task_scheduling/blob/main/README_CN.md)
 
 # Task Scheduling Library
 
@@ -127,7 +127,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## 修改日志等级
@@ -247,7 +247,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 
 ```
 
@@ -296,7 +296,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## 暂停或恢复任务运行
@@ -349,7 +349,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## 读取函数类型
@@ -426,7 +426,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## 获取所有任务状态
@@ -457,7 +457,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## 获取特定任务状态
@@ -491,7 +491,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 # 获取任务总数
@@ -534,7 +534,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## 强制终止运行任务。
@@ -584,7 +584,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## 添加或删除禁用任务名称
@@ -633,7 +633,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1.0)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## 取消队列中某类任务
@@ -676,27 +676,23 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## 关闭调度器
 
-- shutdown_scheduler(force_cleanup: bool) -> None:
+- shutdown_scheduler() -> None:
 
 ### !!!警告!!!
 
 在关闭运行前必须执行该函数去结束和清理运行任务
-
-### 参数说明:
-
-**force_cleanup**:是否等待剩下任务运行
 
 ### 使用示例:
 
 ```python
 from task_scheduling.manager import task_scheduler
 
-task_scheduler.shutdown_scheduler(True)
+task_scheduler.shutdown_scheduler()
 ```
 
 ## 临时更新配置文件参数(热加载)
@@ -705,7 +701,7 @@ task_scheduler.shutdown_scheduler(True)
 
 ### !!!警告!!!
 
-请放在`if __name__ == "__main__":`前面
+请放在`if __name__ == "__main__":`前面,部分参数没法在启动后修改并生效
 
 ### 参数说明:
 
@@ -733,8 +729,6 @@ if __name__ == "__main__":
 !!!该功能只支持CPU密集型线性任务!!!
 
 ### 功能说明:
-
-`线程级任务管理(实验性功能)`默认为关闭状态,当配置文件中`thread_management=True`开启该功能
 
 `main_task`中前三位接受参数必须为`share_info`, `_sharedtaskdict`, `task_signal_transmission`(
 如果开启了该功能,正常任务也可以使用,只需要不传入前面所说的三个参数)
@@ -786,10 +780,6 @@ def main_task(share_info, sharedtaskdict, task_signal_transmission, input_info):
     # task_signal_transmission[sharedtaskdict.read(task_name)] = ["kill"]
 
 
-from task_scheduling.common import update_config
-
-update_config("thread_management", True)
-
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
@@ -806,7 +796,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## 任务树模式管理(实验性功能)
@@ -835,9 +825,6 @@ def liner_task(input_info):
         print(input_info)
 
 
-from task_scheduling.common import update_config
-
-update_config("thread_management", True)
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
@@ -863,7 +850,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## 依赖型任务执行(实验性功能)
@@ -942,12 +929,12 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## 网页控制端
 
-![01.png](./img/01.png)
+![01.png](https://github.com/fallingmeteorite/task_scheduling/blob/main/img/01.png)
 
 Task status UI available at http://localhost:8000
 
@@ -955,7 +942,11 @@ Task status UI available at http://localhost:8000
 
 ## 配置
 
-文件存储在:`task_scheduling/config/config.yaml`
+文件存储在: `task_scheduling/config/config_gil.yaml or config_no_gil.yaml`
+
+## !!!警告!!!
+
+`no_gil`和`gil`在`io_liner_task``timer_task`有区别
 
 同名称的 CPU 密集型异步任务可以运行的最大数量
 
@@ -963,7 +954,7 @@ Task status UI available at http://localhost:8000
 
 IO 密集型异步任务运行最大任务数
 
-`io_asyncio_task: 15`
+`io_asyncio_task: 40`
 
 CPU 密集型线性任务中运行最大任务数
 
@@ -971,11 +962,11 @@ CPU 密集型线性任务中运行最大任务数
 
 IO 密集型线性任务中运行最大任务数
 
-`io_liner_task: 100`
+`io_liner_task: 1000` `no_gil: 60`
 
 定时器执行最多任务数
 
-`timer_task: 100`
+`timer_task: 1000` `no_gil: 60`
 
 当多长时间没有任务时,关闭任务调度器(秒)
 
@@ -983,27 +974,23 @@ IO 密集型线性任务中运行最大任务数
 
 当任务运行多久而未完成时,强制结束(秒)
 
-`watch_dog_time: 120`
+`watch_dog_time: 300`
 
 任务状态存储器中最大存储任务数
 
-`maximum_task_info_storage: 60`
+`maximum_task_info_storage: 2000`
 
 多久检查存储器中任务状态是否正确(秒)
 
-`status_check_interval: 400`
+`status_check_interval: 300`
 
 单个调度器最大储存返回结果数量Maximum number of returned results that a single scheduler can store
 
-`maximum_result_storage: 20`,
+`maximum_result_storage: 2000`,
 
 多久清理一次返回结果储存(秒)How often to clear the return result storage (seconds)
 
-`maximum_result_time_storage: 16`,
-
-是否在 CPU 密集型线性任务中启用超级线程管理
-
-`thread_management: False`
+`maximum_result_time_storage: 300`,
 
 是否应该抛出异常而不捕获以便定位错误
 

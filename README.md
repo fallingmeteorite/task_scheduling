@@ -1,5 +1,5 @@
-- [English version](./README.md)
-- [中文版本](./README_CN.md)
+- [English version](https://github.com/fallingmeteorite/task_scheduling/blob/main/README.md)
+- [中文版本](https://github.com/fallingmeteorite/task_scheduling/blob/main/README_CN.md)
 
 # Task Scheduling Library
 
@@ -131,7 +131,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## Change Log Level
@@ -251,7 +251,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 
 ```
 
@@ -300,7 +300,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## Pause or Resume Task Execution
@@ -354,7 +354,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## Reading Function Types
@@ -431,7 +431,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## Get All Task Statuses
@@ -462,7 +462,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## Get Specific Task Status
@@ -496,7 +496,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 # Get total number of tasks
@@ -539,7 +539,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## Forcefully terminate the running task.
@@ -589,7 +589,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## Add or Remove Disabled Task Names
@@ -638,7 +638,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1.0)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## Cancel a Certain Type of Task in the Queue
@@ -681,12 +681,12 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## Shut Down the Scheduler
 
-- shutdown_scheduler(force_cleanup: bool) -> None:
+- shutdown_scheduler() -> None:
 
 ### !!!Warning!!!
 
@@ -694,14 +694,10 @@ This function must be executed before shutting down to terminate and clean up th
 
 ### Example Usage:
 
-**force_cleanup**: Whether to wait for remaining tasks to complete
-
-### Example Usage:
-
 ```python
 from task_scheduling.manager import task_scheduler
 
-task_scheduler.shutdown_scheduler(True)
+task_scheduler.shutdown_scheduler()
 ```
 
 ## Temporary Update of Configuration File Parameters (Hot Reload)
@@ -710,7 +706,7 @@ task_scheduler.shutdown_scheduler(True)
 
 ### !!!WARNING!!!
 
-Please place it before `if __name__ == "__main__":`
+Please place it before `if __name__ == "__main__":`,some parameters cannot be modified after startup and take effect
 
 ### Parameter Description:
 
@@ -738,9 +734,6 @@ if __name__ == "__main__":
 !!!This feature only supports CPU-intensive linear tasks!!!
 
 ### Function Description:
-
-`Thread-level task management (experimental feature)` is disabled by default. You can enable this feature by setting
-`thread_management=True` in the configuration file.
 
 In `main_task`, the first three parameters must be `share_info`, `_sharedtaskdict`, and `task_signal_transmission`.(If
 this feature is enabled, normal tasks can also be used, you just need not to provide the three parameters mentioned
@@ -798,10 +791,6 @@ def main_task(share_info, sharedtaskdict, task_signal_transmission, input_info):
     # task_signal_transmission[sharedtaskdict.read(task_name)] = ["kill"]
 
 
-from task_scheduling.common import update_config
-
-update_config("thread_management", True)
-
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
@@ -818,7 +807,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## Task Tree Mode Management (Experimental Feature)
@@ -848,9 +837,6 @@ def liner_task(input_info):
         print(input_info)
 
 
-from task_scheduling.common import update_config
-
-update_config("thread_management", True)
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
@@ -876,7 +862,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## Dependent Task Execution (Experimental Feature)
@@ -956,12 +942,12 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        task_scheduler.shutdown_scheduler(True)
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## Web control terminal
 
-![01.png](./img/01.png)
+![01.png](https://github.com/fallingmeteorite/task_scheduling/blob/main/img/01.png)
 
 Task status UI available at http://localhost:8000
 
@@ -969,7 +955,11 @@ Task status UI available at http://localhost:8000
 
 ## Configuration
 
-The file is stored in: `task_scheduling/config/config.yaml`
+The file is stored in: `task_scheduling/config/config_gil.yaml or config_no_gil.yaml`
+
+## !!!Warning!!!
+
+`no_gil` and `gil` have differences in `io_liner_task` and `timer_task`
 
 The maximum number of CPU-intensive asynchronous tasks with the same name that can run
 
@@ -977,7 +967,7 @@ The maximum number of CPU-intensive asynchronous tasks with the same name that c
 
 Maximum Number of IO-Intensive Asynchronous Tasks
 
-`io_asyncio_task: 15`
+`io_asyncio_task: 40`
 
 Maximum number of tasks running in CPU-intensive linear tasks
 
@@ -985,11 +975,11 @@ Maximum number of tasks running in CPU-intensive linear tasks
 
 Maximum number of tasks running in IO-intensive linear tasks
 
-`io_liner_task: 100`
+`io_liner_task: 1000` `no_gil: 60`
 
 Maximum number of tasks executed by the timer
 
-`timer_task: 100`
+`timer_task: 1000` `no_gil: 60`
 
 Time to wait without tasks before shutting down the task scheduler (seconds)
 
@@ -997,27 +987,23 @@ Time to wait without tasks before shutting down the task scheduler (seconds)
 
 Force stop if the task runs for too long without completion (seconds)
 
-`watch_dog_time: 120`
+`watch_dog_time: 300`
 
 Maximum number of tasks stored in the task status memory
 
-`maximum_task_info_storage: 60`
+`maximum_task_info_storage: 2000`
 
 How often to check if the task status in memory is correct (seconds)
 
-`status_check_interval: 400`
+`status_check_interval: 300`
 
 Maximum number of returned results that a single scheduler can store
 
-`maximum_result_storage: 20`,
+`maximum_result_storage: 2000`,
 
 How often to clear the return result storage (seconds)
 
-`maximum_result_time_storage: 16`,
-
-Whether to enable hyper-threading management in CPU-intensive linear tasks
-
-`thread_management: False`
+`maximum_result_time_storage: 300`,
 
 Should an exception be thrown without being caught in order to locate the error?
 

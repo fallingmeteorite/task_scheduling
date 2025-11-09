@@ -49,6 +49,3 @@ class SharedStatusInfo:
         self._task_status_queue = None
         self._task_signal_transmission = None
 
-
-# Create a global instance of SharedTaskInfo for use across the application
-shared_status_info = SharedStatusInfo()
