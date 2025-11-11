@@ -2,6 +2,7 @@
 # Author: fallingmeteorite
 import sys
 
+# Prevent errors during multi-process initialization
 try:
     from .end_cleaning import exit_cleanup
     from .info_share import SharedStatusInfo

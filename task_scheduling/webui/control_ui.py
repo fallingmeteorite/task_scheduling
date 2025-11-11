@@ -1,20 +1,70 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
 import os
-import sys
 import time
 import json
 import threading
 
-try:
-    from http.server import BaseHTTPRequestHandler, HTTPServer
-    from urllib.parse import urlparse
-except KeyboardInterrupt:
-    sys.exit(0)
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import urlparse
 
 from ..common import logger, config
-from ..manager import task_status_manager
+from ..manager import task_status_manager, task_scheduler
 from ..scheduler import kill_api, pause_api, resume_api
+
+# Global variable to control task addition
+_task_addition_enabled = True
+
+
+def _stop_task_addition():
+    """
+    Stop task addition
+    """
+    try:
+        # Call your task addition stop API here
+        # Example: return stop_task_addition_api()
+        global _task_addition_enabled
+        _task_addition_enabled = False
+        task_scheduler._stop_task_addition()
+        logger.info("Task addition has been stopped")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to stop task addition: {str(e)}")
+        return False
+
+
+def _resume_task_addition():
+    """
+    Resume task addition
+    """
+    try:
+        # Call your task addition resume API here
+        # Example: return resume_task_addition_api()
+        global _task_addition_enabled
+        _task_addition_enabled = True
+        task_scheduler._resume_task_addition()
+        logger.info("Task addition has been resumed")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to resume task addition: {str(e)}")
+        return False
+
+
+def is_task_addition_enabled():
+    """
+    Check if task addition is enabled
+    """
+    return _task_addition_enabled
+
+
+def get_task_addition_status():
+    """
+    Get task addition status information
+    """
+    return {
+        'enabled': _task_addition_enabled,
+        'status': 'enabled' if _task_addition_enabled else 'disabled'
+    }
 
 
 def format_tasks_info(tasks_dict):
@@ -249,6 +299,8 @@ class TaskControlHandler(BaseHTTPRequestHandler):
             self._handle_root()
         elif parsed_path.path == '/tasks':
             self._handle_tasks()
+        elif parsed_path.path == '/task-addition-status':  # New status query endpoint
+            self._handle_task_addition_status()
         else:
             self.send_response(404)
             self.end_headers()
@@ -262,6 +314,8 @@ class TaskControlHandler(BaseHTTPRequestHandler):
             task_id = path_parts[1]
             action = path_parts[2]
             self._handle_task_action(task_id, action)
+        elif parsed_path.path == '/toggle-task-addition':  # New toggle endpoint
+            self._handle_toggle_task_addition()
         else:
             self.send_response(404)
             self.end_headers()
@@ -290,6 +344,55 @@ class TaskControlHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(parsed_info).encode('utf-8'))
         except ConnectionAbortedError:
             pass
+
+    def _handle_task_addition_status(self):
+        """Handle task addition status query"""
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
+        try:
+            status_info = get_task_addition_status()
+            self.wfile.write(json.dumps(status_info).encode('utf-8'))
+        except ConnectionAbortedError:
+            pass
+
+    def _handle_toggle_task_addition(self):
+        """Handle task addition status toggle"""
+        try:
+            global _task_addition_enabled
+            if _task_addition_enabled:
+                result = _stop_task_addition()
+                action = 'stopped'
+            else:
+                result = _resume_task_addition()
+                action = 'resumed'
+
+            if result:
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    'success': True,
+                    'message': f'Task addition {action} successfully',
+                    'enabled': _task_addition_enabled
+                }).encode('utf-8'))
+            else:
+                self.send_response(400)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    'success': False,
+                    'message': f'Failed to {action} task addition'
+                }).encode('utf-8'))
+
+        except Exception as e:
+            self.send_response(500)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                'success': False,
+                'message': f'Internal server error: {str(e)}'
+            }).encode('utf-8'))
 
     def _handle_task_action(self, task_id, action):
         """Handle task control actions (terminate, pause, resume)."""

@@ -3,8 +3,10 @@
 import sys
 import sysconfig
 
+# Prevent errors during multi-process initialization
 try:
-    from .api import add_api, kill_api, pause_api, resume_api, get_result_api, shutdown_api, cleanup_results_api
+    from .api import add_api, kill_api, pause_api, resume_api, get_result_api, shutdown_api, \
+        cleanup_results_api
 
     if sysconfig.get_config_var("Py_GIL_DISABLED") == 1:
         from ..common import logger
@@ -13,4 +15,5 @@ try:
 
 except KeyboardInterrupt:
     sys.exit(0)
-__all__ = ['add_api', 'kill_api', 'pause_api', 'resume_api', 'get_result_api', 'shutdown_api', 'cleanup_results_api']
+__all__ = ['add_api', 'kill_api', 'pause_api', 'resume_api', 'get_result_api', 'shutdown_api',
+           'cleanup_results_api']

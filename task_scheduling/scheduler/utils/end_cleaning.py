@@ -2,8 +2,6 @@
 # Author: fallingmeteorite
 import signal
 import sys
-import threading
-
 
 def exit_cleanup() -> None:
     """

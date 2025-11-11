@@ -2,6 +2,7 @@
 # Author: fallingmeteorite
 import sys
 
+# Prevent errors during multi-process initialization
 try:
     from .details_manager import task_status_manager
     from .info_manager import SharedTaskDict

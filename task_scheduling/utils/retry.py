@@ -36,7 +36,7 @@ def retry_on_error(
                     time.sleep(current_delay)
                 except Exception as error:
                     # Caught an exception that is not in the retry list
-                    logger.error(f"Unhandled error type: {type(e).__name__}, message: {error}")
+                    logger.error(f"Unhandled error type: {type(error).__name__}, message: {error}")
                     raise error
 
         wrapper._decorated_by = 'retry_on_error_decorator'

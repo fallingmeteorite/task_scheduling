@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
-import random
 import threading
+
 from typing import Dict, Set, Tuple, Any, Optional
 
 

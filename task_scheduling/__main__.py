@@ -4,9 +4,10 @@ import os
 import shlex
 import sys
 
-from .task_creation import task_creation, shutdown
+from .task_creation import task_creation
+from .manager import task_scheduler
 from .webui import start_task_status_ui
-from .common.log_config import logger
+from .common import logger
 from .variable import *
 
 
@@ -14,7 +15,7 @@ def command_creation(task_name: str, command: str) -> str:
     def wrapper(command):
         os.system(command)
 
-    return task_creation(None, None, scheduler_io, False, task_name, wrapper, priority_high, command)
+    return task_creation(None, None, FUNCTION_TYPE_IO, False, task_name, wrapper, priority_high, command)
 
 
 def parse_input(user_input):
@@ -54,7 +55,7 @@ def main():
 
         except KeyboardInterrupt:
             logger.info("Starting shutdown TaskScheduler.")
-            shutdown(True)
+            task_scheduler.shutdown_scheduler()
             sys.exit(0)
         except Exception as e:
             logger.error(e)

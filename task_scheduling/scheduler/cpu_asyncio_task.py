@@ -2,8 +2,12 @@
 # Author: fallingmeteorite
 import asyncio
 import queue
+import os
 import threading
 import time
+import signal
+import platform
+import multiprocessing
 
 from concurrent.futures import ProcessPoolExecutor, Future, BrokenExecutor
 from functools import partial
@@ -66,7 +70,8 @@ async def _execute_task_async(task: Tuple[bool, str, str, Callable, Tuple, Dict]
 
 def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
                   task_status_queue: queue.Queue,
-                  task_signal_transmission: DictProxy) -> Any:
+                  task_signal_transmission: DictProxy,
+                  task_pid: DictProxy) -> Any:
     """
     Execute a task using an asyncio event loop.
 
@@ -80,11 +85,13 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
             - kwargs: Keyword arguments to pass to the function.
         task_status_queue: Queue to update task status.
         task_signal_transmission: Dict to transmission signal.
+        task_pid: Dict to process task pid.
 
     Returns:
         Result of the task execution or error message.
     """
     _, _, task_id, _, _, _ = task
+    task_pid[task_id] = os.getpid()
     task_manager = ProcessTaskManager(task_signal_transmission)
     try:
         result = asyncio.run(_execute_task_async(task, task_status_queue, task_manager))
@@ -111,6 +118,10 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
         # Remove main thread logging
         if task_manager.exists(task_id):
             task_manager.remove(task_id)
+
+        # Clean up PID mapping
+        if task_id in task_pid:
+            del task_pid[task_id]
     return result
 
 
@@ -268,6 +279,8 @@ class CpuAsyncioTask:
             # First cancel the task pause - use atomic operations
             with self._lock:
                 for task_id, _ in self._running_tasks.items():
+                    if platform.system() in ("Linux", "Darwin"):
+                        os.kill(shared_status_info_asyncio.task_pid.get(task_id), signal.SIGCONT)
                     shared_status_info_asyncio.task_signal_transmission[task_id] = ["resume", "kill"]
 
             # Ensure the executor is properly shut down
@@ -308,7 +321,7 @@ class CpuAsyncioTask:
         Scheduler function, fetch tasks from the task queue and submit them to the process pool for execution.
         """
         with ProcessPoolExecutor(max_workers=int(config["cpu_asyncio_task"]),
-                                 initializer=exit_cleanup) as executor:
+                                 initializer=exit_cleanup, mp_context=multiprocessing.get_context('spawn')) as executor:
             self._executor = executor
             while not self._scheduler_stop_event.is_set():
                 with self._condition:
@@ -329,12 +342,17 @@ class CpuAsyncioTask:
                 timeout_processing, task_name, task_id, func, args, kwargs = task
 
                 # Use lock protection for shared state updates
-                with self._lock:
+                try:
                     future = executor.submit(_execute_task, task, shared_status_info_asyncio.task_status_queue,
-                                             shared_status_info_asyncio.task_signal_transmission)
+                                             shared_status_info_asyncio.task_signal_transmission,
+                                             shared_status_info_asyncio.task_pid)
+                except Exception:
+                    pass
+
+                with self._lock:
                     self._running_tasks[task_id] = [future, task_name]
 
-                    future.add_done_callback(partial(self._task_done, task_id))
+                future.add_done_callback(partial(self._task_done, task_id))
 
     def _task_done(self,
                    task_id: str,
@@ -445,18 +463,24 @@ class CpuAsyncioTask:
             if not task_info:
                 logger.warning(f"task | {task_id} | does not exist or is already completed")
                 return False
-
             future = task_info[0]
 
-        # Perform cancellation outside the lock to avoid deadlocks
-        if not future.running():
-            future.cancel()
-        else:
-            # First ensure that the task is not paused.
-            shared_status_info_asyncio.task_signal_transmission[task_id] = ["resume", "kill"]
+            # Try to cancel the future if not running
+            if not future.running():
+                future.cancel()
+                return True
 
-        shared_status_info_asyncio.task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
-        return True
+            # Send termination signal to running task
+            if platform.system() == "Windows":
+                shared_status_info_asyncio.task_signal_transmission[task_id] = ["resume", "kill"]
+            elif platform.system() in ("Linux", "Darwin"):
+                pid = shared_status_info_asyncio.task_pid.get(task_id)
+                if pid:
+                    os.kill(pid, signal.SIGCONT)
+                    shared_status_info_asyncio.task_signal_transmission[task_id] = ["kill"]
+                else:
+                    logger.warning(f"task | {task_id} | no PID found for task")
+            return True
 
     def pause_task(self,
                    task_id: str) -> bool:
@@ -475,9 +499,18 @@ class CpuAsyncioTask:
                 logger.warning(f"task | {task_id} | does not exist or is already completed")
                 return False
 
-        shared_status_info_asyncio.task_signal_transmission[task_id] = ["pause"]
-        shared_status_info_asyncio.task_status_queue.put(("paused", task_id, None, None, None, None, None))
+        if platform.system() == "Windows":
+            shared_status_info_asyncio.task_signal_transmission[task_id] = ["pause"]
+        elif platform.system() in ("Linux", "Darwin"):
+            pid = shared_status_info_asyncio.task_pid.get(task_id)
+            if pid:
+                os.kill(pid, signal.SIGSTOP)
+            else:
+                logger.warning(f"task | {task_id} | no PID found for task")
+                return False
 
+        shared_status_info_asyncio.task_status_queue.put(("paused", task_id, None, None, None, None, None))
+        logger.info(f"task | {task_id} | paused")
         return True
 
     def resume_task(self,
@@ -497,9 +530,18 @@ class CpuAsyncioTask:
                 logger.warning(f"task | {task_id} | does not exist or is already completed")
                 return False
 
-        shared_status_info_asyncio.task_signal_transmission[task_id] = ["resume"]
-        shared_status_info_asyncio.task_status_queue.put(("running", task_id, None, None, None, None, None))
+        if platform.system() == "Windows":
+            shared_status_info_asyncio.task_signal_transmission[task_id] = ["resume"]
+        elif platform.system() in ("Linux", "Darwin"):
+            pid = shared_status_info_asyncio.task_pid.get(task_id)
+            if pid:
+                os.kill(pid, signal.SIGCONT)
+            else:
+                logger.warning(f"task | {task_id} | no PID found for task")
+                return False
 
+        shared_status_info_asyncio.task_status_queue.put(("running", task_id, None, None, None, None, None))
+        logger.info(f"task | {task_id} | resumed")
         return True
 
     def get_task_result(self,

@@ -27,14 +27,8 @@ class ThreadTerminator:
             self.platform = platform.system()
         except KeyboardInterrupt:
             sys.exit(0)
-        if self.platform == "Windows":
-            self._kernel32 = ctypes.windll.kernel32
-            self.THREAD_ACCESS = 0x0001 | 0x0002  # TERMINATE + SUSPEND
-        elif self.platform in ("Linux", "Darwin"):
-            lib_name = "libc.so.6" if self.platform == "Linux" else "libSystem.dylib"
-            self._libc = ctypes.CDLL(lib_name)
-        else:
-            raise NotImplementedError(f"Unsupported platform: {self.platform}")
+        # All platforms use the same asynchronous exception mechanism
+        # No platform-specific handling is needed anymore
 
     @contextmanager
     def terminate_control(self):
@@ -53,54 +47,36 @@ class ThreadTerminator:
             self._unregister_thread(tid)
 
     def _register_thread(self, tid: int) -> bool:
-        """Register thread with OS"""
+        """Register thread"""
         with self._lock:
             if tid in self._handles:
                 return True
-
-            try:
-                if self.platform == "Windows":
-                    handle = self._kernel32.OpenThread(self.THREAD_ACCESS, False, tid)
-                    if not handle:
-                        raise ctypes.WinError()
-                    self._handles[tid] = handle
-                else:
-                    self._handles[tid] = tid
-                return True
-            except Exception:
-                return False
+            self._handles[tid] = tid
+            return True
 
     def _unregister_thread(self, tid: int) -> bool:
-        """Unregister thread from OS"""
+        """Unregister thread"""
         with self._lock:
-            if tid not in self._handles:
-                return False
-
-            try:
-                if self.platform == "Windows":
-                    self._kernel32.CloseHandle(self._handles[tid])
+            if tid in self._handles:
                 del self._handles[tid]
-                return True
-            except Exception:
-                return False
+            return True
 
     def raise_stop_exception(self, tid: int):
-        """Raise StopException in target thread"""
-        if self.platform == "Windows":
-            # Use async exception on Windows
-            ret = ctypes.pythonapi.PyThreadState_SetAsyncExc(
-                ctypes.c_long(tid),
-                ctypes.py_object(StopException))
+        """Raise StopException in target thread using PyThreadState_SetAsyncExc"""
+        # Use PyThreadState_SetAsyncExc on all platforms
+        ret = ctypes.pythonapi.PyThreadState_SetAsyncExc(
+            ctypes.c_long(tid),
+            ctypes.py_object(StopException)
+        )
 
-            if ret == 0:
-                raise ValueError("Invalid thread ID")
-            elif ret > 1:
-                ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(tid), None)
-                raise SystemError("Async exception failed")
-        else:
-            # Use pthread_cancel on POSIX
-            if self._libc.pthread_cancel(tid) != 0:
-                raise RuntimeError("Failed to cancel thread")
+        if ret == 0:
+            # The thread may have already ended; this is not a fatal error
+            return False
+        elif ret > 1:
+            # Clear state, but do not throw exceptions
+            ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(tid), None)
+            return False
+        return True
 
 
 class TerminateController:
@@ -113,4 +89,3 @@ class TerminateController:
     def terminate(self):
         """Terminate the current thread by raising StopException in it"""
         self._terminator.raise_stop_exception(self._tid)
-        # This line won't be reached as the thread will be terminated

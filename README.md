@@ -43,7 +43,7 @@ Does not support precise control over tasks
 
 ### Example of Use:
 
-```commandline
+```
 python -m task_scheduling
 
 #  The task scheduler starts.
@@ -168,6 +168,10 @@ start_task_status_ui()
 
 - task_creation(delay: int or None, daily_time: str or None, function_type: str, timeout_processing: bool, task_name:
   str, func: Callable, *args, **kwargs) -> str or None:
+
+### !!!Warning!!!
+
+`Windows`, `Linux`, and `Mac` all use `spawn` uniformly in multiprocessing.
 
 ### Parameter Description:
 
@@ -312,7 +316,9 @@ if __name__ == "__main__":
 ### !!!Warning!!!
 
 When a task is paused, the timeout timer still operates. If you need to use the pause function, it is recommended to
-disable the timeout handling to prevent the task from being terminated due to a timeout when it resumes.
+disable the timeout processing to prevent the task from being terminated due to a timeout when it resumes. In `Linux`
+and `Mac`, pausing and resuming threaded tasks is not supported; only process-level tasks are supported. Pausing will
+pause all tasks within the process.
 
 ### Parameter Description:
 
@@ -690,7 +696,9 @@ if __name__ == "__main__":
 
 ### !!!Warning!!!
 
-This function must be executed before shutting down to terminate and clean up the running tasks.
+This function must be executed to terminate and clean up running tasks before shutting down. In large-scale task
+scheduling, it is recommended to first click `Stop Adding Tasks` on the webpage to prevent errors caused by task
+initialization during exit. If not used, exit may report errors, which is normal.
 
 ### Example Usage:
 
@@ -749,7 +757,8 @@ The `@branch_thread_control` decorator accepts the parameters `share_info`, `_sh
 `task_name`.
 
 `task_name` must be unique and not duplicated, used to obtain the task_id of other branch threads (use
-`_sharedtaskdict.read(task_name)` to get the task_id for terminating, pausing, or resuming them)
+`_sharedtaskdict.read(task_name)` to get the task_id for terminating, pausing, or resuming them)The name will be
+displayed as `main_task_name|task_name`
 
 When using `threading.Thread`, you must add `daemon=True` to set the thread as a daemon thread (if not added, closing
 operations will take longer; anyway, once the main thread ends, it will forcibly terminate all child threads).
@@ -957,7 +966,7 @@ Task status UI available at http://localhost:8000
 
 The file is stored in: `task_scheduling/config/config_gil.yaml or config_no_gil.yaml`
 
-## !!!Warning!!!
+### !!!Warning!!!
 
 `no_gil` and `gil` have differences in `io_liner_task` and `timer_task`
 

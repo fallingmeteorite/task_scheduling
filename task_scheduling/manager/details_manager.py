@@ -2,10 +2,12 @@
 # Author: fallingmeteorite
 import time
 import threading
+import gc
+
 from collections import OrderedDict, Counter
 from typing import Dict, Optional, Union
 
-from ..common import config
+from ..common import config, logger
 
 
 class TaskStatusManager:
@@ -111,6 +113,9 @@ class TaskStatusManager:
                 for k in to_remove:
                     self._task_status_dict.pop(k)
                 del to_remove
+
+        # Memory Cleanup
+        logger.warning(f"Garbage collection performed. A total of <{gc.collect()}> objects were recycled.")
 
     def get_task_status(self,
                         task_id: str) -> Optional[Dict[str, Optional[Union[str, float, bool]]]]:

@@ -2,6 +2,7 @@
 # Author: fallingmeteorite
 import sys
 
+# Prevent errors during multi-process initialization
 try:
     from .control_ui import start_task_status_ui, get_tasks_info
 except KeyboardInterrupt:

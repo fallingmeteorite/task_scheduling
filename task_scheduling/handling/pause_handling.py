@@ -28,8 +28,7 @@ class ThreadSuspender:
             self._kernel32 = ctypes.windll.kernel32
             self.THREAD_ACCESS = 0x0002  # THREAD_SUSPEND_RESUME
         elif self.platform in ("Linux", "Darwin"):
-            lib_name = "libc.so.6" if self.platform == "Linux" else "libSystem.dylib"
-            self._libc = ctypes.CDLL(lib_name)
+            pass
         else:
             raise NotImplementedError(f"Unsupported platform: {self.platform}")
 
@@ -65,8 +64,6 @@ class ThreadSuspender:
                 if not handle:
                     raise ctypes.WinError()
                 self._handles[tid] = handle
-            else:
-                self._handles[tid] = tid
             return True
 
     def _unregister_thread(self, tid: int) -> bool:
@@ -89,9 +86,6 @@ class ThreadSuspender:
             if self.platform == "Windows":
                 if self._kernel32.SuspendThread(self._handles[tid]) == -1:
                     raise ctypes.WinError()
-            else:
-                if self._libc.pthread_kill(tid, 19) != 0:  # SIGSTOP
-                    raise RuntimeError("Failed to pause thread")
             return True
 
     def resume_thread(self, tid: int) -> bool:
@@ -103,9 +97,6 @@ class ThreadSuspender:
             if self.platform == "Windows":
                 if self._kernel32.ResumeThread(self._handles[tid]) == -1:
                     raise ctypes.WinError()
-            else:
-                if self._libc.pthread_kill(tid, 18) != 0:  # SIGCONT
-                    raise RuntimeError("Failed to resume thread")
             return True
 
 

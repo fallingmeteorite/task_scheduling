@@ -10,5 +10,5 @@
   "status_check_interval": 300,
   "maximum_result_storage": 2000,
   "maximum_result_time_storage": 300,
-  "exception_thrown": true
+  "exception_thrown": false
 }

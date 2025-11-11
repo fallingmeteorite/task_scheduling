@@ -2,6 +2,7 @@
 # Author: fallingmeteorite
 import sys
 
+# Prevent errors during multi-process initialization
 try:
     from .process_control import ProcessTaskManager
     from .thread_control import ThreadTaskManager

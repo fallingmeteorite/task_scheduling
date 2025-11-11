@@ -2,6 +2,8 @@
 # Author: fallingmeteorite
 import threading
 import time
+import platform
+
 from typing import Dict, Any
 
 from ..common import config
@@ -13,7 +15,7 @@ class ProcessTaskManager:
     Monitors a task queue for control commands and applies them to managed tasks.
     """
 
-    __slots__ = ['_tasks', '_lock', '_task_queue', '_running', '_main_task_id']
+    __slots__ = ['_tasks', '_lock', '_task_queue', '_running', '_main_task_id', '_fail_count_dict']
 
     def __init__(self, task_queue: Dict) -> None:
         """
@@ -27,6 +29,7 @@ class ProcessTaskManager:
         self._task_queue = task_queue
         self._running = True
         self._main_task_id: str = None
+        self._fail_count_dict: dict = None
 
         # Start monitor thread
         threading.Thread(target=self._monitor_loop, daemon=True).start()
@@ -133,7 +136,8 @@ class ProcessTaskManager:
         Args:
             task_id: Unique identifier for the task to pause
         """
-        self._control_task(task_id, 'pause')
+        if platform.system() == "Windows":
+            self._control_task(task_id, 'pause')
 
     def resume_task(self, task_id: str) -> None:
         """
@@ -142,7 +146,8 @@ class ProcessTaskManager:
         Args:
             task_id: Unique identifier for the task to resume
         """
-        self._control_task(task_id, 'resume')
+        if platform.system() == "Windows":
+            self._control_task(task_id, 'resume')
 
     def _control_task(self, task_id: str, action: str) -> None:
         """
@@ -164,6 +169,7 @@ class ProcessTaskManager:
 
     def _monitor_loop(self) -> None:
         """Monitor the task queue for control commands and process them."""
+        MAX_FAIL_COUNT = 10  # 最大失败次数阈值
         while self._running:
             try:
                 if not self._task_queue:
@@ -173,6 +179,19 @@ class ProcessTaskManager:
                 items_copy = list(self._task_queue.items())[:]
                 for task_id, actions in items_copy:
                     if not self.exists(task_id):
+                        # Initialize or increase the failure count
+                        if task_id not in self._fail_count_dict:
+                            self._fail_count_dict[task_id] = 1
+                        else:
+                            self._fail_count_dict[task_id] += 1
+                            # If the maximum number of failures is exceeded, log a warning and perform cleanup.
+                            if self._fail_count_dict[task_id] >= MAX_FAIL_COUNT:
+                                # Remove this nonexistent task from the task queue
+                                if task_id in self._task_queue:
+                                    del self._task_queue[task_id]
+                                # Remove from failure count
+                                if task_id in self._fail_count_dict:
+                                    del self._fail_count_dict[task_id]
                         continue
                     # Remove from queue since we're processing it
                     del self._task_queue[task_id]

@@ -2,8 +2,12 @@
 # Author: fallingmeteorite
 import math
 import queue
+import os
 import threading
 import time
+import platform
+import signal
+import multiprocessing
 
 from concurrent.futures import ProcessPoolExecutor, Future, BrokenExecutor
 from functools import partial
@@ -24,7 +28,8 @@ shared_status_info_liner = SharedStatusInfo()
 
 def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict],
                   task_status_queue: queue.Queue,
-                  task_signal_transmission: DictProxy) -> Any:
+                  task_signal_transmission: DictProxy,
+                  tasks_pid: DictProxy) -> Any:
     """
     Execute a task and handle its status.
 
@@ -39,14 +44,18 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict],
             - kwargs: Keyword arguments to pass to the function.
         task_status_queue: Queue to update task status.
         task_signal_transmission: Dict to transmission signal.
+        tasks_pid: Dict to process task pid.
 
     Returns:
         Result of the task execution or error message.
     """
+    # Get process ID
+    timeout_processing, task_name, task_id, func, priority, args, kwargs = task
+    tasks_pid[task_id] = os.getpid()
+
     # Create a shared dictionary
     _sharedtaskdict = SharedTaskDict()
 
-    timeout_processing, task_name, task_id, func, priority, args, kwargs = task
     task_manager = ProcessTaskManager(task_signal_transmission)
     try:
         with _threadterminator.terminate_control() as terminate_ctx:
@@ -105,6 +114,10 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict],
         # Remove main thread logging
         if task_manager.exists(task_id):
             task_manager.remove(task_id)
+
+        # Clean up PID mapping
+        if task_id in tasks_pid:
+            del tasks_pid[task_id]
     return result
 
 
@@ -266,6 +279,8 @@ class CpuLinerTask:
             # First cancel the task pause - use atomic operations
             with self._lock:
                 for task_id, _ in self._running_tasks.items():
+                    if platform.system() in ("Linux", "Darwin"):
+                        os.kill(shared_status_info_liner.task_pid.get(task_id), signal.SIGCONT)
                     shared_status_info_liner.task_signal_transmission[task_id] = ["resume", "kill"]
 
             # Ensure the executor is properly shut down
@@ -306,7 +321,7 @@ class CpuLinerTask:
         Scheduler function, fetch tasks from the task queue and submit them to the process pool for execution.
         """
         with ProcessPoolExecutor(max_workers=int(config["cpu_liner_task"] + math.ceil(config["cpu_liner_task"] / 2)),
-                                 initializer=exit_cleanup) as executor:
+                                 initializer=exit_cleanup, mp_context=multiprocessing.get_context('spawn')) as executor:
             self._executor = executor
             while not self._scheduler_stop_event.is_set():
                 with self._condition:
@@ -327,11 +342,17 @@ class CpuLinerTask:
                 timeout_processing, task_name, task_id, func, priority, args, kwargs = task
 
                 # Use lock protection for shared state updates
-                with self._lock:
+                try:
                     future = executor.submit(_execute_task, task, shared_status_info_liner.task_status_queue,
-                                             shared_status_info_liner.task_signal_transmission)
+                                             shared_status_info_liner.task_signal_transmission,
+                                             shared_status_info_liner.task_pid)
+                except Exception:
+                    pass
+
+                with self._lock:
                     self._running_tasks[task_id] = [future, task_name, priority]
-                    future.add_done_callback(partial(self._task_done, task_id))
+
+                future.add_done_callback(partial(self._task_done, task_id))
 
     def _task_done(self,
                    task_id: str,
@@ -438,8 +459,11 @@ class CpuLinerTask:
         with self._lock:
             task_info = self._running_tasks.get(task_id)
             if not task_info:
-                logger.warning(f"task | {task_id} | does not exist or is already completed")
-                return False
+                # Task might have already completed, but send kill signal anyway
+                shared_status_info_liner.task_signal_transmission[task_id] = ["resume", "kill"]
+                shared_status_info_liner.task_status_queue.put(
+                    ("cancelled", task_id, None, None, time.time(), None, None))
+                return True
 
             future = task_info[0]
 
@@ -447,10 +471,22 @@ class CpuLinerTask:
         if not future.running():
             future.cancel()
         else:
-            # First ensure that the task is not paused.
-            shared_status_info_liner.task_signal_transmission[task_id] = ["resume", "kill"]
+            try:
+                if platform.system() == "Windows":
+                    # First ensure that the task is not paused.
+                    shared_status_info_liner.task_signal_transmission[task_id] = ["resume", "kill"]
+                elif platform.system() in ("Linux", "Darwin"):
+                    pid = shared_status_info_liner.task_pid.get(task_id)
+                    if pid:
+                        os.kill(pid, signal.SIGCONT)
+                        shared_status_info_liner.task_signal_transmission[task_id] = ["kill"]
+                    else:
+                        logger.warning(f"task | {task_id} | no PID found for task")
+            except Exception as e:
+                logger.error(f"task | {task_id} | error sending termination signal: {e}")
+                return False
 
-        shared_status_info_liner.task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
+        shared_status_info_liner.task_status_queue.put(("cancelled", task_id, None, None, time.time(), None, None))
         return True
 
     def pause_task(self,
@@ -466,14 +502,28 @@ class CpuLinerTask:
         """
         # Use lock protection for running tasks dictionary access
         with self._lock:
-            if task_id not in self._running_tasks:
-                logger.warning(f"task | {task_id} | does not exist or is already completed")
+            if task_id not in self._running_tasks and not platform.system() == "Windows":
+                logger.warning(f"The pause signal must be issued in the main thread.")
                 return False
 
-        shared_status_info_liner.task_signal_transmission[task_id] = ["pause"]
-        shared_status_info_liner.task_status_queue.put(("paused", task_id, None, None, None, None, None))
+        try:
+            if platform.system() == "Windows":
+                # Use lock protection for running tasks dictionary access
+                shared_status_info_liner.task_signal_transmission[task_id] = ["pause"]
+            elif platform.system() in ("Linux", "Darwin"):
+                pid = shared_status_info_liner.task_pid.get(task_id)
+                if pid:
+                    os.kill(pid, signal.SIGSTOP)
+                else:
+                    logger.warning(f"task | {task_id} | no PID found for task")
+                    return False
 
-        return True
+            shared_status_info_liner.task_status_queue.put(("paused", task_id, None, None, None, None, None))
+            logger.info(f"task | {task_id} | paused")
+            return True
+        except Exception as e:
+            logger.error(f"task | {task_id} | error during pause: {e}")
+            return False
 
     def resume_task(self,
                     task_id: str) -> bool:
@@ -488,14 +538,27 @@ class CpuLinerTask:
         """
         # Use lock protection for running tasks dictionary access
         with self._lock:
-            if task_id not in self._running_tasks:
-                logger.warning(f"task | {task_id} | does not exist or is already completed")
+            if task_id not in self._running_tasks and not platform.system() == "Windows":
+                logger.warning(f"The resume signal must be issued in the main thread.")
                 return False
 
-        shared_status_info_liner.task_signal_transmission[task_id] = ["resume"]
-        shared_status_info_liner.task_status_queue.put(("running", task_id, None, None, None, None, None))
+        try:
+            if platform.system() == "Windows":
+                shared_status_info_liner.task_signal_transmission[task_id] = ["resume"]
+            elif platform.system() in ("Linux", "Darwin"):
+                pid = shared_status_info_liner.task_pid.get(task_id)
+                if pid:
+                    os.kill(pid, signal.SIGCONT)
+                else:
+                    logger.warning(f"task | {task_id} | no PID found for task")
+                    return False
 
-        return True
+            shared_status_info_liner.task_status_queue.put(("running", task_id, None, None, None, None, None))
+            logger.info(f"task | {task_id} | resumed")
+            return True
+        except Exception as e:
+            logger.error(f"task | {task_id} | error during resume: {e}")
+            return False
 
     def get_task_result(self,
                         task_id: str) -> Optional[Any]:

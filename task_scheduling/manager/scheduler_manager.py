@@ -3,7 +3,6 @@
 import queue
 import threading
 import time
-import gc
 
 from typing import Callable, List, Optional, Union
 
@@ -16,7 +15,8 @@ class TaskScheduler:
     __slots__ = ['ban_task_names', 'core_task_queue',
                  'allocator_running', 'allocator_started', 'allocator_thread',
                  'timeout_check_interval', '_timeout_checker',
-                 '_task_event', '_lock']
+                 '_task_event', '_lock',
+                 '_allow_task_addition']
 
     def __init__(self) -> None:
         self.ban_task_names: List[str] = []
@@ -28,6 +28,7 @@ class TaskScheduler:
         self._timeout_checker: Optional[threading.Timer] = None
         self._task_event = threading.Event()  # Add an event for task notification
         self._lock = threading.RLock()  # Reentrant lock for thread safety
+        self._allow_task_addition: bool = True
 
     def add_task(self,
                  delay: Union[int, None],
@@ -56,6 +57,9 @@ class TaskScheduler:
         Returns:
             bool: True if task was added successfully, False otherwise
         """
+        if not self._allow_task_addition:
+            return False
+
         with self._lock:
             # Check if the task name is in the ban list
             if task_name in self.ban_task_names:
@@ -101,6 +105,10 @@ class TaskScheduler:
             self._start_timeout_checker()
 
         while self.allocator_running:
+            if not self._allow_task_addition:
+                time.sleep(1)
+                continue
+
             if not self.core_task_queue.empty():
                 (delay, daily_time, async_function, function_type, timeout_processing, task_name, task_id, func,
                  priority,
@@ -155,6 +163,20 @@ class TaskScheduler:
                 self._task_event.clear()
                 if self.core_task_queue.empty():
                     self._task_event.wait()  # Wait for the event to trigger
+
+    def _stop_task_addition(self) -> None:
+        """
+        Stop task addition by banning all task names
+        """
+        self._allow_task_addition = False
+        logger.warning(f"Task addition was disabled by user!")
+
+    def _resume_task_addition(self) -> None:
+        """
+        Resume task addition by removing all bans
+        """
+        self._allow_task_addition = True
+        logger.warning(f"Task addition was enabled by user!")
 
     def cancel_the_queue_task_by_name(self, task_name: str) -> None:
         """
@@ -222,9 +244,6 @@ class TaskScheduler:
                     # Stop task
                     kill_api(task_id, task_status['task_type'])
 
-        # Memory Cleanup
-        logger.warning(f"Garbage collection performed. A total of <{gc.collect()}> objects were recycled.")
-
         self._start_timeout_checker()  # Restart the timer
 
     def _start_timeout_checker(self) -> None:
@@ -283,6 +302,8 @@ class TaskScheduler:
         task_status_manager.details_manager_shutdown()
 
         logger.info("All scheduler has been shut down.")
+        # Restore default settings
+        self._allow_task_addition = True
 
 
 task_scheduler = TaskScheduler()

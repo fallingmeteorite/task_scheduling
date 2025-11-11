@@ -2,6 +2,7 @@
 # Author: fallingmeteorite
 import sys
 
+# Prevent errors during multi-process initialization
 try:
     from .log_config import configure_logger, logger, set_log_level
     from .config import config, ensure_config_loaded, update_config

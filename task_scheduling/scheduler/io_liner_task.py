@@ -4,6 +4,7 @@ import queue
 import threading
 import math
 import time
+import platform
 
 from concurrent.futures import ThreadPoolExecutor, Future
 from functools import partial
@@ -392,15 +393,21 @@ class IoLinerTask:
             future = task_info[0]
 
         # Perform cancellation operations outside the lock to avoid deadlocks.
-        if not future.running():
-            future.cancel()
-        else:
-            # First ensure that the task is not paused.
-            _task_manager.resume_task(task_id)
-            _task_manager.terminate_task(task_id)
+        try:
+            if not future.running():
+                future.cancel()
+            else:
+                # First ensure that the task is not paused.
+                if platform.system() == "Windows":
+                    _task_manager.resume_task(task_id)
+                _task_manager.terminate_task(task_id)
 
-        task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None, None)
-        return True
+            task_status_manager.add_task_status(task_id, None, "cancelled", None, time.time(), None, None,
+                                                "io_liner_task")
+            return True
+        except Exception as e:
+            logger.error(f"task | {task_id} | error during force stop: {e}")
+            return False
 
     def pause_task(self,
                    task_id: str) -> bool:
@@ -419,10 +426,18 @@ class IoLinerTask:
                 logger.warning(f"task | {task_id} | does not exist or is already completed")
                 return False
 
-        _task_manager.pause_task(task_id)
-        task_status_manager.add_task_status(task_id, None, "paused", None, None, None, None, None)
+        if not platform.system() == "Windows":
+            logger.warning(f"Pause and resume functionality is not supported on Linux and Mac!")
+            return False
 
-        return True
+        try:
+            _task_manager.pause_task(task_id)
+            task_status_manager.add_task_status(task_id, None, "paused", None, None, None, None, "io_liner_task")
+            logger.info(f"task | {task_id} | paused")
+            return True
+        except Exception as e:
+            logger.error(f"task | {task_id} | error during pause: {e}")
+            return False
 
     def resume_task(self,
                     task_id: str) -> bool:
@@ -441,10 +456,18 @@ class IoLinerTask:
                 logger.warning(f"task | {task_id} | does not exist or is already completed")
                 return False
 
-        _task_manager.resume_task(task_id)
-        task_status_manager.add_task_status(task_id, None, "running", None, None, None, None, None)
+        if not platform.system() == "Windows":
+            logger.warning(f"Pause and resume functionality is not supported on Linux and Mac!")
+            return False
 
-        return True
+        try:
+            _task_manager.resume_task(task_id)
+            task_status_manager.add_task_status(task_id, None, "running", None, None, None, None, "io_liner_task")
+            logger.info(f"task | {task_id} | resumed")
+            return True
+        except Exception as e:
+            logger.error(f"task | {task_id} | error during resume: {e}")
+            return False
 
     # Obtain the information returned by the corresponding task
     def get_task_result(self,

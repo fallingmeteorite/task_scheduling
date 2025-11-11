@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
 import multiprocessing
+
 from multiprocessing import Manager
 
 
@@ -14,6 +15,7 @@ class SharedStatusInfo:
         # Initialize attributes as None, will be lazily initialized when accessed
         self._manager = None
         self._channel = True
+        self._task_pid = None
         self._task_status_queue = None
         self._task_signal_transmission = None
 
@@ -21,8 +23,15 @@ class SharedStatusInfo:
         """Lazy initialization, create Manager only in the main process"""
         if self._manager is None and multiprocessing.current_process().name == 'MainProcess':
             self._manager = Manager()
+            self._task_pid = self._manager.dict()
             self._task_status_queue = self._manager.Queue()
             self._task_signal_transmission = self._manager.dict()
+
+    @property
+    def task_pid(self) -> str:
+        """Return the task pid"""
+        self._initialize()
+        return self._task_pid
 
     @property
     def task_status_queue(self) -> None:
@@ -46,6 +55,6 @@ class SharedStatusInfo:
         """Reset all variables"""
         self._manager = None
         self._channel = True
+        self._task_pid = None
         self._task_status_queue = None
         self._task_signal_transmission = None
-

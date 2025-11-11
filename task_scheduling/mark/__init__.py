@@ -2,6 +2,7 @@
 # Author: fallingmeteorite
 import sys
 
+# Prevent errors during multi-process initialization
 try:
     from task_scheduling.mark.mark_edit import task_function_type
 except KeyboardInterrupt:

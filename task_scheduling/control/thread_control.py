@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
+# Author: fallingmeteorite
 import threading
+import platform
+
 from typing import Dict, Any
 
 from ..common import logger
@@ -101,11 +104,13 @@ class ThreadTaskManager:
 
     def pause_task(self, task_id: str) -> None:
         """Pause specific task."""
-        self._execute_operation(task_id, 'pause', 'pause')
+        if platform.system() == "Windows":
+            self._execute_operation(task_id, 'pause', 'pause')
 
     def resume_task(self, task_id: str) -> None:
         """Resume specific task."""
-        self._execute_operation(task_id, 'pause', 'resume')
+        if platform.system() == "Windows":
+            self._execute_operation(task_id, 'pause', 'resume')
 
     def resume_all_tasks(self) -> None:
         """Resume all tasks."""

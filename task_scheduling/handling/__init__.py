@@ -2,6 +2,7 @@
 # Author: fallingmeteorite
 import sys
 
+# Prevent errors during multi-process initialization
 try:
     from .pause_handling import ThreadSuspender
     from .timeout_handling import ThreadingTimeout, TimeoutException

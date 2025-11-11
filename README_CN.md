@@ -40,7 +40,7 @@ pip install --upgrade task_scheduling
 
 ### 使用示例:
 
-```commandline
+```
 python -m task_scheduling
 
 #  The task scheduler starts.
@@ -164,6 +164,10 @@ start_task_status_ui()
 
 - task_creation(delay: int or None, daily_time: str or None, function_type: str, timeout_processing: bool, task_name:
   str, func: Callable, *args, **kwargs) -> str or None:
+
+### !!!警告!!!
+
+`Windows`,`Linux`,`Mac`在多进程中都统一使用`spawn`
 
 ### 参数说明:
 
@@ -307,7 +311,8 @@ if __name__ == "__main__":
 
 ### !!!警告!!!
 
-任务暂停时候,超时计时器依然在运作,如果需要使用暂停功能建议关闭超时处理,防止当任务恢复时候因为超时被终止
+任务暂停时候,超时计时器依然在运作,如果需要使用暂停功能建议关闭超时处理,防止当任务恢复时候因为超时被终止,在`Linux`,`Mac`
+中不支持线程任务暂停恢复,只支持进程进程任务,暂停将暂停整个进程的任务
 
 ### 参数说明:
 
@@ -685,7 +690,8 @@ if __name__ == "__main__":
 
 ### !!!警告!!!
 
-在关闭运行前必须执行该函数去结束和清理运行任务
+在关闭运行前必须执行该函数去结束和清理运行任务,在大型任务调度中建议在网页先点击`Stop Adding Tasks`
+防止进程任务初始化退出报错,如果没有使用，退出可能报错，这是正常的
 
 ### 使用示例:
 
@@ -740,7 +746,7 @@ if __name__ == "__main__":
 `@branch_thread_control`装饰器接收参数`share_info`, `_sharedtaskdict`, `timeout_processing`, `task_name`
 
 `task_name`必须是唯一不重复的,用于获取其他分支线程的task_id(使用`_sharedtaskdict.read(task_name)`
-获取task_id去终止，暂停或恢复)
+获取task_id去终止，暂停或恢复)名字将按照`main_task_name|task_name`显示
 
 使用`threading.Thread`语句必须添加`daemon=True`将线程设置为守护线程(
 没有添加会让关闭操作时间增加,反正主线程结束,会强制终止所有分支线程)
@@ -944,7 +950,7 @@ Task status UI available at http://localhost:8000
 
 文件存储在: `task_scheduling/config/config_gil.yaml or config_no_gil.yaml`
 
-## !!!警告!!!
+### !!!警告!!!
 
 `no_gil`和`gil`在`io_liner_task``timer_task`有区别
 

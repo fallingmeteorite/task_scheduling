@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
 import time
+
 from typing import Any, Union, Callable
 
 from .cpu_asyncio_task import cpu_asyncio_task, shared_status_info_asyncio

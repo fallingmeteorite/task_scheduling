@@ -4,6 +4,8 @@ import asyncio
 import queue
 import threading
 import time
+import platform
+
 from typing import Dict, Tuple, Callable, Optional, Any, List
 from concurrent.futures import Future, CancelledError
 from functools import partial
@@ -38,7 +40,7 @@ async def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> A
     """
     # Unpack task tuple into local variables
     timeout_processing, task_name, task_id, func, args, kwargs = task
-    return_results = None
+    result = None
     try:
         with _threadsuspender.suspend_context() as pause_ctx:
             _task_manager.add(None, None, pause_ctx, task_id)
@@ -50,31 +52,31 @@ async def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> A
             # If the task needs timeout processing, set the timeout time
             if timeout_processing:
                 if retry_on_error_decorator_check(func):
-                    return_results = await asyncio.wait_for(func(task_id, *args, **kwargs),
-                                                            timeout=config["watch_dog_time"])
+                    result = await asyncio.wait_for(func(task_id, *args, **kwargs),
+                                                    timeout=config["watch_dog_time"])
                 else:
-                    return_results = await asyncio.wait_for(func(*args, **kwargs), timeout=config["watch_dog_time"])
+                    result = await asyncio.wait_for(func(*args, **kwargs), timeout=config["watch_dog_time"])
             else:
                 if retry_on_error_decorator_check(func):
-                    return_results = await func(task_id, *args, **kwargs)
+                    result = await func(task_id, *args, **kwargs)
                 else:
-                    return_results = await func(*args, **kwargs)
+                    result = await func(*args, **kwargs)
 
         _task_manager.remove(task_id)
     except asyncio.TimeoutError:
         logger.warning(f"task | {task_id} | timed out, forced termination")
         task_status_manager.add_task_status(task_id, None, "timeout", None, None, None, None, None)
-        return_results = "timeout action"
+        result = "timeout action"
     except asyncio.CancelledError:
         logger.warning(f"task | {task_id} | was cancelled")
         task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None,
                                             None, None)
-        return_results = "cancelled action"
+        result = "cancelled action"
     finally:
         if _task_manager.exists(task_id):
             _task_manager.remove(task_id)
 
-    return return_results
+    return result
 
 
 class IoAsyncioTask:
@@ -482,15 +484,21 @@ class IoAsyncioTask:
             future = task_info[0]
 
         # Perform cancellation outside the lock to avoid deadlocks
-        if not future.running():
-            future.cancel()
-        else:
-            # First ensure that the task is not paused.
-            _task_manager.resume_task(task_id)
-            _task_manager.cancel_task(task_id)
+        try:
+            if not future.running():
+                future.cancel()
+            else:
+                # First ensure that the task is not paused.
+                if platform.system() == "Windows":
+                    _task_manager.resume_task(task_id)
+                _task_manager.cancel_task(task_id)
 
-        task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None, None)
-        return True
+            task_status_manager.add_task_status(task_id, None, "cancelled", None, time.time(), None, None,
+                                                "io_asyncio_task")
+            return True
+        except Exception as e:
+            logger.error(f"task | {task_id} | error during force stop: {e}")
+            return False
 
     def pause_task(self,
                    task_id: str) -> bool:
@@ -509,10 +517,18 @@ class IoAsyncioTask:
                 logger.warning(f"task | {task_id} | does not exist or is already completed")
                 return False
 
-        _task_manager.pause_task(task_id)
-        task_status_manager.add_task_status(task_id, None, "paused", None, None, None, None, None)
+        if not platform.system() == "Windows":
+            logger.warning(f"Pause and resume functionality is not supported on Linux and Mac!")
+            return False
 
-        return True
+        try:
+            _task_manager.pause_task(task_id)
+            task_status_manager.add_task_status(task_id, None, "paused", None, None, None, None, "io_asyncio_task")
+            logger.info(f"task | {task_id} | paused")
+            return True
+        except Exception as e:
+            logger.error(f"task | {task_id} | error during pause: {e}")
+            return False
 
     def resume_task(self,
                     task_id: str) -> bool:
@@ -531,10 +547,18 @@ class IoAsyncioTask:
                 logger.warning(f"task | {task_id} | does not exist or is already completed")
                 return False
 
-        _task_manager.resume_task(task_id)
-        task_status_manager.add_task_status(task_id, None, "running", None, None, None, None, None)
+        if not platform.system() == "Windows":
+            logger.warning(f"Pause and resume functionality is not supported on Linux and Mac!")
+            return False
 
-        return True
+        try:
+            _task_manager.resume_task(task_id)
+            task_status_manager.add_task_status(task_id, None, "running", None, None, None, None, "io_asyncio_task")
+            logger.info(f"task | {task_id} | resumed")
+            return True
+        except Exception as e:
+            logger.error(f"task | {task_id} | error during resume: {e}")
+            return False
 
     # Obtain the information returned by the corresponding task
     def get_task_result(self,
@@ -567,8 +591,7 @@ class IoAsyncioTask:
         asyncio.set_event_loop(self._event_loops[task_name])
         self._event_loops[task_name].run_forever()
 
-    def _stop_event_loop(self,
-                         task_name: str) -> None:
+    def _stop_event_loop(self, task_name: str) -> None:
         """
         Stop the event loop for a specific task name.
 
@@ -576,15 +599,38 @@ class IoAsyncioTask:
             task_name: Task name.
         """
         if (task_name in self._event_loops and
-                self._event_loops[task_name].is_running()):  # Ensure the event loop is running
+                self._event_loops[task_name].is_running()):
             try:
-                self._event_loops[task_name].call_soon_threadsafe(self._event_loops[task_name].stop)
-                # Wait for the event loop thread to finish
-                if (task_name in self._scheduler_threads and
-                        self._scheduler_threads[task_name].is_alive()):
-                    self._scheduler_threads[task_name].join(timeout=1.0)  # Wait up to 1 second
+                # First cancel all unfinished tasks
+                loop = self._event_loops[task_name]
+
+                # Perform cleanup in the event loop thread
+                future = asyncio.run_coroutine_threadsafe(
+                    self._cleanup_tasks(task_name),
+                    loop
+                )
+
+                try:
+                    future.result(timeout=5.0)  # Wait up to 5 seconds
+                except Exception:
+                    logger.warning(f"Cleanup timeout for task {task_name}")
+
+                # Then stop the event loop
+                loop.call_soon_threadsafe(loop.stop)
+
             except Exception as error:
                 logger.debug(f"task | stopping event loop | error occurred: {error}")
+
+    async def _cleanup_tasks(self, task_name: str):
+        """Clear unfinished tasks"""
+        loop = self._event_loops[task_name]
+        tasks = [t for t in asyncio.all_tasks(loop) if t is not asyncio.current_task()]
+
+        for task in tasks:
+            task.cancel()
+
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
 
 
 io_asyncio_task = IoAsyncioTask()

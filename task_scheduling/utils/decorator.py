@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+import os
 import time
 import uuid
 import threading
@@ -34,7 +35,7 @@ def branch_thread_control(share_info: Any, _sharedtaskdict: Any, timeout_process
         timeout_processing: Enable timeout handling
         task_name: Task name
     """
-    task_manager, _threadterminator, StopException, ThreadingTimeout, TimeoutException, _threadsuspender, task_status_queue = share_info
+    task_group_name, task_manager, _threadterminator, StopException, ThreadingTimeout, TimeoutException, _threadsuspender, task_status_queue = share_info
 
     def decorator(func):
         @wraps(func)
@@ -42,7 +43,8 @@ def branch_thread_control(share_info: Any, _sharedtaskdict: Any, timeout_process
             # Assign a unique identification code
             task_id = str(uuid.uuid4())
             _sharedtaskdict.write(task_name, task_id)
-            task_status_queue.put(("running", task_id, task_name, time.time(), None, None, timeout_processing))
+            task_status_queue.put(
+                ("running", task_id, f"{task_group_name}|{task_name}", time.time(), None, None, timeout_processing))
             with _threadterminator.terminate_control() as terminate_ctx:
                 with _threadsuspender.suspend_context() as pause_ctx:
                     try:
@@ -93,6 +95,7 @@ def wait_branch_thread_ended(func: Callable) -> Any:
     Returns:
         Decorated function
     """
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         # Get Task Manager
