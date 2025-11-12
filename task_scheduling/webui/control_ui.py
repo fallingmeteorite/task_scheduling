@@ -288,7 +288,7 @@ def _handle_tasks(self):
     self.send_header('Content-type', 'application/json')
     self.end_headers()
     try:
-        self.wfile.write(json.dumps(tasks_info))
+        self.wfile.write(json.dumps(tasks_info).encode('utf-8'))
     except ConnectionAbortedError:
         pass
 
@@ -332,9 +332,9 @@ class TaskControlHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
         try:
-            with open(get_template_path(), encoding='utf-8') as f:
+            with open(get_template_path(), 'r', encoding='utf-8') as f:
                 html = f.read()
-            self.wfile.write(html)
+            self.wfile.write(html.encode('utf-8'))
         except FileNotFoundError:
             self.send_error(404, "Template file not found")
 
@@ -346,7 +346,7 @@ class TaskControlHandler(BaseHTTPRequestHandler):
         self.send_header('Content-type', 'application/json')
         self.end_headers()
         try:
-            self.wfile.write(json.dumps(parsed_info))
+            self.wfile.write(json.dumps(parsed_info).encode('utf-8'))
         except ConnectionAbortedError:
             pass
 
@@ -357,7 +357,7 @@ class TaskControlHandler(BaseHTTPRequestHandler):
         self.end_headers()
         try:
             status_info = get_task_addition_status()
-            self.wfile.write(json.dumps(status_info))
+            self.wfile.write(json.dumps(status_info).encode('utf-8'))
         except ConnectionAbortedError:
             pass
 
@@ -380,7 +380,7 @@ class TaskControlHandler(BaseHTTPRequestHandler):
                     'success': True,
                     'message': f'Task addition {action} successfully',
                     'enabled': _task_addition_enabled
-                }))
+                }).encode('utf-8'))
             else:
                 self.send_response(400)
                 self.send_header('Content-type', 'application/json')
@@ -388,7 +388,7 @@ class TaskControlHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({
                     'success': False,
                     'message': f'Failed to {action} task addition'
-                }))
+                }).encode('utf-8'))
 
         except Exception as e:
             self.send_response(500)
@@ -397,7 +397,7 @@ class TaskControlHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({
                 'success': False,
                 'message': f'Internal server error: {str(e)}'
-            }))
+            }).encode('utf-8'))
 
     def _handle_task_action(self, task_id, action):
         """Handle task control actions (terminate, pause, resume)."""
@@ -405,7 +405,7 @@ class TaskControlHandler(BaseHTTPRequestHandler):
             content_length = int(self.headers.get('Content-Length', 0))
             if content_length > 0:
                 post_data = self.rfile.read(content_length)
-                request_data = json.loads(post_data)
+                request_data = json.loads(post_data.decode('utf-8'))
                 task_type = request_data.get('task_type', 'unknown')
             else:
                 task_type = 'unknown'
@@ -430,7 +430,7 @@ class TaskControlHandler(BaseHTTPRequestHandler):
                     'success': True,
                     'message': f'Task {task_id} {action}d successfully',
                     'task_type': task_type
-                }))
+                }).encode('utf-8'))
             else:
                 self.send_response(400)
                 self.send_header('Content-type', 'application/json')
@@ -438,7 +438,7 @@ class TaskControlHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({
                     'success': False,
                     'message': f'Failed to {action} task {task_id}'
-                }))
+                }).encode('utf-8'))
 
         except Exception as e:
             self.send_response(500)
@@ -447,7 +447,7 @@ class TaskControlHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({
                 'success': False,
                 'message': f'Internal server error: {str(e)}'
-            }))
+            }).encode('utf-8'))
 
     def log_message(self, format, *args):
         """Override to disable logging."""
