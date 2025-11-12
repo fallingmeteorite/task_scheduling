@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+"""IO-bound linear task execution module.
+
+This module provides a task scheduler for IO-bound linear tasks using
+thread pool execution with priority-based scheduling and timeout handling.
+"""
 import queue
 import threading
 import math
@@ -41,7 +46,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict]) -> An
         Result of the task execution or error message.
     """
     timeout_processing, task_name, task_id, func, priority, args, kwargs = task
-
+    logger.debug(f"Start running task, task ID: {task_id}")
     try:
         with _threadterminator.terminate_control() as terminate_ctx:
             with _threadsuspender.suspend_context() as pause_ctx:
@@ -49,7 +54,6 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict]) -> An
                 _task_manager.add(None, terminate_ctx, pause_ctx, task_id)
 
                 task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None, None, None)
-                logger.debug(f"Start running task, task ID: {task_id}")
 
                 if timeout_processing:
                     with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
@@ -67,10 +71,12 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict]) -> An
     except TimeoutException:
         logger.warning(f"task | {task_id} | timed out, forced termination")
         task_status_manager.add_task_status(task_id, None, "timeout", None, None, None, None, None)
+
         result = "timeout action"
     except StopException:
         logger.warning(f"task | {task_id} | was cancelled")
         task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None, None)
+
         result = "cancelled action"
     except Exception as error:
         if config["exception_thrown"]:
@@ -78,6 +84,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict]) -> An
 
         logger.error(f"task | {task_id} | execution failed: {error}")
         task_status_manager.add_task_status(task_id, None, "failed", None, None, error, None, None)
+
         result = "failed action"
 
     finally:
@@ -192,6 +199,7 @@ class IoLinerTask:
         Start the scheduler thread.
         """
         self._scheduler_started = True
+        self._scheduler_stop_event.clear()
         self._scheduler_thread = threading.Thread(target=self._scheduler, daemon=True)
         self._scheduler_thread.start()
 
@@ -233,13 +241,13 @@ class IoLinerTask:
             # Wait for the scheduler thread to finish
             self._join_scheduler_thread()
 
+            self._wait_tasks_end()
             # Reset state variables - Needs to be protected by a lock
             with self._lock:
                 self._scheduler_started = False
                 self._running_tasks.clear()
                 self._task_results.clear()
 
-            self._scheduler_stop_event.clear()
             self._scheduler_thread = None
 
             # Cancel idle timer
@@ -250,18 +258,28 @@ class IoLinerTask:
 
             logger.debug(
                 "Scheduler and event loop have stopped, all resources have been released and parameters reset")
+        return None
+
+    def _wait_tasks_end(self) -> None:
+        """
+        Wait for all tasks to finish
+        """
+        while True:
+            if len(self._running_tasks) == 0:
+                break
+            time.sleep(0.01)
 
     # Task scheduler
     def _scheduler(self) -> None:
         """
         Scheduler function, fetch tasks from the task queue and submit them to the thread pool for execution.
         """
-        with ThreadPoolExecutor(max_workers=int(config["io_liner_task"] + math.ceil(config["io_liner_task"] / 2)),
-                                initializer=None) as executor:
+        with ThreadPoolExecutor(max_workers=int(config["io_liner_task"] + math.ceil(config["io_liner_task"] / 2))
+                                ) as executor:
             self._executor = executor
             while not self._scheduler_stop_event.is_set():
                 with self._condition:
-                    # Use loops and timeouts to prevent spurious wakeups
+                    # Use loops and timeouts to prevent spurious wakeup
                     while (self._task_queue.empty() and
                            not self._scheduler_stop_event.is_set()):
                         self._condition.wait(timeout=1.0)  # Add a timeout to prevent waiting indefinitely
@@ -295,6 +313,7 @@ class IoLinerTask:
             task_id: Task ID.
             future: Future object corresponding to the task.
         """
+        result = None
         try:
             result = future.result()  # Get task result, exceptions will be raised here
         except StopException:
@@ -344,7 +363,7 @@ class IoLinerTask:
         """
         Callback for idle timeout.
         """
-        self.stop_scheduler(False)
+        self.stop_scheduler()
 
     def _cancel_idle_timer(self) -> None:
         """

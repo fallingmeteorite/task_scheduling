@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+"""CPU-bound asynchronous task execution module.
+
+This module provides a task scheduler for CPU-bound asynchronous tasks using
+process pool execution with asyncio event loops in separate processes.
+"""
 import asyncio
 import queue
 import os
@@ -44,13 +49,13 @@ async def _execute_task_async(task: Tuple[bool, str, str, Callable, Tuple, Dict]
         Result of the task execution or error message.
     """
     timeout_processing, task_name, task_id, func, args, kwargs = task
+    logger.debug(f"Start running task, task ID: {task_id}")
 
     with _threadterminator.terminate_control() as terminate_ctx:
         with _threadsuspender.suspend_context() as pause_ctx:
             task_manager.add(terminate_ctx, pause_ctx, task_id)
 
             task_status_queue.put(("running", task_id, None, time.time(), None, None, None))
-            logger.debug(f"Start running task, task ID: {task_id}")
 
             if timeout_processing:
                 if retry_on_error_decorator_check(func):
@@ -170,18 +175,12 @@ class CpuAsyncioTask:
         """
         while not self._scheduler_stop_event.is_set() or not shared_status_info_asyncio.task_status_queue.empty():
             try:
-                if not shared_status_info_asyncio.task_status_queue.empty():
-                    task = shared_status_info_asyncio.task_status_queue.get(timeout=0.01)
-                    status, task_id, task_name, start_time, end_time, error, timeout_processing = task
-                    task_status_manager.add_task_status(task_id, task_name, status, start_time, end_time, error,
-                                                        timeout_processing, "cpu_asyncio_task")
+                task = shared_status_info_asyncio.task_status_queue.get(timeout=0.01)
+                status, task_id, task_name, start_time, end_time, error, timeout_processing = task
+                task_status_manager.add_task_status(task_id, task_name, status, start_time, end_time, error,
+                                                    timeout_processing, "cpu_asyncio_task")
             except (queue.Empty, ValueError):
                 pass  # Ignore empty queue exceptions
-            finally:
-                try:
-                    time.sleep(0.01)
-                except KeyboardInterrupt:
-                    pass
 
     def add_task(self,
                  timeout_processing: bool,
@@ -245,9 +244,9 @@ class CpuAsyncioTask:
         Start the scheduler thread.
         """
         self._scheduler_started = True
+        self._scheduler_stop_event.clear()
         self._scheduler_thread = threading.Thread(target=self._scheduler, daemon=True)
         self._scheduler_thread.start()
-
         self._status_thread.start()
 
     def stop_scheduler(self,
@@ -298,13 +297,14 @@ class CpuAsyncioTask:
             if self._status_thread.is_alive():
                 self._status_thread.join(timeout=5.0)
 
+            self._wait_tasks_end()
+
             # Reset state variables - use atomic operations with locks
             with self._lock:
                 self._scheduler_started = False
                 self._running_tasks.clear()
                 self._task_results.clear()
 
-            self._scheduler_stop_event.clear()
             self._scheduler_thread = None
 
             # Cancel idle timer safely
@@ -316,6 +316,15 @@ class CpuAsyncioTask:
             logger.debug(
                 "Scheduler and event loop have stopped, all resources have been released and parameters reset")
 
+    def _wait_tasks_end(self) -> None:
+        """
+        Wait for all tasks to finish
+        """
+        while True:
+            if shared_status_info_asyncio.task_status_queue.empty():
+                break
+            time.sleep(0.01)
+
     def _scheduler(self) -> None:
         """
         Scheduler function, fetch tasks from the task queue and submit them to the process pool for execution.
@@ -325,7 +334,7 @@ class CpuAsyncioTask:
             self._executor = executor
             while not self._scheduler_stop_event.is_set():
                 with self._condition:
-                    # Use loop and timeout to prevent spurious wakeups
+                    # Use loop and timeout to prevent spurious wakeup
                     while (self._task_queue.empty() and
                            not self._scheduler_stop_event.is_set()):
                         self._condition.wait(timeout=1.0)  # Add timeout to prevent permanent waiting
@@ -333,7 +342,7 @@ class CpuAsyncioTask:
                     if self._scheduler_stop_event.is_set():
                         break
 
-                    # Check queue state again due to possible spurious wakeups
+                    # Check queue state again due to possible spurious wakeup
                     if self._task_queue.empty():
                         continue
 
@@ -364,6 +373,7 @@ class CpuAsyncioTask:
             task_id: Task ID.
             future: Future object corresponding to the task.
         """
+        result = None
         try:
             result = future.result()  # Get the task result, where the exception will be thrown
 
@@ -418,7 +428,7 @@ class CpuAsyncioTask:
         """
         Callback for idle timeout.
         """
-        self.stop_scheduler(False)
+        self.stop_scheduler()
 
     def _cancel_idle_timer(self) -> None:
         """

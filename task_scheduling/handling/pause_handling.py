@@ -1,5 +1,11 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+"""
+Thread suspension and control utility.
+
+This module provides a platform-agnostic way to suspend and resume threads
+using context managers for safe resource management.
+"""
 import sys
 import threading
 import ctypes

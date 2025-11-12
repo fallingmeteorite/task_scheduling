@@ -1,5 +1,35 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+"""
+Configuration Management Module.
+
+This module provides a thread-safe configuration management system with
+caching capabilities. It supports dynamic configuration loading based on
+Python interpreter features (GIL status) and provides efficient access
+to configuration values with LRU caching.
+
+Key Features:
+    - Automatic configuration file selection based on GIL status
+    - LRU caching for frequently accessed configuration values
+    - Thread-safe configuration access
+    - In-memory configuration updates
+    - Graceful handling of missing configuration files
+
+Classes:
+    None (module-level functions)
+
+Functions:
+    _get_package_directory: Get package directory path
+    _get_default_config_path: Get default config path based on GIL status
+    _load_config: Load configuration from JSON file
+    get_config_value: Get configuration value with caching
+    update_config: Update configuration value in memory
+    ensure_config_loaded: Ensure configuration is loaded
+
+Global Variables:
+    config: Global dictionary storing configuration data
+"""
+
 import os
 import json
 import sysconfig
@@ -51,7 +81,7 @@ def _load_config(_file_path: Optional[str] = None) -> bool:
         _file_path = _get_default_config_path()
 
     try:
-        with open(_file_path, 'r', encoding='utf-8') as f:
+        with open(_file_path, encoding='utf-8') as f:
             # Load the JSON file
             global config
             loaded_config = json.load(f)

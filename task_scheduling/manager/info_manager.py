@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+"""Thread-safe shared dictionary for task management.
+
+This module provides a thread-safe dictionary implementation for sharing
+task information across multiple threads.
+"""
 import threading
 
 from typing import Any, Dict

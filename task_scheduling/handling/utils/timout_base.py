@@ -82,7 +82,7 @@ class BaseTimeout(object):
         raise NotImplementedError
 
 
-class base_timeoutable(object):  # noqa
+class base_timetable(object):  # noqa
     """A base for function or method decorator that raises a ``TimeoutException`` to
     decorated functions that should not last a certain amount of time.
 

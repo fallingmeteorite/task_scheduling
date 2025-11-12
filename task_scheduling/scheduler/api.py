@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+"""Task management API module.
+
+This module provides a unified API for managing different types of tasks
+(IO-bound, CPU-bound, timer) with support for asynchronous and linear execution modes.
+"""
 import time
 
 from typing import Any, Union, Callable
@@ -171,8 +176,6 @@ def shutdown_api() -> None:
                 scheduler.stop_all_schedulers()
             elif hasattr(scheduler, 'stop_scheduler'):
                 scheduler.stop_scheduler()
-
-    stop_spinner = True
 
     # Close the shared channel
     shared_status_info_asyncio.channel_shutdown()

@@ -1,12 +1,26 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+"""
+Process Task Management System.
+
+This module provides a thread-safe process task manager that handles task lifecycle
+operations including pause, resume, and termination. It features a monitoring system
+that processes control commands from a shared task queue in real-time.
+
+The manager is designed to work with multiprocessing tasks and provides:
+- Thread-safe task operations using RLock
+- Automatic task failure detection and cleanup
+- Platform-specific pause/resume functionality (Windows only)
+- Graceful task termination with pre-resume handling
+
+Key Components:
+    ProcessTaskManager: Main class for managing process tasks with monitoring capabilities
+"""
 import threading
 import time
 import platform
 
-from typing import Dict, Any
-
-from ..common import config
+from typing import Dict, Any, Union
 
 
 class ProcessTaskManager:
@@ -28,8 +42,8 @@ class ProcessTaskManager:
         self._lock = threading.RLock()
         self._task_queue = task_queue
         self._running = True
-        self._main_task_id: str = None
-        self._fail_count_dict: dict = None
+        self._main_task_id: Union[str, None] = None
+        self._fail_count_dict: dict = {}
 
         # Start monitor thread
         threading.Thread(target=self._monitor_loop, daemon=True).start()
@@ -69,9 +83,6 @@ class ProcessTaskManager:
                 del self._tasks[task_id]
                 # Update main task if needed
                 if task_id == self._main_task_id:
-                    self._main_task_id = next(iter(self._tasks)) if self._tasks else None
-                # Stop monitor if no tasks remaining
-                if not self._tasks:
                     self._running = False
 
     def exists(self, task_id: str) -> bool:
@@ -87,96 +98,62 @@ class ProcessTaskManager:
         with self._lock:
             return task_id in self._tasks
 
-    def terminate_task(self, task_id: str) -> None:
+    def _execute_operation(self, task_id: str, op_type: str, method: str) -> None:
         """
-        Terminate a specific task.
+        Execute operation on task with error handling.
 
         Args:
-            task_id: Unique identifier for the task to terminate
+            task_id: Task identifier
+            op_type: Operation type key in task dict
+            method: Method name to call
         """
         with self._lock:
             if task_id not in self._tasks:
                 return
-            terminate_obj = self._tasks[task_id].get('terminate')
-            if terminate_obj and hasattr(terminate_obj, 'terminate'):
-                terminate_obj.terminate()
+
+            obj = self._tasks[task_id].get(op_type)
+            if obj is not None and hasattr(obj, method):
+                try:
+                    getattr(obj, method)()
+                except (RuntimeError, Exception):
+                    pass  # Ignore all exceptions
 
     def terminate_branch_tasks(self) -> None:
         """Terminate all tasks except the main task."""
         with self._lock:
             for task_id in list(self._tasks.keys()):
                 if task_id != self._main_task_id:
-                    self._terminate_single_task(task_id)
+                    self.terminate_task(task_id)
                     del self._tasks[task_id]
 
-    def _terminate_single_task(self, task_id: str) -> None:
-        """
-        Terminate a single task (internal method).
-
-        Args:
-            task_id: Unique identifier for the task to terminate
-        """
-        if config.get("thread_management", False):
-            # Resume before terminating to ensure clean shutdown
-            pause_obj = self._tasks[task_id].get('pause')
-            if pause_obj and hasattr(pause_obj, 'resume'):
-                try:
-                    pause_obj.resume()
-                except RuntimeError:
-                    pass  # Already running, ignore
-            # Terminate the task
-            terminate_obj = self._tasks[task_id].get('terminate')
-            if terminate_obj and hasattr(terminate_obj, 'terminate'):
-                terminate_obj.terminate()
+    def terminate_task(self, task_id: str) -> None:
+        """Terminate specific task."""
+        # Resume before terminating to ensure clean shutdown
+        self.resume_task(task_id)
+        self._execute_operation(task_id, 'terminate', 'terminate')
 
     def pause_task(self, task_id: str) -> None:
-        """
-        Pause a specific task.
-
-        Args:
-            task_id: Unique identifier for the task to pause
-        """
+        """Pause specific task."""
         if platform.system() == "Windows":
-            self._control_task(task_id, 'pause')
+            self._execute_operation(task_id, 'pause', 'pause')
 
     def resume_task(self, task_id: str) -> None:
-        """
-        Resume a paused task.
-
-        Args:
-            task_id: Unique identifier for the task to resume
-        """
+        """Resume specific task."""
         if platform.system() == "Windows":
-            self._control_task(task_id, 'resume')
-
-    def _control_task(self, task_id: str, action: str) -> None:
-        """
-        Control task pause/resume (internal method).
-
-        Args:
-            task_id: Unique identifier for the task
-            action: Action to perform ('pause' or 'resume')
-        """
-        with self._lock:
-            if task_id not in self._tasks:
-                return
-            pause_obj = self._tasks[task_id].get('pause')
-            if pause_obj and hasattr(pause_obj, action):
-                try:
-                    getattr(pause_obj, action)()
-                except RuntimeError:
-                    pass  # Already in desired state
+            self._execute_operation(task_id, 'pause', 'resume')
 
     def _monitor_loop(self) -> None:
         """Monitor the task queue for control commands and process them."""
-        MAX_FAIL_COUNT = 10  # 最大失败次数阈值
+        MAX_FAIL_COUNT = 5  # Maximum failure threshold
+
         while self._running:
             try:
                 if not self._task_queue:
                     time.sleep(0.01)
                     continue
+
                 # Create a copy of items to avoid modification during iteration
-                items_copy = list(self._task_queue.items())[:]
+                items_copy = list(self._task_queue.items())
                 for task_id, actions in items_copy:
                     if not self.exists(task_id):
                         # Initialize or increase the failure count
@@ -184,7 +161,7 @@ class ProcessTaskManager:
                             self._fail_count_dict[task_id] = 1
                         else:
                             self._fail_count_dict[task_id] += 1
-                            # If the maximum number of failures is exceeded, log a warning and perform cleanup.
+                            # If the maximum number of failures is exceeded, perform cleanup
                             if self._fail_count_dict[task_id] >= MAX_FAIL_COUNT:
                                 # Remove this nonexistent task from the task queue
                                 if task_id in self._task_queue:
@@ -193,28 +170,19 @@ class ProcessTaskManager:
                                 if task_id in self._fail_count_dict:
                                     del self._fail_count_dict[task_id]
                         continue
-                    # Remove from queue since we're processing it
-                    del self._task_queue[task_id]
+
                     # Process each action in sequence
                     for action in actions:
-                        self._execute_action(task_id, action)
+                        # Directly call the corresponding method
+                        if action == "kill":
+                            self.terminate_task(task_id)
+                        elif action == "pause":
+                            self.pause_task(task_id)
+                        elif action == "resume":
+                            self.resume_task(task_id)
+                    # Remove from queue since we're processing it
+                    del self._task_queue[task_id]
 
                 time.sleep(0.01)
             except (BrokenPipeError, EOFError):
                 break
-
-    def _execute_action(self, task_id: str, action: str) -> None:
-        """
-        Execute a single action for a task.
-
-        Args:
-            task_id: Task identifier
-            action: Action to perform
-        """
-        action_handlers = {
-            "kill": self.terminate_task,
-            "pause": self.pause_task,
-            "resume": self.resume_task
-        }
-        if action in action_handlers:
-            action_handlers[action](task_id)

@@ -690,8 +690,8 @@ if __name__ == "__main__":
 
 ### !!!警告!!!
 
-在关闭运行前必须执行该函数去结束和清理运行任务,在大型任务调度中建议在网页先点击`Stop Adding Tasks`
-防止进程任务初始化退出报错,如果没有使用，退出可能报错，这是正常的
+在关闭运行前必须执行该函数去结束和清理运行任务,在大型任务调度中建议在网页控制端先点击`Stop Adding Tasks`(停止任务添加)
+防止进程任务初始化退出报错,如果没有使用,退出有概率出现报错,这是正常的
 
 ### 使用示例:
 
@@ -758,7 +758,7 @@ if __name__ == "__main__":
 在主线程内使用`task_signal_transmission[_sharedtaskdict.read(task_name)] = ["action"]` action可以填写为`kill`, `pause`,
 `resume`, 也可以按顺序填写几个操作
 
-在主线程外部可以使用`kill_api()`
+在主线程外部可以使用网页控制端
 
 ### 使用示例:
 
@@ -810,7 +810,7 @@ if __name__ == "__main__":
 ### 功能说明
 
 字典中的任务名字将会以`task_group_name|task_name`显示,当名字任务为`task_group_name`被结束,所有的以
-`task_group_name|task_name`显示的任务都会一并结束,`task_group`是这个任务树中的主任务(该任务实际只是一个载体,没有功能)
+`task_group_name|task_name`显示的任务都会一并结束,`task_group_name`是这个任务树中的主任务(该任务实际只是一个载体,没有功能)
 
 ### 参数说明
 
@@ -850,7 +850,7 @@ if __name__ == "__main__":
 
     task_id1 = task_creation(
         None, None, FUNCTION_TYPE_CPU, True, task_group_name,
-        task_group, priority_low, task_group_name, task_dict)
+        task_group, priority_low, task_dict)
 
     try:
         while True:
@@ -1000,7 +1000,7 @@ IO 密集型线性任务中运行最大任务数
 
 是否应该抛出异常而不捕获以便定位错误
 
-`exception_thrown: False`
+`exception_thrown: false`
 
 ### 如果你有更好的想法，欢迎提交一个 PR
 

@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+"""Task scheduler module.
+
+This module provides a comprehensive task scheduling system with support for
+different task types, priority management, timeout handling, and thread-safe operations.
+"""
 import queue
 import threading
 import time
@@ -12,6 +17,11 @@ from ..manager import task_status_manager
 
 
 class TaskScheduler:
+    """Main task scheduler for managing and distributing tasks.
+
+    This scheduler handles task queuing, allocation to appropriate executors,
+    timeout monitoring, and provides thread-safe task management operations.
+    """
     __slots__ = ['ban_task_names', 'core_task_queue',
                  'allocator_running', 'allocator_started', 'allocator_thread',
                  'timeout_check_interval', '_timeout_checker',
@@ -106,7 +116,7 @@ class TaskScheduler:
 
         while self.allocator_running:
             if not self._allow_task_addition:
-                time.sleep(1)
+                time.sleep(0.1)
                 continue
 
             if not self.core_task_queue.empty():
@@ -191,7 +201,7 @@ class TaskScheduler:
                 item = self.core_task_queue.queue[count]
                 if item[5] == task_name:
                     self.core_task_queue.queue.remove(item)
-                    # Do not increase the count after deletion, because the next element will move to the current position.
+                # Do not increase the count after deletion, because the next element will move to the current position.
                 else:
                     count += 1  # Only move to the next element if not deleting
             # Remove task status
@@ -272,6 +282,7 @@ class TaskScheduler:
         """
         from ..scheduler import shutdown_api
         logger.info("Starting shutdown TaskScheduler.")
+        self._stop_task_addition()
 
         # Clean up all resources in the task scheduler, stop running tasks, and empty the task queue.
         # Stop the task allocator

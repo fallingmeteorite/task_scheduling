@@ -1,5 +1,11 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+"""Task counter with priority-based scheduling capabilities.
+
+This module provides a thread-safe task counter that manages task preemption
+based on priority levels, allowing high-priority tasks to temporarily pause
+low-priority tasks when resources are constrained.
+"""
 import threading
 
 from typing import Dict, Set, Tuple, Any, Optional

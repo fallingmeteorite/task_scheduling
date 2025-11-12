@@ -1,11 +1,30 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+"""Task creation and management utilities.
+
+This module provides functions for creating and managing different types of tasks
+including asynchronous, linear, and timer-based tasks with proper type handling.
+"""
 import uuid
 import inspect
 
 from typing import Callable, Union
 
 from .manager import task_scheduler
+from .common import logger
+
+
+def wait_branch_thread_ended_check(func: Callable) -> bool:
+    """
+
+    Args:
+        func: function
+
+    Returns: Add retry decorator?
+
+    """
+    return (hasattr(func, '_decorated_by') and
+            getattr(func, '_decorated_by') == 'wait_branch_thread_ended')
 
 
 def is_async_function(func: Callable) -> bool:
@@ -44,6 +63,10 @@ def task_creation(delay: Union[int, None], daily_time: Union[str, None], functio
     # Generate a unique task ID
     task_id = str(uuid.uuid4())
     async_function = is_async_function(func)
+    if wait_branch_thread_ended_check(func):
+        if not function_type == "cpu":
+            logger.error("Experimental tasks must specify the function type as FUNCTION_TYPE_CPU!")
+            return False
 
     if async_function and not function_type == "timer":
         # Add asynchronous task

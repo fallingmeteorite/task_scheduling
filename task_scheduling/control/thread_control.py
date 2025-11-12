@@ -1,5 +1,21 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+"""
+Thread Task Management System.
+
+This module provides a thread-safe task manager for controlling thread-based tasks
+with comprehensive lifecycle management capabilities including cancellation,
+termination, pause, and resume operations.
+
+The manager is designed to work with threading tasks and provides:
+- Thread-safe task operations using RLock
+- Batch operations for managing multiple tasks
+- Platform-specific pause/resume functionality (Windows only)
+- Graceful error handling for task operations
+
+Key Components:
+    ThreadTaskManager: Main class for managing thread tasks with control capabilities
+"""
 import threading
 import platform
 
@@ -82,25 +98,30 @@ class ThreadTaskManager:
             except (RuntimeError, Exception):
                 pass  # Ignore all exceptions
 
-    def cancel_task(self, task_id: str) -> None:
-        """Cancel specific task."""
-        self._execute_operation(task_id, 'cancel', 'cancel')
-
     def cancel_all_tasks(self) -> None:
         """Cancel all tasks."""
         for task_id in list(self._tasks.keys()):
             self.resume_task(task_id)
             self.cancel_task(task_id)
 
-    def terminate_task(self, task_id: str) -> None:
-        """Terminate specific task."""
-        self._execute_operation(task_id, 'terminate', 'terminate')
-
     def terminate_all_tasks(self) -> None:
         """Terminate all tasks."""
         for task_id in list(self._tasks.keys()):
             self.resume_task(task_id)
             self.terminate_task(task_id)
+
+    def resume_all_tasks(self) -> None:
+        """Resume all tasks."""
+        for task_id in list(self._tasks.keys()):
+            self.resume_task(task_id)
+
+    def cancel_task(self, task_id: str) -> None:
+        """Cancel specific task."""
+        self._execute_operation(task_id, 'cancel', 'cancel')
+
+    def terminate_task(self, task_id: str) -> None:
+        """Terminate specific task."""
+        self._execute_operation(task_id, 'terminate', 'terminate')
 
     def pause_task(self, task_id: str) -> None:
         """Pause specific task."""
@@ -111,8 +132,3 @@ class ThreadTaskManager:
         """Resume specific task."""
         if platform.system() == "Windows":
             self._execute_operation(task_id, 'pause', 'resume')
-
-    def resume_all_tasks(self) -> None:
-        """Resume all tasks."""
-        for task_id in list(self._tasks.keys()):
-            self.resume_task(task_id)

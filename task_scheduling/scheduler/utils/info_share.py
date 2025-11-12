@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+"""Shared status information management for multiprocessing.
+
+This module provides a thread-safe way to share task status and signal information
+across multiple processes using multiprocessing.Manager.
+"""
 import multiprocessing
 
 from multiprocessing import Manager

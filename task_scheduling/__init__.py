@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+"""
+Initialize available methods
+"""
 import sys
 
 try:

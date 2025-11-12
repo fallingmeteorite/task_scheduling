@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+"""Task status management module.
+
+This module provides a thread-safe task status manager for tracking and managing
+the status of various tasks in a multithreaded environment.
+"""
 import time
 import threading
 import gc
@@ -11,6 +16,11 @@ from ..common import config, logger
 
 
 class TaskStatusManager:
+    """Manager for tracking task statuses in a thread-safe manner.
+
+    This class provides functionality to add, remove, and query task status
+    information with automatic cleanup and memory management.
+    """
     __slots__ = ['_task_status_dict', '_max_storage', '_lock']
 
     def __init__(self) -> None:
@@ -143,14 +153,11 @@ class TaskStatusManager:
             Task Type
         """
         while True:
-            try:
-                time.sleep(0.01)
-                with self._lock:
-                    task_info = self._task_status_dict.get(task_id)
-                    if task_info and task_info["task_type"] != "NAN":
-                        return task_info["task_type"]
-            except KeyboardInterrupt:
-                pass
+            time.sleep(0.01)
+            with self._lock:
+                task_info = self._task_status_dict.get(task_id)
+                if task_info and task_info["task_type"] != "NAN":
+                    return task_info["task_type"]
 
     def get_all_task_statuses(self) -> Dict[str, Dict[str, Optional[Union[str, float, bool]]]]:
         """

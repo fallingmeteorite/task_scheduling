@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+"""Task function type management module.
+
+This module provides functionality to store and retrieve task function types
+using persistent pickle storage with in-memory caching for performance.
+"""
 import os
 import pickle
 
@@ -7,6 +12,11 @@ from typing import IO, Optional, Any, Dict
 
 
 class TaskFunctionType:
+    """Manager for task function type storage and retrieval.
+
+    This class provides methods to persistently store task function types
+    (e.g., 'io', 'cpu', 'timer') and retrieve them with caching for efficiency.
+    """
     # Define cache_dict as a class variable
     _cache_dict: Dict = {}
 

@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+"""Thread termination utility module.
+
+This module provides a mechanism for gracefully terminating threads by raising
+a custom StopException within the target thread's execution context.
+"""
 import sys
 import threading
 import ctypes

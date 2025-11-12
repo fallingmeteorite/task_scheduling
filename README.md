@@ -696,9 +696,9 @@ if __name__ == "__main__":
 
 ### !!!Warning!!!
 
-This function must be executed to terminate and clean up running tasks before shutting down. In large-scale task
-scheduling, it is recommended to first click `Stop Adding Tasks` on the webpage to prevent errors caused by task
-initialization during exit. If not used, exit may report errors, which is normal.
+This function must be executed before shutting down to terminate and clean up running tasks. In large task scheduling,
+it is recommended to first click `Stop Adding Tasks`(Stop adding tasks) on the web control panel.Prevent process task
+initialization exit errors. If not used, there is a chance that an error will occur upon exit, which is normal.
 
 ### Example Usage:
 
@@ -772,7 +772,7 @@ Using `task_signal_transmission[_sharedtaskdict.read(task_name)] = ["action"]` i
 `kill`, `pause`,
 `resume`, you can also fill in several operations in order
 
-`kill_api()` can be used outside the main thread
+The web control interface can be used outside the main thread.
 
 ### Example of Use:
 
@@ -823,8 +823,9 @@ if __name__ == "__main__":
 
 ### Function Description
 
-The task names in the dictionary will be displayed as `task_group_name|task_name`. When a task named `task_group_name`
-is terminated, all tasks displayed as `task_group_name|task_name` will also be terminated together.
+The task names in the dictionary will be displayed as `task_group_name|task_name`. When the task named `task_group_name`
+is ended, all tasks displayed as `task_group_name|task_name` will also be ended. `task_group_name` is the main task in
+this task tree (this task is actually just a carrier and has no functionality).
 
 ### Parameter Description
 
@@ -865,7 +866,7 @@ if __name__ == "__main__":
 
     task_id1 = task_creation(
         None, None, FUNCTION_TYPE_CPU, True, task_group_name,
-        task_group, priority_low, task_group_name, task_dict)
+        task_group, priority_low, task_dict)
 
     try:
         while True:
@@ -1016,7 +1017,7 @@ How often to clear the return result storage (seconds)
 
 Should an exception be thrown without being caught in order to locate the error?
 
-`exception_thrown: False`
+`exception_thrown: false`
 
 ### If you have a better idea, feel free to submit a PR.
 

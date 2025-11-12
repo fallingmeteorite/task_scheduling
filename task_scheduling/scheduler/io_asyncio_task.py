@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+"""IO-bound asynchronous task execution module.
+
+This module provides a task scheduler for IO-bound asynchronous tasks using
+asyncio event loops with per-task-name isolation and thread-safe operations.
+"""
 import asyncio
 import queue
 import threading
@@ -40,14 +45,13 @@ async def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> A
     """
     # Unpack task tuple into local variables
     timeout_processing, task_name, task_id, func, args, kwargs = task
+    logger.debug(f"Start running task | {task_id} | ")
     result = None
     try:
         with _threadsuspender.suspend_context() as pause_ctx:
             _task_manager.add(None, None, pause_ctx, task_id)
             # Modify the task status
             task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None, None, None)
-
-            logger.debug(f"Start running task | {task_id} | ")
 
             # If the task needs timeout processing, set the timeout time
             if timeout_processing:
@@ -238,7 +242,8 @@ class IoAsyncioTask:
                     del self._task_counters[task_name]
 
             logger.debug(
-                f"Scheduler and event loop for task | {task_name} | have stopped, all resources have been released and parameters reset")
+                f"Scheduler event loop | {task_name} | have stopped")
+        return None
 
     def stop_all_schedulers(self,
                             system_operations: bool = False) -> None:
@@ -285,6 +290,7 @@ class IoAsyncioTask:
             for task_name in list(self._scheduler_threads.keys()):
                 self._join_scheduler_thread(task_name)
 
+            self._wait_tasks_end()
             # Reset all parameters - use atomic operations with lock
             with self._lock:
                 self._task_results.clear()
@@ -300,6 +306,16 @@ class IoAsyncioTask:
 
             logger.debug(
                 "Scheduler and event loop have stopped, all resources have been released and parameters reset")
+        return None
+
+    def _wait_tasks_end(self) -> None:
+        """
+        Wait for all tasks to finish
+        """
+        while True:
+            if len(self._running_tasks) == 0:
+                break
+            time.sleep(0.01)
 
     # Task scheduler
     def _scheduler(self,
@@ -314,7 +330,7 @@ class IoAsyncioTask:
 
         while not self._scheduler_stop_event.is_set():
             with self._lock:
-                # Use loop and timeout to prevent spurious wakeups
+                # Use loop and timeout to prevent spurious wakeup
                 while ((task_name not in self._task_queues or
                         self._task_queues[task_name].empty() or
                         self._task_counters[task_name] >= config["io_asyncio_task"]) and
@@ -324,7 +340,7 @@ class IoAsyncioTask:
                 if self._scheduler_stop_event.is_set():
                     break
 
-                # Check conditions again due to possible spurious wakeups
+                # Check conditions again due to possible spurious wakeup
                 if (task_name not in self._task_queues or
                         self._task_queues[task_name].empty()):
                     continue

@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+"""Function inspection utilities.
+
+This module provides utility functions for inspecting function parameters
+and decorator metadata.
+"""
 import inspect
 
 from typing import Callable

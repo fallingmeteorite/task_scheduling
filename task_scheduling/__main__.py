@@ -1,5 +1,11 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+"""Command-line interface for task scheduler system.
+
+This module provides a command-line interface for creating and managing
+tasks through the task scheduler system with web UI integration.
+"""
+
 import os
 import shlex
 import sys
@@ -12,13 +18,42 @@ from .variable import *
 
 
 def command_creation(task_name: str, command: str) -> str:
+    """Create a task that executes a shell command.
+
+    Args:
+        task_name: Name identifier for the task.
+        command: Shell command to execute.
+
+    Returns:
+        str: Task ID of the created task.
+    """
+
     def wrapper(command):
+        """Wrapper function to execute shell command."""
         os.system(command)
 
-    return task_creation(None, None, FUNCTION_TYPE_IO, False, task_name, wrapper, priority_high, command)
+    return task_creation(
+        delay=None,
+        daily_time=None,
+        function_type=FUNCTION_TYPE_IO,
+        timeout_processing=False,
+        async_function=False,
+        task_name=task_name,
+        func=wrapper,
+        priority=priority_high,
+        command=command
+    )
 
 
-def parse_input(user_input):
+def parse_input(user_input: str) -> dict:
+    """Parse user input string into command arguments.
+
+    Args:
+        user_input: Raw input string from user.
+
+    Returns:
+        dict: Parsed arguments with keys 'command' and 'name'.
+    """
     parts = shlex.split(user_input)
     args = {'command': None, 'name': 'command_task'}
     arg_map = {'-cmd': 'command', '-n': 'name', '-name': 'name'}
@@ -32,6 +67,7 @@ def parse_input(user_input):
 
 
 def main():
+    """Main entry point for the command-line task scheduler."""
     logger.info("The task scheduler starts.")
     start_task_status_ui()
 

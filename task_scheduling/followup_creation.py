@@ -22,9 +22,10 @@ async def _wait_main_task_result(condition: str, main_task_id: str,
         dependent_task: The dependent task function to execute
         args: Arguments for the dependent task
     """
+    task_type = task_status_manager.get_task_type(main_task_id)
     while True:
         await asyncio.sleep(1.0)
-        result = get_result_api(task_status_manager.get_task_type(main_task_id), main_task_id)
+        result = get_result_api(task_type, main_task_id)
 
         # When the task status meets the trigger conditions
         if result == condition:

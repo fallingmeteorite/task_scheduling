@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
 # Task priority constants
+"""Common variables, so they can be searched by the IDE without having to type them yourself"""
 PRIORITY_LOW = priority_low = "low"
 PRIORITY_HIGH = priority_high = "high"
 

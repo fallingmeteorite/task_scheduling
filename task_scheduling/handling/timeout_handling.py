@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 =================
-stopit.threadstop
+stopit.thread stop
 =================
 
 Raise asynchronous exceptions in other thread, control the timeout of blocks
@@ -11,13 +11,13 @@ or callables with a context manager or a decorator.
 import ctypes
 import threading
 
-from .utils import BaseTimeout, base_timeoutable, TimeoutException
+from .utils import BaseTimeout, base_timetable, TimeoutException
 
 
 def _async_raise(target_tid, exception):
     """Raises an asynchronous exception in another thread.
     Read http://docs.python.org/c-api/init.html#PyThreadState_SetAsyncExc
-    for further enlightenments.
+    for further enlightenment's.
 
     :param target_tid: target thread identifier
     :param exception: Exception class to be raised in that thread
@@ -69,11 +69,11 @@ class ThreadingTimeout(BaseTimeout):
             self._timer.cancel()
 
 
-class _threading_timeoutable(base_timeoutable):  # noqa
+class _threading_timeoutable(base_timetable):  # noqa
     """A function or method decorator that raises a ``TimeoutException`` to
     decorated functions that should not last a certain amount of time.
     This one uses ``ThreadingTimeout`` context manager.
 
-    See :class:`.utils.base_timeoutable` class for further comments.
+    See :class:`.utils.base_timetable` class for further comments.
     """
     _to_ctx_mgr = ThreadingTimeout

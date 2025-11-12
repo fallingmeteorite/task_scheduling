@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+"""Timer-based task execution module.
+
+This module provides a task scheduler for timer-based tasks with support for
+delayed execution and daily recurring tasks using priority queues.
+"""
 import queue
 import threading
 import time
@@ -39,6 +44,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
         Result of the task execution or error message.
     """
     timeout_processing, task_name, task_id, func, args, kwargs = task
+    logger.debug(f"Start running task, task ID: {task_id}")
 
     try:
         with _threadterminator.terminate_control() as terminate_ctx:
@@ -46,8 +52,6 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
                 _task_manager.add(None, terminate_ctx, pause_ctx, task_id)
                 task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None,
                                                     None, None)
-
-            logger.debug(f"Start running task, task ID: {task_id}")
 
             if timeout_processing:
                 with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
@@ -195,6 +199,7 @@ class TimerTask:
         Start the scheduler thread.
         """
         self._scheduler_started = True
+        self._scheduler_stop_event.clear()
         self._scheduler_thread = threading.Thread(target=self._scheduler, daemon=True)
         self._scheduler_thread.start()
 
@@ -236,13 +241,13 @@ class TimerTask:
             # Wait for the scheduler thread to finish
             self._join_scheduler_thread()
 
+            self._wait_tasks_end()
             # Reset state variables - use atomic operations with locks
             with self._lock:
                 self._scheduler_started = False
                 self._running_tasks.clear()
                 self._task_results.clear()
 
-            self._scheduler_stop_event.clear()
             self._scheduler_thread = None
 
             # Cancel idle timer safely
@@ -253,17 +258,27 @@ class TimerTask:
 
             logger.debug(
                 "Scheduler and event loop have stopped, all resources have been released and parameters reset")
+        return None
+
+    def _wait_tasks_end(self) -> None:
+        """
+        Wait for all tasks to finish
+        """
+        while True:
+            if len(self._running_tasks) == 0:
+                break
+            time.sleep(0.01)
 
     # Scheduler function
     def _scheduler(self) -> None:
         """
         Scheduler function, fetch tasks from the task queue and submit them to the thread pool for execution.
         """
-        with ThreadPoolExecutor(max_workers=int(config["timer_task"]), initializer=None) as executor:
+        with ThreadPoolExecutor(max_workers=int(config["timer_task"])) as executor:
             self._executor = executor
             while not self._scheduler_stop_event.is_set():
                 with self._condition:
-                    # Use loop and timeout to prevent spurious wakeups
+                    # Use loop and timeout to prevent spurious wakeup
                     while (self._task_queue.empty() and
                            not self._scheduler_stop_event.is_set()):
                         self._condition.wait(timeout=1.0)  # Add timeout to prevent permanent waiting
@@ -271,7 +286,7 @@ class TimerTask:
                     if self._scheduler_stop_event.is_set():
                         break
 
-                    # Check queue state again due to possible spurious wakeups or timeouts
+                    # Check queue state again due to possible spurious wakeup or timeouts
                     if self._task_queue.empty():
                         continue
 
@@ -316,6 +331,7 @@ class TimerTask:
             kwargs: Keyword arguments for the task function.
             future: Future object corresponding to the task.
         """
+        result = None
         try:
             result = future.result()  # Get task result, exceptions will be raised here
         except StopException:
@@ -382,7 +398,7 @@ class TimerTask:
         """
         Callback for idle timeout.
         """
-        self.stop_scheduler(False)
+        self.stop_scheduler()
 
     def _cancel_idle_timer(self) -> None:
         """
