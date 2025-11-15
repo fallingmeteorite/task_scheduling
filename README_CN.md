@@ -701,6 +701,26 @@ from task_scheduling.manager import task_scheduler
 task_scheduler.shutdown_scheduler()
 ```
 
+## 自动关闭调度器
+
+- abnormal_exit_cleanup() -> None:
+
+### !!!警告!!!
+
+这个必须在开启调度器前启用,只有在异常退出比如(代码报错,人为终止等场景会生效,如果是代码正常退出将不会生效),需要写在
+`if __name__ == "__main__":`下面
+
+### 使用示例:
+
+```python
+if __name__ == "__main__":
+    from task_scheduling.task_creation import abnormal_exit_cleanup
+
+    abnormal_exit_cleanup()
+    # 你的运行代码
+    ...
+```
+
 ## 临时更新配置文件参数(热加载)
 
 - update_config(key: str, value: Any) -> Any:
@@ -810,7 +830,8 @@ if __name__ == "__main__":
 ### 功能说明
 
 字典中的任务名字将会以`task_group_name|task_name`显示,当名字任务为`task_group_name`被结束,所有的以
-`task_group_name|task_name`显示的任务都会一并结束,`task_group_name`是这个任务树中的主任务(该任务实际只是一个载体,没有功能)
+`task_group_name|task_name`显示的任务都会一并结束,`task_group_name`是这个任务树中的主任务(
+该任务实际只是一个载体,没有功能)
 
 ### 参数说明
 

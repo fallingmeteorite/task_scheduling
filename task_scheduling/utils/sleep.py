@@ -43,4 +43,4 @@ def interruptible_sleep(seconds: Union[float, int]) -> None:
         _event.wait(0.1)
 
     # Clean up the thread
-    _thread.join(timeout=0)
+    _thread.join(timeout=1.0)

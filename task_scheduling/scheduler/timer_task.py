@@ -338,8 +338,9 @@ class TimerTask:
             logger.warning(f"task | {task_id} | was cancelled")
             task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None, None)
             result = "cancelled action"
-        except Exception:
+        except Exception as error:
             # Other exceptions are already handled in _execute_task
+            task_status_manager.add_task_status(task_id, None, "cancelled", None, None, error, None, None)
             result = "failed action"
         finally:
             # Store task results with lock protection
@@ -424,7 +425,7 @@ class TimerTask:
         Wait for the scheduler thread to finish.
         """
         if self._scheduler_thread and self._scheduler_thread.is_alive():
-            self._scheduler_thread.join(timeout=5.0)  # Add timeout to prevent permanent waiting
+            self._scheduler_thread.join(timeout=1.0)  # Add timeout to prevent permanent waiting
 
     def force_stop_task(self,
                         task_id: str) -> bool:

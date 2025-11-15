@@ -45,7 +45,7 @@ async def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> A
     """
     # Unpack task tuple into local variables
     timeout_processing, task_name, task_id, func, args, kwargs = task
-    logger.debug(f"Start running task | {task_id} | ")
+    logger.debug(f"Start running task, task ID: {task_id}")
     result = None
     try:
         with _threadsuspender.suspend_context() as pause_ctx:
@@ -90,7 +90,7 @@ class IoAsyncioTask:
     __slots__ = [
         '_task_queues', '_running_tasks',
         '_lock', '_scheduler_lock',
-        '_scheduler_started', '_scheduler_stop_event', '_scheduler_threads',
+        '_scheduler_started', '_scheduler_stop_events', '_scheduler_threads',
         '_event_loops',
         '_idle_timers', '_idle_timeout', '_idle_timer_lock',
         '_task_results', '_task_counters'
@@ -107,7 +107,7 @@ class IoAsyncioTask:
         self._scheduler_lock = threading.RLock()  # Reentrant lock for scheduler operations
 
         self._scheduler_started = False  # Whether the scheduler thread has started
-        self._scheduler_stop_event = threading.Event()  # Scheduler thread stop event
+        self._scheduler_stop_events: Dict[str, threading.Event] = {}  # Scheduler thread stop events for each task name
         self._scheduler_threads: Dict[str, threading.Thread] = {}  # Scheduler threads for each task name
 
         self._event_loops: Dict[str, Any] = {}  # Event loops for each task name
@@ -148,20 +148,26 @@ class IoAsyncioTask:
                     self._task_queues[task_name] = queue.Queue()
 
                 # Atomic queue size check
-                queue_size = self._task_queues[task_name].qsize()
-                if queue_size >= config["io_asyncio_task"]:
+                if self._task_counters.get(task_name, None) is None:
+                    self._task_counters[task_name] = 0  # Initialize the task counter
+
+                if self._task_counters[task_name] >= config["io_asyncio_task"] or len(self._task_counters) >= config[
+                    "maximum_event_loop"]:
                     return False
-
-                task_status_manager.add_task_status(task_id, None, "waiting", None, None, None, None, "io_asyncio_task")
-
-                self._task_queues[task_name].put((timeout_processing, task_name, task_id, func, args, kwargs))
 
                 # If the scheduler thread has not started, start it
                 if (task_name not in self._scheduler_threads or
                         not self._scheduler_threads[task_name].is_alive()):
                     self._event_loops[task_name] = asyncio.new_event_loop()
                     self._task_counters[task_name] = 0  # Initialize the task counter
+                    self._scheduler_stop_events[task_name] = threading.Event()  # Create stop event for this task name
                     self._start_scheduler(task_name)
+
+                # Add Count Reference
+                with self._lock:
+                    self._task_counters[task_name] += 1
+                task_status_manager.add_task_status(task_id, None, "waiting", None, None, None, None, "io_asyncio_task")
+                self._task_queues[task_name].put((timeout_processing, task_name, task_id, func, args, kwargs))
 
                 # Cancel the idle timer
                 self._cancel_idle_timer(task_name)
@@ -189,6 +195,7 @@ class IoAsyncioTask:
                 self._scheduler_threads[task_name] = threading.Thread(
                     target=self._scheduler, args=(task_name,), daemon=True)
                 self._scheduler_threads[task_name].start()
+                self._scheduler_stop_events[task_name].clear()
 
                 # Start the event loop thread
                 threading.Thread(target=self._run_event_loop, args=(task_name,), daemon=True).start()
@@ -213,7 +220,9 @@ class IoAsyncioTask:
                     logger.debug(f"task was detected to be running, and the task stopped terminating")
                     return None
 
-            self._scheduler_stop_event.set()
+            # Set the stop event for this specific task name
+            if task_name in self._scheduler_stop_events:
+                self._scheduler_stop_events[task_name].set()
 
             with self._lock:
                 self._scheduler_started = False
@@ -240,9 +249,11 @@ class IoAsyncioTask:
                     del self._idle_timers[task_name]
                 if task_name in self._task_counters:
                     del self._task_counters[task_name]
+                if task_name in self._scheduler_stop_events:
+                    del self._scheduler_stop_events[task_name]
 
             logger.debug(
-                f"Scheduler event loop | {task_name} | have stopped")
+                f"Event loop | {task_name} | have stopped, all resources have been released and parameters reset")
         return None
 
     def stop_all_schedulers(self,
@@ -253,8 +264,9 @@ class IoAsyncioTask:
         Args:
             system_operations: System execution metrics.
         """
-        # Turn off the scheduler
-        self._scheduler_stop_event.set()
+        # Set stop events for all task names
+        for task_name in list(self._scheduler_stop_events.keys()):
+            self._scheduler_stop_events[task_name].set()
 
         # Notify all waiting threads first
         with self._lock:
@@ -290,7 +302,7 @@ class IoAsyncioTask:
             for task_name in list(self._scheduler_threads.keys()):
                 self._join_scheduler_thread(task_name)
 
-            self._wait_tasks_end()
+            # self._wait_tasks_end()
             # Reset all parameters - use atomic operations with lock
             with self._lock:
                 self._task_results.clear()
@@ -300,9 +312,7 @@ class IoAsyncioTask:
                 self._idle_timers.clear()
                 self._task_counters.clear()
                 self._running_tasks.clear()
-
-            # Reset stop event for potential reuse
-            self._scheduler_stop_event.clear()
+                self._scheduler_stop_events.clear()
 
             logger.debug(
                 "Scheduler and event loop have stopped, all resources have been released and parameters reset")
@@ -328,16 +338,13 @@ class IoAsyncioTask:
         """
         asyncio.set_event_loop(self._event_loops[task_name])
 
-        while not self._scheduler_stop_event.is_set():
+        while not self._scheduler_stop_events[task_name].is_set():
             with self._lock:
                 # Use loop and timeout to prevent spurious wakeup
-                while ((task_name not in self._task_queues or
-                        self._task_queues[task_name].empty() or
-                        self._task_counters[task_name] >= config["io_asyncio_task"]) and
-                       not self._scheduler_stop_event.is_set()):
+                while task_name not in self._task_queues or self._task_queues[task_name].empty():
                     self._lock.wait(timeout=1.0)  # Add timeout to prevent permanent waiting
 
-                if self._scheduler_stop_event.is_set():
+                if self._scheduler_stop_events[task_name].is_set():
                     break
 
                 # Check conditions again due to possible spurious wakeup
@@ -355,7 +362,6 @@ class IoAsyncioTask:
             # Use lock protection for shared state updates
             with self._lock:
                 self._running_tasks[task_id] = [future, task_name]
-                self._task_counters[task_name] += 1
 
             future.add_done_callback(partial(self._task_done, task_id, task_name))
 
@@ -477,7 +483,7 @@ class IoAsyncioTask:
             task_name: Task name.
         """
         if task_name in self._scheduler_threads and self._scheduler_threads[task_name].is_alive():
-            self._scheduler_threads[task_name].join(timeout=5.0)  # Add timeout to prevent permanent waiting
+            self._scheduler_threads[task_name].join(timeout=1.0)  # Add timeout to prevent permanent waiting
 
     def force_stop_task(self,
                         task_id: str) -> bool:
@@ -627,9 +633,9 @@ class IoAsyncioTask:
                 )
 
                 try:
-                    future.result(timeout=5.0)  # Wait up to 5 seconds
+                    future.result(timeout=1.0)  # Wait up to 1.0 seconds
                 except Exception:
-                    logger.warning(f"Cleanup timeout for task {task_name}")
+                    pass
 
                 # Then stop the event loop
                 loop.call_soon_threadsafe(loop.stop)

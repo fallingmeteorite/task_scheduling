@@ -45,6 +45,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict]) -> An
     Returns:
         Result of the task execution or error message.
     """
+    result = None
     timeout_processing, task_name, task_id, func, priority, args, kwargs = task
     logger.debug(f"Start running task, task ID: {task_id}")
     try:
@@ -320,8 +321,9 @@ class IoLinerTask:
             logger.warning(f"task | {task_id} | was cancelled")
             task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None, None)
             result = "cancelled action"
-        except Exception:
+        except Exception as error:
             # Other exceptions have already been handled in _execute_task.
+            task_status_manager.add_task_status(task_id, None, "cancelled", None, None, error, None, None)
             result = "failed action"
         finally:
             # Store task return results - Use a lock to protect the result dictionary
@@ -389,7 +391,7 @@ class IoLinerTask:
         Wait for the scheduler thread to finish.
         """
         if self._scheduler_thread and self._scheduler_thread.is_alive():
-            self._scheduler_thread.join(timeout=5.0)  # Add a timeout to prevent waiting indefinitely
+            self._scheduler_thread.join(timeout=1.0)  # Add a timeout to prevent waiting indefinitely
 
     def force_stop_task(self,
                         task_id: str) -> bool:

@@ -708,6 +708,27 @@ from task_scheduling.manager import task_scheduler
 task_scheduler.shutdown_scheduler()
 ```
 
+## Automatic shutdown scheduler
+
+- abnormal_exit_cleanup() -> None:
+
+### !!!Warning!!!
+
+This must be enabled before starting the scheduler. It only takes effect in cases of abnormal exit, such as code errors
+or manual termination. It will not take effect if the code exits normally. It needs to be placed under
+`if __name__ == "__main__":`.
+
+### Example of Use:
+
+```python
+if __name__ == "__main__":
+    from task_scheduling.task_creation import abnormal_exit_cleanup
+
+    abnormal_exit_cleanup()
+    # Your running code
+    ...
+```
+
 ## Temporary Update of Configuration File Parameters (Hot Reload)
 
 - update_config(key: str, value: Any) -> Any:

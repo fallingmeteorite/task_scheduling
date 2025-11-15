@@ -175,11 +175,11 @@ class CpuAsyncioTask:
         """
         while not self._scheduler_stop_event.is_set() or not shared_status_info_asyncio.task_status_queue.empty():
             try:
-                task = shared_status_info_asyncio.task_status_queue.get(timeout=0.01)
+                task = shared_status_info_asyncio.task_status_queue.get(timeout=0.1)
                 status, task_id, task_name, start_time, end_time, error, timeout_processing = task
                 task_status_manager.add_task_status(task_id, task_name, status, start_time, end_time, error,
                                                     timeout_processing, "cpu_asyncio_task")
-            except (queue.Empty, ValueError):
+            except (queue.Empty, ValueError, EOFError, BrokenPipeError):
                 pass  # Ignore empty queue exceptions
 
     def add_task(self,
@@ -203,41 +203,37 @@ class CpuAsyncioTask:
         Returns:
             Whether the task was successfully added.
         """
-        try:
-            with self._scheduler_lock:
-                shared_status_info_asyncio.task_status_queue.put(("queuing", task_id, None, None, None, None, None))
+        with self._scheduler_lock:
+            shared_status_info_asyncio.task_status_queue.put(("queuing", task_id, None, None, None, None, None))
 
-                # Use atomic operations for queue size check and running tasks check
-                with self._lock:
-                    queue_size = self._task_queue.qsize()
-                    running_task_names = {details[1] for details in self._running_tasks.values()}
+            # Use atomic operations for queue size check and running tasks check
+            with self._lock:
+                queue_size = self._task_queue.qsize()
+                running_task_names = {details[1] for details in self._running_tasks.values()}
 
-                    if queue_size >= config["cpu_asyncio_task"]:
-                        return False
+                if queue_size >= config["cpu_asyncio_task"]:
+                    return False
 
-                    if task_name in running_task_names:
-                        return False
+                if task_name in running_task_names:
+                    return False
 
-                if self._scheduler_stop_event.is_set() and not self._scheduler_started:
-                    self._join_scheduler_thread()
+            if self._scheduler_stop_event.is_set() and not self._scheduler_started:
+                self._join_scheduler_thread()
 
-                # Reduce the granularity of the lock
-                shared_status_info_asyncio.task_status_queue.put(("waiting", task_id, None, None, None, None, None))
+            # Reduce the granularity of the lock
+            shared_status_info_asyncio.task_status_queue.put(("waiting", task_id, None, None, None, None, None))
 
-                self._task_queue.put((timeout_processing, task_name, task_id, func, args, kwargs))
+            self._task_queue.put((timeout_processing, task_name, task_id, func, args, kwargs))
 
-                if not self._scheduler_started:
-                    self._start_scheduler()
+            if not self._scheduler_started:
+                self._start_scheduler()
 
-                with self._condition:
-                    self._condition.notify()
+            with self._condition:
+                self._condition.notify()
 
-                self._cancel_idle_timer()
+            self._cancel_idle_timer()
 
-                return True
-        except Exception as error:
-            logger.error(f"task | {task_id} | error adding task: {error}")
-            return error
+            return True
 
     def _start_scheduler(self) -> None:
         """
@@ -295,7 +291,8 @@ class CpuAsyncioTask:
 
             # Wait for status thread to finish
             if self._status_thread.is_alive():
-                self._status_thread.join(timeout=5.0)
+                self._status_thread.join(timeout=1.0)
+            self._status_thread = threading.Thread(target=self._handle_task_status_updates, daemon=True)
 
             self._wait_tasks_end()
 
@@ -321,7 +318,7 @@ class CpuAsyncioTask:
         Wait for all tasks to finish
         """
         while True:
-            if shared_status_info_asyncio.task_status_queue.empty():
+            if len(self._running_tasks) == 0:
                 break
             time.sleep(0.01)
 
@@ -454,7 +451,7 @@ class CpuAsyncioTask:
         Wait for the scheduler thread to finish.
         """
         if self._scheduler_thread and self._scheduler_thread.is_alive():
-            self._scheduler_thread.join(timeout=5.0)  # Add timeout to prevent permanent waiting
+            self._scheduler_thread.join(timeout=1.0)  # Add timeout to prevent permanent waiting
 
     def force_stop_task(self,
                         task_id: str) -> bool:

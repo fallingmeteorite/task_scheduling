@@ -4,6 +4,7 @@
   "cpu_liner_task": 30,
   "io_liner_task": 60,
   "timer_task": 60,
+  "maximum_event_loop": 30,
   "max_idle_time": 300,
   "watch_dog_time": 300,
   "maximum_task_info_storage": 2000,

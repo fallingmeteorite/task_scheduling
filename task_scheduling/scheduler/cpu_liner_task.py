@@ -185,12 +185,12 @@ class CpuLinerTask:
         """
         while not self._scheduler_stop_event.is_set() or not shared_status_info_liner.task_status_queue.empty():
             try:
-                task = shared_status_info_liner.task_status_queue.get(timeout=0.01)
+                task = shared_status_info_liner.task_status_queue.get(timeout=0.1)
                 status, task_id, task_name, start_time, end_time, error, timeout_processing = task
                 task_status_manager.add_task_status(task_id, task_name, status, start_time, end_time, error,
                                                     timeout_processing, "cpu_liner_task")
 
-            except (queue.Empty, ValueError):
+            except (queue.Empty, ValueError, EOFError, BrokenPipeError):
                 pass  # Ignore empty queue exceptions
 
     def add_task(self,
@@ -310,7 +310,8 @@ class CpuLinerTask:
 
             # Wait for status thread to finish
             if self._status_thread.is_alive():
-                self._status_thread.join(timeout=5.0)
+                self._status_thread.join(timeout=1.0)
+            self._status_thread = threading.Thread(target=self._handle_task_status_updates, daemon=True)
 
             self._wait_tasks_end()
 
@@ -337,7 +338,7 @@ class CpuLinerTask:
         Wait for all tasks to finish
         """
         while True:
-            if shared_status_info_liner.task_status_queue.empty():
+            if len(self._running_tasks) == 0:
                 break
             time.sleep(0.01)
 
@@ -468,7 +469,7 @@ class CpuLinerTask:
         Wait for the scheduler thread to finish.
         """
         if self._scheduler_thread and self._scheduler_thread.is_alive():
-            self._scheduler_thread.join(timeout=5.0)  # Add timeout to prevent permanent waiting
+            self._scheduler_thread.join(timeout=1.0)  # Add timeout to prevent permanent waiting
 
     def force_stop_task(self,
                         task_id: str) -> bool:

@@ -8,6 +8,7 @@ different task types, priority management, timeout handling, and thread-safe ope
 import queue
 import threading
 import time
+import signal
 
 from typing import Callable, List, Optional, Union
 
@@ -25,7 +26,7 @@ class TaskScheduler:
     __slots__ = ['ban_task_names', 'core_task_queue',
                  'allocator_running', 'allocator_started', 'allocator_thread',
                  'timeout_check_interval', '_timeout_checker',
-                 '_task_event', '_lock',
+                 '_task_event', '_lock', '_shutdown_lock',
                  '_allow_task_addition']
 
     def __init__(self) -> None:
@@ -38,6 +39,7 @@ class TaskScheduler:
         self._timeout_checker: Optional[threading.Timer] = None
         self._task_event = threading.Event()  # Add an event for task notification
         self._lock = threading.RLock()  # Reentrant lock for thread safety
+        self._shutdown_lock = threading.Lock()  # Lock for shutdown operation
         self._allow_task_addition: bool = True
 
     def add_task(self,
@@ -276,45 +278,52 @@ class TaskScheduler:
                 self._timeout_checker.cancel()
                 self._timeout_checker = None
 
-    def shutdown_scheduler(self) -> None:
+    def shutdown_scheduler(self, signum=None, frame=None) -> None:
         """
         Shutdown the scheduler, stop all tasks, and release resources.
         """
-        from ..scheduler import shutdown_api
-        logger.info("Starting shutdown TaskScheduler.")
-        self._stop_task_addition()
+        with self._shutdown_lock:
+            from ..scheduler import shutdown_api
+            logger.info("Starting shutdown TaskScheduler.")
+            self._stop_task_addition()
 
-        # Clean up all resources in the task scheduler, stop running tasks, and empty the task queue.
-        # Stop the task allocator
-        with self._lock:
-            self.allocator_running = False
-            self._task_event.set()  # Wake up allocator thread to exit
+            # Clean up all resources in the task scheduler, stop running tasks, and empty the task queue.
+            # Stop the task allocator
+            with self._lock:
+                self.allocator_running = False
+                self._task_event.set()  # Wake up allocator thread to exit
 
-        if self.allocator_thread and self.allocator_thread.is_alive():
-            self.allocator_thread.join(timeout=5.0)
+            if self.allocator_thread and self.allocator_thread.is_alive():
+                self.allocator_thread.join(timeout=1.0)
 
-        # Stop the timeout checker
-        self._stop_timeout_checker()
+            # Stop the timeout checker
+            self._stop_timeout_checker()
 
-        # Clear the core task queue
-        with self._lock:
-            with self.core_task_queue.mutex:
-                self.core_task_queue.queue.clear()
+            # Clear the core task queue
+            with self._lock:
+                with self.core_task_queue.mutex:
+                    self.core_task_queue.queue.clear()
 
-            # Reset status
-            self.ban_task_names.clear()
-            self.allocator_started = False
-            self.allocator_thread = None
+                # Reset status
+                self.ban_task_names.clear()
+                self.allocator_started = False
+                self.allocator_thread = None
 
-        # Turn off the scheduler
-        shutdown_api()
+            # Turn off the scheduler
+            shutdown_api()
 
-        # Clear task status
-        task_status_manager.details_manager_shutdown()
+            # Clear task status
+            task_status_manager.details_manager_shutdown()
 
-        logger.info("All scheduler has been shut down.")
-        # Restore default settings
-        self._allow_task_addition = True
+            logger.info("All scheduler has been shut down.")
+            # Restore default settings
+            self._allow_task_addition = True
+
+            if signum and frame:
+                # Restore the default handler and resend the signal
+                logger.error("Abnormal exit, resource cleanup completed!")
+                signal.signal(signum, signal.SIG_DFL)
+                signal.raise_signal(signum)
 
 
 task_scheduler = TaskScheduler()

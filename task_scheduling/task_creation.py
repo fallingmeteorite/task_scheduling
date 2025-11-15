@@ -7,6 +7,7 @@ including asynchronous, linear, and timer-based tasks with proper type handling.
 """
 import uuid
 import inspect
+import signal
 
 from typing import Callable, Union
 
@@ -90,3 +91,8 @@ def task_creation(delay: Union[int, None], daily_time: Union[str, None], functio
                                 **kwargs)
 
     return task_id
+
+
+def abnormal_exit_cleanup() -> None:
+    signal.signal(signal.SIGINT, task_scheduler.shutdown_scheduler)  # Ctrl+C
+    signal.signal(signal.SIGTERM, task_scheduler.shutdown_scheduler)  # Termination signal
