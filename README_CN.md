@@ -169,6 +169,8 @@ start_task_status_ui()
 
 `Windows`,`Linux`,`Mac`在多进程中都统一使用`spawn`
 
+IO异步任务将不会通过任务名字排队,将提交后交给时间循环管理,其他任务都会通过名字排队执行
+
 ### 参数说明:
 
 **delay**: 延迟执行时间（秒），用于定时任务(不使用填写None)
@@ -177,7 +179,7 @@ start_task_status_ui()
 
 **function_type**: 函数类型 (`FUNCTION_TYPE_IO`, `FUNCTION_TYPE_CPU`, `FUNCTION_TYPE_TIMER`)
 
-**timeout_processing**: 是否启用超时检测和强制终止 (`True`, `False`)
+**timeout_processing**: 是否启用超时终止 (`True`, `False`)
 
 **task_name**: 任务名称，相同名称的任务会排队执行
 
@@ -252,7 +254,44 @@ if __name__ == "__main__":
             time.sleep(1)
     except KeyboardInterrupt:
         task_scheduler.shutdown_scheduler()
+```
 
+# 随机命名
+
+- random_name(prefix: str) -> str:
+
+### 参数说明:
+
+**prefix**: 名字前缀
+
+### 使用示例:
+
+```python
+import time
+
+
+def linear_task(input_info):
+    while True:
+        print(input_info)
+        time.sleep(input_info)
+
+
+if __name__ == "__main__":
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
+    from task_scheduling.utils import random_name
+    from task_scheduling.variable import *
+
+    task_creation(
+        None, None, FUNCTION_TYPE_CPU, True, random_name("test"),
+        linear_task, priority_low, "test"
+    )
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## 任务重试
@@ -994,6 +1033,10 @@ IO 密集型线性任务中运行最大任务数
 定时器执行最多任务数
 
 `timer_task: 1000` `no_gil: 60`
+
+事件循环最大创建数量
+
+`maximum_event_loop: 30`
 
 当多长时间没有任务时,关闭任务调度器(秒)
 

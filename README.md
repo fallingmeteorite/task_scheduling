@@ -173,6 +173,9 @@ start_task_status_ui()
 
 `Windows`, `Linux`, and `Mac` all use `spawn` uniformly in multiprocessing.
 
+IO asynchronous tasks will not be queued by task name; once submitted, they are managed by the event loop. Other tasks
+will be queued and executed by name.
+
 ### Parameter Description:
 
 **delay**: Delay execution time (seconds), used for scheduled tasks (fill in None if not used)
@@ -181,7 +184,7 @@ start_task_status_ui()
 
 **function_type**: Function types (`FUNCTION_TYPE_IO`, `FUNCTION_TYPE_CPU`, `FUNCTION_TYPE_TIMER`)
 
-**timeout_processing**: Whether to enable timeout detection and forced termination (`True`, `False`)
+**timeout_processing**: Enable timeout termination (`True`, `False`)
 
 **task_name**: Task name; tasks with the same name will be executed in queue
 
@@ -256,7 +259,44 @@ if __name__ == "__main__":
             time.sleep(1)
     except KeyboardInterrupt:
         task_scheduler.shutdown_scheduler()
+```
 
+# Random Naming
+
+- random_name(prefix: str) -> str:
+
+### Parameter Description:
+
+**prefix**: Name prefix
+
+### Example of use:
+
+```python
+import time
+
+
+def linear_task(input_info):
+    while True:
+        print(input_info)
+        time.sleep(input_info)
+
+
+if __name__ == "__main__":
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.manager import task_scheduler
+    from task_scheduling.utils import random_name
+    from task_scheduling.variable import *
+
+    task_creation(
+        None, None, FUNCTION_TYPE_CPU, True, random_name("test"),
+        linear_task, priority_low, "test"
+    )
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## Task Retry
@@ -1011,6 +1051,10 @@ Maximum number of tasks running in IO-intensive linear tasks
 Maximum number of tasks executed by the timer
 
 `timer_task: 1000` `no_gil: 60`
+
+Maximum number of event loop creations
+
+`maximum_event_loop: 30`
 
 Time to wait without tasks before shutting down the task scheduler (seconds)
 
