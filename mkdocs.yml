@@ -6,10 +6,26 @@ repo_name: fallingmeteorite/task_scheduling
 
 theme:
   name: material
+  palette:
+    - scheme: default
+      primary: teal
+      accent: deep orange
+      toggle:
+        icon: material/brightness-7
+        name: Dark
+    - scheme: slate
+      primary: teal
+      accent: deep orange
+      toggle:
+        icon: material/brightness-4
+        name: Light
   features:
     - navigation.tabs
     - navigation.sections
     - toc.integrate
+    - navigation.expand
+    - navigation.indexes
+    - content.code.copy
 
 nav:
   - 首页: index.md
