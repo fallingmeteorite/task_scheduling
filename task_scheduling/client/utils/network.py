@@ -10,7 +10,7 @@ import socket
 import pickle
 
 from typing import Dict, Any
-from task_scheduling.common import logger
+from task_scheduling.common import logger, config
 
 
 def send_request(request_data: Dict[str, Any]) -> None:
@@ -35,7 +35,7 @@ def send_request(request_data: Dict[str, Any]) -> None:
         client_socket.settimeout(10)  # Set connection timeout only
 
         # Establish connection to proxy server
-        client_socket.connect(('localhost', 8999))
+        client_socket.connect(('localhost', config["proxy_ip"]))
 
         # Serialize request data and send
         request_bytes = pickle.dumps(request_data)

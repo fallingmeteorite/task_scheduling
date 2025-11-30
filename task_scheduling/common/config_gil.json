@@ -11,6 +11,11 @@
   "status_check_interval": 300,
   "maximum_result_storage": 2000,
   "maximum_result_time_storage": 60,
+  "proxy_ip": 7999,
+  "server_ip": 8000,
+  "webui_ip": 9000,
+  "get_ip": 10000,
+  "max_port_attempts": 999,
   "exception_thrown": false,
   "network_storage_results": false
 }

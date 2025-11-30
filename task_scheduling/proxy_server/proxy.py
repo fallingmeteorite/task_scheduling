@@ -25,18 +25,18 @@ import threading
 import signal
 
 from typing import Dict
-from task_scheduling.common import logger
+from task_scheduling.common import logger, config
 from task_scheduling.proxy_server.utils import NetworkManager, ServerManager, TaskManager
 
 
 class ProxyServer:
     """Main Proxy Server - Coordinates all managers"""
 
-    def __init__(self, host: str = 'localhost', port: int = 8999):
+    def __init__(self):
         self.server_socket = None
         self.health_thread = None
-        self.host = host
-        self.port = port
+        self.host = "localhost"
+        self.port = config["proxy_ip"]
         self.running = False
         self.shutdown_event = threading.Event()
 

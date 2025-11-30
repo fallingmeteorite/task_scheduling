@@ -18,10 +18,10 @@ from task_scheduling.common import config
 class ResultServer:
     """Server for managing task results storage and retrieval."""
 
-    def __init__(self, host='localhost', port=7998):
+    def __init__(self):
         self._running = None
-        self.host = host
-        self.port = port
+        self.host = 'localhost'
+        self.port = config["get_ip"]
         # Store task results and creation time (task_id: (result, create_time))
         self.tasks: Dict[str, Tuple[Any, float]] = {}
         self.lock = asyncio.Lock()

@@ -1,14 +1,22 @@
-## 功能说明
+## 任务树模式
 
-字典中的任务名字将会以`task_group_name|task_name`显示,当名字任务为`task_group_name`被结束,所有的以`task_group_name|task_name`显示的任务都会一并结束,`task_group_name`是这个任务树中的主任务(该任务实际只是一个载体,没有功能)
+task_group(share_info: Any, sharedtaskdict: Any, task_signal_transmission: Any,
+task_dict: Dict) -> None:
 
-## 参数说明
+- 功能说明:
+
+字典中的任务名字将会以`task_group_name|task_name`显示,当名字任务为`task_group_name`被结束,所有的以
+`task_group_name|task_name`显示的任务都会一并结束,`task_group_name`是这个任务树中的主任务(
+该任务实际只是一个载体,没有功能)
+
+- 参数说明:
 
 **task_group_name**: 这个任务树中的主任务名字(该任务实际只是一个载体,没有功能),所有的分支任务都会加上该主任务的名字
 
-**task_dict**: `键`存储任务名字,`值`存储要执行的函数,是否启用超时检测强制终止 (`True`, `False`) 和函数需要的参数 (必须按照顺序)
+**task_dict**: `键`存储任务名字,`值`存储要执行的函数,是否启用超时检测强制终止 (`True`, `False`) 和函数需要的参数 (
+必须按照顺序)
 
-## 使用示例:
+- 使用示例:
 
 ```python
 import time
@@ -46,3 +54,4 @@ if __name__ == "__main__":
             time.sleep(1)
     except KeyboardInterrupt:
         task_scheduler.shutdown_scheduler()
+```

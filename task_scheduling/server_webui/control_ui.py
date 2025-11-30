@@ -304,18 +304,19 @@ def is_port_available(port):
         return False
 
 
-def find_available_port(start_port=7999, max_attempts=100):
+def find_available_port():
     """Find an available port starting from start_port."""
-    port = start_port
+    port = config["webui_ip"]
     attempts = 0
 
-    while attempts < max_attempts:
+    while attempts < config["max_port_attempts"]:
         if is_port_available(port):
             return port
         port += 1
         attempts += 1
 
-    raise RuntimeError(f"No available port found in range {start_port}-{start_port + max_attempts - 1}")
+    raise RuntimeError(
+        f"No available port found in range {config["webui_ip"]}-{config["webui_ip"] + config["max_port_attempts"] - 1}")
 
 
 class TaskControlHandler(BaseHTTPRequestHandler):

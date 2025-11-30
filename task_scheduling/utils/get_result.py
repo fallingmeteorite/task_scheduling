@@ -9,15 +9,15 @@ from a remote server using custom protocol over TCP sockets.
 import asyncio
 import pickle
 
+from task_scheduling.common import config
 
-async def get_task_result(task_id: str, timeout: float = 30.0, host='localhost', port=7998):
+
+async def get_task_result(task_id: str, timeout: float = 30.0):
     """Get task result (asynchronous function)
 
     Args:
         task_id: Task ID
         timeout: Timeout in seconds
-        host: Server host address
-        port: Server port number
 
     Returns:
         Serialized result data, returns None if not found
@@ -28,7 +28,7 @@ async def get_task_result(task_id: str, timeout: float = 30.0, host='localhost',
         'timeout': timeout
     }
 
-    reader, writer = await asyncio.open_connection(host, port)
+    reader, writer = await asyncio.open_connection('localhost', config["get_ip"])
 
     request_data = pickle.dumps(request)
     writer.write(len(request_data).to_bytes(4, 'big'))

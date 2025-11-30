@@ -1,23 +1,17 @@
-## 获取任务结果
+## 同步获取任务结果
 
-- `get_result_api(task_type: str, task_id: str) -> Any`
-  **!!!该函数可能已经过时!!!**
+get_result_api(task_type: str, task_id: str) -> Any
+**!!!该函数可能已经过时!!!**
 
-- `get_task_result(task_id: str) -> Any`
-  **!!!该函数是异步函数,请在事件循环中使用!!!**
-
-### 函数说明
-
-返回值: 任务结果，如果未完成则返回None
-
-### 参数说明:
+- 参数说明:
 
 **task_type**: 任务类型
+
 **task_id**: 任务ID
 
-## 使用示例
+**返回**: 任务结果,如果未完成则返回None
 
-### 同步方式获取结果
+- 使用示例
 
 ```python
 import time
@@ -46,7 +40,18 @@ if __name__ == "__main__":
         time.sleep(1)
 ```
 
-### 异步方式获取结果
+## 异步方式获取结果
+
+get_task_result(task_id: str) -> Any
+**!!!该函数是异步函数,请在事件循环中使用,可以在配置文件中修改ip!!!**
+
+- 参数说明:
+
+**task_id**: 任务ID
+
+**返回**: 任务结果,如果未完成则返回None
+
+- 使用示例
 
 ```python
 import asyncio

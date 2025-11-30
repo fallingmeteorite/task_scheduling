@@ -1,14 +1,17 @@
 ## 重试装饰器
 
-- `retry_on_error(exceptions: Union[Type[Exception], Tuple[Type[Exception], ...], None], max_attempts: int, delay: Union[float, int]) -> Any`
+retry_on_error(exceptions: Union[Type[Exception], Tuple[Type[Exception], ...], None], max_attempts: int, delay:
+Union[float, int]) -> Any
 
-## 参数说明:
+- 参数说明:
 
 **exceptions**: 当什么错误类型发生才开始重试
+
 **max_attempts**: 最大尝试次数
+
 **delay**: 每次重试的间隔时间
 
-## 使用示例:
+- 使用示例:
 
 ```python
 import time
@@ -41,3 +44,4 @@ if __name__ == "__main__":
             time.sleep(1)
     except KeyboardInterrupt:
         task_scheduler.shutdown_scheduler()
+```

@@ -13,7 +13,7 @@ import pickle
 import time
 
 from typing import Any, Optional, Dict
-from task_scheduling.common import logger
+from task_scheduling.common import logger, config
 from task_scheduling.server.utils import TaskServerCore
 
 
@@ -22,24 +22,15 @@ class TaskServer:
     Task server, receives and executes tasks from broker.
     """
 
-    def __init__(self, host: str = 'localhost', port: int = 9000,
-                 broker_host: str = 'localhost', broker_port: int = 8999,
-                 max_port_attempts: int = 999) -> None:
+    def __init__(self) -> None:
         """
         Initialize task server.
-
-        Args:
-            host: Server host address
-            port: Server port number
-            broker_host: Broker host address
-            broker_port: Broker port number
-            max_port_attempts: Maximum port attempts when default port is occupied
         """
-        self.host = host
-        self.port = port
-        self.broker_host = broker_host
-        self.broker_port = broker_port
-        self.max_port_attempts = max_port_attempts
+        self.host = "localhost"
+        self.port = config["server_ip"]
+        self.broker_host = "localhost"
+        self.broker_port = config["proxy_ip"]
+        self.max_port_attempts = config["max_port_attempts"]
         self.running = True
         self.server_socket: Optional[socket.socket] = None
         self.broker_socket: Optional[socket.socket] = None
