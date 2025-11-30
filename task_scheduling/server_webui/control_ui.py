@@ -146,11 +146,11 @@ def _calculate_elapsed_time(task_info):
 
     if end_time is None:
         elapsed = current_time - start_time
-        if elapsed > config["watch_dog_time"]:
+        if elapsed > config.get("watch_dog_time", float('inf')):
             return "timeout"
     else:
         elapsed = end_time - start_time
-        if elapsed > config["watch_dog_time"]:
+        if elapsed > config.get("watch_dog_time", float('inf')):
             return "timeout"
 
     if elapsed < 0.1:
@@ -274,7 +274,7 @@ def _calculate_elapsed_time_seconds(task_info):
         elapsed = end_time - start_time
 
     # Check Timeout
-    if elapsed > config["watch_dog_time"]:
+    if elapsed > config.get("watch_dog_time", float('inf')):
         return -1  # Special value indicates timeout
 
     return elapsed
@@ -304,19 +304,18 @@ def is_port_available(port):
         return False
 
 
-def find_available_port():
+def find_available_port(start_port, max_attempts):
     """Find an available port starting from start_port."""
-    port = config["webui_ip"]
+    port = start_port
     attempts = 0
 
-    while attempts < config["max_port_attempts"]:
+    while attempts < max_attempts:
         if is_port_available(port):
             return port
         port += 1
         attempts += 1
 
-    raise RuntimeError(
-        f"No available port found in range {config["webui_ip"]}-{config["webui_ip"] + config["max_port_attempts"] - 1}")
+    raise RuntimeError(f"No available port found in range {start_port}-{start_port + max_attempts - 1}")
 
 
 class TaskControlHandler(BaseHTTPRequestHandler):
@@ -488,16 +487,12 @@ class TaskControlHandler(BaseHTTPRequestHandler):
 class TaskStatusServer:
     """Server for displaying task status information."""
 
-    def __init__(self, port=7999, max_port_attempts=999):
+    def __init__(self):
         """
         Initialize the task status server.
-
-        Args:
-            port (int): Starting port number
-            max_port_attempts (int): Maximum number of port attempts when default port is occupied
         """
-        self.port = port
-        self.max_port_attempts = max_port_attempts
+        self.port = config["webui_ip"]
+        self.max_port_attempts = config["max_port_attempts"]
         self.actual_port = None  # Store the actual port used
         self.server = None
         self.thread = None
@@ -508,7 +503,7 @@ class TaskStatusServer:
         def run_server():
             """Start Service"""
             # Find available port with max attempts limit
-            self.actual_port = find_available_port()
+            self.actual_port = find_available_port(self.port, self.max_port_attempts)
             self.server = HTTPServer(('', self.actual_port), TaskControlHandler)
             logger.info(f"Task status UI available at http://localhost:{self.actual_port}")
             self.server.serve_forever()
@@ -541,6 +536,6 @@ def start_task_status_ui(port=7999, max_port_attempts=100):
     Returns:
         TaskStatusServer: The server instance with actual port information
     """
-    server = TaskStatusServer(port, max_port_attempts)
+    server = TaskStatusServer()
     server.start()
     return server
