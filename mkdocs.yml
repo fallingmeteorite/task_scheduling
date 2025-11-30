@@ -65,7 +65,6 @@ copyright: |
 # 导航优化
 nav:
   - 首页: index.md
-  - 快速开始: getting-started.md  # 建议添加快速开始指南
   - 基础功能:
       - 创建任务: basic/create_tasks.md
       - 任务控制: basic/task_control.md
