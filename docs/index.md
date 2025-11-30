@@ -39,5 +39,5 @@ pip install --upgrade task_scheduling
 https://github.com/glenfant/stopit
 感谢这个库给予我了一个很巧妙地思维去处理任务控制相关的逻辑
 
-为了便于后续修改我将它放在库内部,而不是通过 pip 安装的,所以这里明确说明并感谢:
+为了便于后续修改我将它放在库内部,而不是通过 pip 安装的,所以这里明确说明并感谢
 
