@@ -146,11 +146,11 @@ def _calculate_elapsed_time(task_info):
 
     if end_time is None:
         elapsed = current_time - start_time
-        if elapsed > config.get("watch_dog_time", float('inf')):
+        if elapsed > config["watch_dog_time"]:
             return "timeout"
     else:
         elapsed = end_time - start_time
-        if elapsed > config.get("watch_dog_time", float('inf')):
+        if elapsed > config["watch_dog_time"]:
             return "timeout"
 
     if elapsed < 0.1:
@@ -274,7 +274,7 @@ def _calculate_elapsed_time_seconds(task_info):
         elapsed = end_time - start_time
 
     # Check Timeout
-    if elapsed > config.get("watch_dog_time", float('inf')):
+    if elapsed > config["watch_dog_time"]:
         return -1  # Special value indicates timeout
 
     return elapsed
@@ -508,7 +508,7 @@ class TaskStatusServer:
         def run_server():
             """Start Service"""
             # Find available port with max attempts limit
-            self.actual_port = find_available_port(self.port, self.max_port_attempts)
+            self.actual_port = find_available_port()
             self.server = HTTPServer(('', self.actual_port), TaskControlHandler)
             logger.info(f"Task status UI available at http://localhost:{self.actual_port}")
             self.server.serve_forever()

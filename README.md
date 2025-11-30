@@ -51,31 +51,15 @@ if __name__ == "__main__":
             task_scheduler.shutdown_scheduler()
 ```
 
-## 文档
+### 文档
 
 详细使用说明和完整功能请查看:
 https://fallingmeteorite.github.io/task_scheduling/
 
-基础功能
-
-- 任务创建和管理
-- 任务状态控制
-- 结果获取
-- Web 控制界面
-- 配置文件支持
-
-高级功能
-
-- 线程级任务
-- 任务树模式
-- 依赖型任务
-- 任务重试机制
-- 分布式服务
-
-## 许可证
+### 许可证
 
 MIT License
 
-## 贡献
+### 贡献
 
 欢迎提交 Issue 和 Pull Request！
