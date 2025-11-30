@@ -10,5 +10,11 @@ from task_scheduling.server_webui import start_task_status_ui
 # 启动网页界面，访问: http://localhost:8000
 start_task_status_ui()
 ```
+
+- 功能说明
+
+- `Stop Adding Task` 停止任务添加到调度器
+- `Task Overview` 调度器各类任务状态统计
+
 - 效果图
-![img](./../img/01.png)
+  ![img](./../img/01.png)

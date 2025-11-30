@@ -6,28 +6,25 @@ repo_name: fallingmeteorite/task_scheduling
 
 theme:
   name: material
-  logo: assets/logo.svg  # 建议添加一个 logo
-  favicon: assets/favicon.ico  # 建议添加 favicon
   features:
     - navigation.tabs
     - navigation.sections
     - navigation.expand
-    - navigation.indexes
     - toc.integrate
     - search.suggest
     - search.highlight
     - content.tabs.link
-    - content.code.annotate
+
+  # 调色板优化
   palette:
-    # 主色调方案
     - scheme: default
-      primary: teal
+      primary: indigo
       accent: blue
       toggle:
         icon: material/brightness-7
         name: 切换到暗色模式
     - scheme: slate
-      primary: teal
+      primary: indigo
       accent: blue
       toggle:
         icon: material/brightness-4
@@ -36,33 +33,33 @@ theme:
   # 字体优化
   font:
     text: Roboto
-    code: Fira Code
+    code: Roboto Mono
 
-  # 图标设置
+  # 图标美化
   icon:
     repo: fontawesome/brands/github
-    view: material/eye
-    edit: material/pencil
 
 # 插件配置
 plugins:
-  - search:
-      lang: en
-  - tags
+  - search
 
-# 额外 CSS 美化
-extra_css:
-  - stylesheets/extra.css
+# Markdown 扩展增强
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - toc:
+      permalink: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
 
-# 额外 JavaScript
-extra_javascript:
-  - javascripts/extra.js
-
-# 版权信息
-copyright: |
-  &copy; 2024 fallingmeteorite. 基于 <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank">Material for MkDocs</a> 构建。
-
-# 导航优化
+      # 导航结构优化
 nav:
   - 首页: index.md
   - 基础功能:
@@ -80,36 +77,16 @@ nav:
       - 依赖型任务: advanced/dependent_tasks.md
       - 任务重试: advanced/task_retry.md
       - 分布式服务: advanced/distributed_service.md
-  - API 参考: api.md  # 建议添加 API 文档
-  - 示例: examples.md  # 建议添加示例页面
   - 忠告: advice.md
-
-# 扩展配置
-markdown_extensions:
-  - admonition
-  - pymdownx.details
-  - pymdownx.superfences
-  - pymdownx.tabbed:
-      alternate_style: true
-  - pymdownx.highlight:
-      anchor_linenums: true
-  - pymdownx.inlinehilite
-  - pymdownx.snippets
-  - pymdownx.arithmatex:
-      generic: true
-  - toc:
-      permalink: true
-  - pymdownx.emoji:
-      emoji_index: !!python/name:material.extensions.emoji.twemoji
-      emoji_generator: !!python/name:material.extensions.emoji.to_svg
 
 # 额外配置
 extra:
+  # 社交链接
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/fallingmeteorite
-    - icon: fontawesome/brands/python
-      link: https://pypi.org/project/task-scheduling
-  analytics:
-    provider: google
-    property: YOUR_GOOGLE_ANALYTICS_ID  # 可选：添加分析
+      name: GitHub
+
+  # 版权信息
+  copyright: |
+    &copy; 2025-2026 fallingmeteorite | 基于 Material for MkDocs 构建
