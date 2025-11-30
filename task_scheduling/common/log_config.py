@@ -25,7 +25,7 @@ _DEFAULT_FORMAT: str = (
 )
 
 # Default log level
-_LOG_LEVEL: str = "INFO"
+_LOG_LEVEL: str = "DEBUG"
 
 # Flag to check if logger is already configured
 _logger_configured: bool = False

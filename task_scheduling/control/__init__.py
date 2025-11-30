@@ -7,8 +7,8 @@ import sys
 
 # Prevent errors during multi-process initialization
 try:
-    from .process_control import ProcessTaskManager
-    from .thread_control import ThreadTaskManager
+    from task_scheduling.control.process_control import ProcessTaskManager
+    from task_scheduling.control.thread_control import ThreadTaskManager
 except KeyboardInterrupt:
     sys.exit(0)
 

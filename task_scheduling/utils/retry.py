@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+# Author: fallingmeteorite
 """Retry decorator for handling task failures with exponential backoff.
 
 This module provides a decorator for automatically retrying functions when
@@ -6,9 +8,9 @@ specific exceptions occur, with configurable retry attempts and delays.
 
 import time
 import functools
-from typing import Union, Type, Tuple, Callable, Any
 
-from ..common import logger
+from typing import Union, Type, Tuple, Callable, Any
+from task_scheduling.common import logger
 
 
 def retry_on_error(
@@ -25,11 +27,6 @@ def retry_on_error(
 
     Returns:
         A decorator that wraps the function with retry logic.
-
-    Example:
-        >>> @retry_on_error(exceptions=(ConnectionError,), max_attempts=5, delay=2)
-        >>> def connect_to_service():
-        ...     # function implementation
     """
     if exceptions is None:
         exceptions = Exception

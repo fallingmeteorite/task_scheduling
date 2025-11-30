@@ -11,10 +11,9 @@ import time
 import signal
 
 from typing import Callable, List, Optional, Union
-
-from ..common import logger, config
-from ..mark import task_function_type
-from ..manager import task_status_manager
+from task_scheduling.common import logger, config
+from task_scheduling.mark import task_function_type
+from task_scheduling.manager import task_status_manager
 
 
 class TaskScheduler:
@@ -110,7 +109,9 @@ class TaskScheduler:
             return True
 
     def _allocator(self) -> None:
-        from ..scheduler import add_api, cleanup_results_api
+        # Avoid import issues
+        from task_scheduling.scheduler import add_api, cleanup_results_api
+
         threading.Thread(target=cleanup_results_api, daemon=True).start()
 
         if self._timeout_checker is None:
@@ -243,7 +244,8 @@ class TaskScheduler:
         """
         Check for tasks that have exceeded their timeout time based on task start times.
         """
-        from ..scheduler import kill_api
+        # Avoid import issues
+        from task_scheduling.scheduler import kill_api
         logger.warning("Start checking the status of all tasks and fix them")
         current_time = time.time()
 
@@ -283,7 +285,8 @@ class TaskScheduler:
         Shutdown the scheduler, stop all tasks, and release resources.
         """
         with self._shutdown_lock:
-            from ..scheduler import shutdown_api
+            # Avoid import issues
+            from task_scheduling.scheduler import shutdown_api
             logger.info("Starting shutdown TaskScheduler.")
             self._stop_task_addition()
 

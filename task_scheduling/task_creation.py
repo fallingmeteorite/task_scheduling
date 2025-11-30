@@ -6,46 +6,19 @@ This module provides functions for creating and managing different types of task
 including asynchronous, linear, and timer-based tasks with proper type handling.
 """
 import uuid
-import inspect
 import signal
 
 from typing import Callable, Union
-
-from .manager import task_scheduler
-from .common import logger
-
-
-def wait_branch_thread_ended_check(func: Callable) -> bool:
-    """
-
-    Args:
-        func: function
-
-    Returns: Add retry decorator?
-
-    """
-    return (hasattr(func, '_decorated_by') and
-            getattr(func, '_decorated_by') == 'wait_branch_thread_ended')
-
-
-def is_async_function(func: Callable) -> bool:
-    """
-    Determine if a function is an asynchronous function.
-
-    Args:
-        func (Callable): The function to check.
-
-    Returns:
-        bool: True if the function is asynchronous; otherwise, False.
-    """
-    return inspect.iscoroutinefunction(func)
+from task_scheduling.manager import task_scheduler
+from task_scheduling.common import logger
+from task_scheduling.utils import is_async_function, wait_branch_thread_ended_check
 
 
 def task_creation(delay: Union[int, None], daily_time: Union[str, None], function_type: str, timeout_processing: bool,
                   task_name: str,
                   func: Callable,
                   priority: str,
-                  *args, **kwargs) -> Union[str, None]:
+                  *args, **kwargs) -> Union[str, bool]:
     """
     Add a task to the queue, choosing between asynchronous or linear task based on the function type.
     Generate a unique task ID and return it.
@@ -94,5 +67,6 @@ def task_creation(delay: Union[int, None], daily_time: Union[str, None], functio
 
 
 def abnormal_exit_cleanup() -> None:
+    """Register exit function"""
     signal.signal(signal.SIGINT, task_scheduler.shutdown_scheduler)  # Ctrl+C
     signal.signal(signal.SIGTERM, task_scheduler.shutdown_scheduler)  # Termination signal

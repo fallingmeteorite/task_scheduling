@@ -22,10 +22,6 @@ def interruptible_sleep(seconds: Union[float, int]) -> None:
 
     Args:
         seconds: Number of seconds to sleep. Can be a float for sub-second precision.
-
-    Example:
-        >>> interruptible_sleep(5.5)  # Sleep for 5.5 seconds
-        >>> # Can be interrupted by setting the internal event if needed
     """
     _event = threading.Event()
 

@@ -12,8 +12,7 @@ import threading
 
 from functools import wraps
 from typing import Any, Callable
-
-from ..common import logger, config
+from task_scheduling.common import logger, config
 
 
 def wait_ended() -> None:

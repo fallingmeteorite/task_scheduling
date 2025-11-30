@@ -1,14 +1,19 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+"""Task dependency management module.
+
+This module provides functionality for managing task dependencies
+and triggering dependent tasks based on main task completion status.
+"""
+
 import asyncio
 import threading
 
 from typing import Callable
-
-from .common import logger
-from .scheduler import get_result_api
-from .manager import task_status_manager
-from .task_creation import task_creation
+from task_scheduling.common import logger
+from task_scheduling.scheduler import get_result_api
+from task_scheduling.manager import task_status_manager
+from task_scheduling.task_creation import task_creation
 
 
 async def _wait_main_task_result(condition: str, main_task_id: str,
@@ -17,7 +22,7 @@ async def _wait_main_task_result(condition: str, main_task_id: str,
     Wait for the main task to complete and then trigger the dependent task.
 
     Args:
-        condition: Under what circumstances is the main task executed
+        condition: Condition under which the main task is considered executed
         main_task_id: ID of the main task
         dependent_task: The dependent task function to execute
         args: Arguments for the dependent task
@@ -32,7 +37,7 @@ async def _wait_main_task_result(condition: str, main_task_id: str,
             task_creation(args[0], args[1], args[2], args[3], args[4], dependent_task, *args[5:])
             break
 
-        # If completed, there will be a return result.
+        # If completed, there will be a return result
         if condition == "completed action":
             if result is not None and result not in ["timeout action", "cancelled action", "failed action",
                                                      "completed action"]:
@@ -70,7 +75,7 @@ class TaskDependencyManager:
         self.thread.start()
 
     def _run_in_async_loop(self, coro):
-        """Running a coroutine in an asynchronous loop"""
+        """Run a coroutine in an asynchronous loop"""
         asyncio.run_coroutine_threadsafe(coro, self.loop)
 
     def after_completion(self, main_task_id: str, dependent_task: Callable, *args) -> None:
@@ -88,10 +93,9 @@ class TaskDependencyManager:
 
     def after_cancel(self, main_task_id: str, dependent_task: Callable, *args) -> None:
         """
-        Trigger a dependent task to run after the main task completes.
+        Trigger a dependent task to run after the main task is cancelled.
 
         Args:
-
             main_task_id: ID of the main task
             dependent_task: The dependent task function to execute
             *args: Arguments for the dependent task
@@ -102,7 +106,7 @@ class TaskDependencyManager:
 
     def after_timeout(self, main_task_id: str, dependent_task: Callable, *args) -> None:
         """
-        Trigger a dependent task to run after the main task completes.
+        Trigger a dependent task to run after the main task times out.
 
         Args:
             main_task_id: ID of the main task
@@ -115,7 +119,7 @@ class TaskDependencyManager:
 
     def after_error(self, main_task_id: str, dependent_task: Callable, *args) -> None:
         """
-        Trigger a dependent task to run after the main task completes.
+        Trigger a dependent task to run after the main task fails with error.
 
         Args:
             main_task_id: ID of the main task
@@ -127,4 +131,5 @@ class TaskDependencyManager:
         )
 
 
+# Global task dependency manager instance
 task_dependency_manager = TaskDependencyManager()

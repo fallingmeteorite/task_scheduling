@@ -7,6 +7,9 @@
 
 ## 核心功能
 
+!!!警告!!!
+(实验性功能)为测试功能，可能会出现异常和其他问题
+
 - 任务调度: 支持异步代码和同步代码,相同名称的任务自动排队执行
 - 任务管理: 强大的任务状态监控和管理能力
 - 灵活控制: 支持向执行代码发送(终止,暂停,恢复)命令
@@ -17,14 +20,15 @@
 - 结果获取: 可以获取任务返回的运行结果
 - 任务禁用管理: 可以在黑名单中添加任务名称,该名称的任务添加会被阻拦
 - 队列任务取消: 可以取消还在排队的同名称的所有任务
-- 线程级任务管理(实验性功能): 灵活的任务结构管理
-- 任务树模式管理(实验性功能): 当主任务结束,其他所有分支任务都会被销毁
-- 依赖型任务执行(实验性功能): 依赖于主任务返回结果运行的函数将启动并运行
+- 线程级任务管理: 灵活的任务结构管理
+- 任务树模式管理: 当主任务结束,其他所有分支任务都会被销毁
+- 依赖型任务执行: 依赖于主任务返回结果运行的函数将启动并运行
 - 任务重试: 在对应的报错发生时重新尝试运行任务
+- 分布式管理(实验性功能): 可以使用客户端和服务端加中转服务器模式
 
 ## 未来的计划
 
-暂时没有
+- 完善分布式逻辑
 
 ## 安装
 
@@ -154,7 +158,7 @@ if __name__ == "__main__":
 ### 使用示例:
 
 ```python
-from task_scheduling.webui import start_task_status_ui
+from task_scheduling.server_webui import start_task_status_ui
 
 # Launch the web interface and visit: http://localhost:8000
 start_task_status_ui()
@@ -215,7 +219,7 @@ async def async_task(input_info):
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
-    from task_scheduling.webui import start_task_status_ui
+    from task_scheduling.server_webui import start_task_status_ui
 
     start_task_status_ui()
 
@@ -427,6 +431,10 @@ print(task_function_type.read_from_dict("CPU_Task"))
 ## 获取任务结果
 
 - get_result_api(task_type: str, task_id: str) -> Any:
+  **!!!该函数可能已经过时!!!**
+
+- get_task_result(task_id: str) -> Any:
+  **!!!该函数是异步函数,请在事件循环中使用!!!**
 
 ### 函数说明
 
@@ -473,6 +481,49 @@ if __name__ == "__main__":
         task_scheduler.shutdown_scheduler()
 ```
 
+```python
+import asyncio
+import time
+
+from task_scheduling.variable import *
+
+
+def calculation_task(x, y):
+    time.sleep(4)
+    return x * y
+
+
+async def main_async():
+    from task_scheduling.task_creation import task_creation
+    from task_scheduling.utils import get_task_result
+
+    task_id1 = task_creation(
+        None, None, FUNCTION_TYPE_IO, True, "linear_task",
+        calculation_task, priority_low, 5, 10
+    )
+
+    result = await get_task_result(task_id1)
+    print(result)
+
+    return result
+
+
+if __name__ == "__main__":
+    from task_scheduling.manager import task_scheduler
+    from task_scheduling.get_service import result_server
+
+    # Start result storage server
+    result_server.start_server()
+
+    try:
+        asyncio.run(main_async())
+
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        task_scheduler.shutdown_scheduler()
+```
+
 ## 获取所有任务状态
 
 - get_tasks_info() -> str:
@@ -488,7 +539,7 @@ import time
 from task_scheduling.variable import *
 
 if __name__ == "__main__":
-    from task_scheduling.webui import get_tasks_info
+    from task_scheduling.server_webui import get_tasks_info
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
 
@@ -662,7 +713,7 @@ input_info = "test"
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
-    from task_scheduling.webui import start_task_status_ui
+    from task_scheduling.server_webui import start_task_status_ui
     from task_scheduling.variable import *
 
     start_task_status_ui()
@@ -705,7 +756,7 @@ input_info = "test"
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
-    from task_scheduling.webui import start_task_status_ui
+    from task_scheduling.server_webui import start_task_status_ui
     from task_scheduling.variable import *
 
     start_task_status_ui()
@@ -787,7 +838,7 @@ if __name__ == "__main__":
     ...
 ```
 
-## 线程级任务管理(实验性功能)
+## 线程级任务管理
 
 ### !!!警告!!!
 
@@ -848,7 +899,7 @@ def main_task(share_info, sharedtaskdict, task_signal_transmission, input_info):
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
-    from task_scheduling.webui import start_task_status_ui
+    from task_scheduling.server_webui import start_task_status_ui
     from task_scheduling.variable import *
 
     start_task_status_ui()
@@ -864,7 +915,7 @@ if __name__ == "__main__":
         task_scheduler.shutdown_scheduler()
 ```
 
-## 任务树模式管理(实验性功能)
+## 任务树模式管理
 
 ### 功能说明
 
@@ -895,7 +946,7 @@ if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
     from task_scheduling.quick_creation import task_group
-    from task_scheduling.webui import start_task_status_ui
+    from task_scheduling.server_webui import start_task_status_ui
     from task_scheduling.variable import *
 
     start_task_status_ui()
@@ -919,7 +970,7 @@ if __name__ == "__main__":
         task_scheduler.shutdown_scheduler()
 ```
 
-## 依赖型任务执行(实验性功能)
+## 依赖型任务执行
 
 - task_dependency_manager(main_task_id: str, dependent_task: Callable, *args) -> None:
 
@@ -981,7 +1032,7 @@ if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
     from task_scheduling.followup_creation import task_dependency_manager
-    from task_scheduling.webui import start_task_status_ui
+    from task_scheduling.server_webui import start_task_status_ui
     from task_scheduling.variable import *
 
     start_task_status_ui()
@@ -998,11 +1049,54 @@ if __name__ == "__main__":
         task_scheduler.shutdown_scheduler()
 ```
 
+# 分布式管理(实验性功能)
+
+- submit_function_task(delay: Union[int, None], daily_time: Union[str, None], function_type: str,
+  timeout_processing: bool,
+  task_name: str,
+  func: Optional[Callable],
+  priority: str,
+  *args, **kwargs) -> Union[str, None]:
+
+### !!!警告!!!
+
+执行的代码导入库和使用其他函数必须包含在传入函数中出现和声明,否则序列化传输会出问题,服务端客户端必须存在一样的配置和文件
+
+### 功能说明
+
+首先在一个命令行中输入`python -m task_scheduling.proxy_server`启动代理服务器(这个服务器只用一个)
+
+然后在另一个命令行中输入`python -m task_scheduling.server`启动主服务器(最多可以开启`999`个)
+
+在客户端使用`submit_function_task`提交函数即可
+
+### 使用示例:
+
+```python
+def linear_task(input_info):
+    import time
+    while True:
+        time.sleep(1)
+        print(input_info)
+
+
+if __name__ == "__main__":
+    from task_scheduling.client import submit_function_task
+    from task_scheduling.variable import *
+
+    submit_function_task(
+        None, None, FUNCTION_TYPE_IO, True, "linear_task",
+        linear_task, priority_low, "running..."
+    )
+```
+
 ## 网页控制端
 
 ![01.png](https://github.com/fallingmeteorite/task_scheduling/blob/main/img/01.png)
 
 Task status UI available at http://localhost:8000
+
+最多可以开启最多`999`个控制端口
 
 - 观察任务运行状态并控制任务(`终止`,`暂停`,`恢复`)
 
@@ -1018,9 +1112,9 @@ Task status UI available at http://localhost:8000
 
 `cpu_asyncio_task: 30`
 
-IO 密集型异步任务运行最大任务数
+IO 密集型异步任务单个事件循环的运行最大任务数
 
-`io_asyncio_task: 40`
+`io_asyncio_task: 20`
 
 CPU 密集型线性任务中运行最大任务数
 
@@ -1036,7 +1130,7 @@ IO 密集型线性任务中运行最大任务数
 
 事件循环最大创建数量
 
-`maximum_event_loop: 30`
+`maximum_event_loop: 100`
 
 当多长时间没有任务时,关闭任务调度器(秒)
 
@@ -1056,7 +1150,7 @@ IO 密集型线性任务中运行最大任务数
 
 单个调度器最大储存返回结果数量Maximum number of returned results that a single scheduler can store
 
-`maximum_result_storage: 2000`,
+`maximum_result_storage: 1000`,
 
 多久清理一次返回结果储存(秒)How often to clear the return result storage (seconds)
 
@@ -1065,6 +1159,9 @@ IO 密集型线性任务中运行最大任务数
 是否应该抛出异常而不捕获以便定位错误
 
 `exception_thrown: false`
+
+是否启用结果储存服务器
+`network_storage_results: false`
 
 ### 如果你有更好的想法，欢迎提交一个 PR
 

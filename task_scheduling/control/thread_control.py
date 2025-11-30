@@ -21,8 +21,6 @@ import platform
 
 from typing import Dict, Any
 
-from ..common import logger
-
 
 class ThreadTaskManager:
     """
@@ -68,8 +66,6 @@ class ThreadTaskManager:
         with self._lock:
             if task_id in self._tasks:
                 del self._tasks[task_id]
-            else:
-                logger.debug(f"Task not found: {task_id}")
 
     def exists(self, task_id: str) -> bool:
         """

@@ -7,10 +7,10 @@ import sys
 
 # Prevent errors during multi-process initialization
 try:
-    from .end_cleaning import exit_cleanup
-    from .info_share import SharedStatusInfo
-    from .priority_check import TaskCounter
-    from .parameter_check import get_param_count, retry_on_error_decorator_check
+    from task_scheduling.scheduler.utils.end_cleaning import exit_cleanup
+    from task_scheduling.scheduler.utils.info_share import SharedStatusInfo
+    from task_scheduling.scheduler.utils.priority_check import TaskCounter
+    from task_scheduling.scheduler.utils.parameter_check import get_param_count, retry_on_error_decorator_check
 except KeyboardInterrupt:
     sys.exit(0)
 

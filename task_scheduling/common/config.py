@@ -14,6 +14,7 @@ Key Features:
     - Thread-safe configuration access
     - In-memory configuration updates
     - Graceful handling of missing configuration files
+    - Support for custom configuration directories
 
 Classes:
     None (module-level functions)
@@ -25,6 +26,7 @@ Functions:
     get_config_value: Get configuration value with caching
     update_config: Update configuration value in memory
     ensure_config_loaded: Ensure configuration is loaded
+    set_config_directory: Set custom configuration directory
 
 Global Variables:
     config: Global dictionary storing configuration data
@@ -39,6 +41,9 @@ from typing import Dict, Any, Optional
 
 # Global configuration dictionary to store loaded configurations
 config: Dict[str, Any] = {}
+
+# Global variable to store custom config directory
+_custom_config_dir: Optional[str] = None
 
 
 @lru_cache(maxsize=1)
@@ -60,10 +65,15 @@ def _get_default_config_path() -> str:
     Returns:
         Default path to the configuration file.
     """
-    if sysconfig.get_config_var("Py_GIL_DISABLED") == 1:
-        return os.path.join(_get_package_directory(), 'config_no_gil.json')
+    if _custom_config_dir:
+        config_dir = _custom_config_dir
     else:
-        return os.path.join(_get_package_directory(), 'config_gil.json')
+        config_dir = _get_package_directory()
+
+    if sysconfig.get_config_var("Py_GIL_DISABLED") == 1:
+        return os.path.join(config_dir, 'config_no_gil.json')
+    else:
+        return os.path.join(config_dir, 'config_gil.json')
 
 
 def _load_config(_file_path: Optional[str] = None) -> bool:
@@ -72,7 +82,7 @@ def _load_config(_file_path: Optional[str] = None) -> bool:
 
     Args:
         _file_path: Path to the configuration file. If not provided,
-                   defaults to 'config.json' in the package directory.
+                   defaults to appropriate config file in the config directory.
 
     Returns:
         Whether the configuration file was successfully loaded.
@@ -145,3 +155,33 @@ def ensure_config_loaded() -> bool:
     if not config:
         return _load_config()
     return True
+
+
+def set_config_directory(config_dir: str) -> bool:
+    """
+    Set a custom directory for configuration files and reload the configuration.
+
+    Args:
+        config_dir: Path to the directory containing config_no_gil.json and config_gil.json
+
+    Returns:
+        Whether the configuration was successfully reloaded from the new directory.
+    """
+    global _custom_config_dir
+
+    if not os.path.isdir(config_dir):
+        return False
+
+    # Set the custom config directory
+    _custom_config_dir = config_dir
+
+    # Clear relevant caches
+    _get_default_config_path.cache_clear()
+    get_config_value.cache_clear()
+
+    # Clear the current config and reload from new directory
+    global config
+    config.clear()
+
+    # Attempt to load configuration from the new directory
+    return _load_config()

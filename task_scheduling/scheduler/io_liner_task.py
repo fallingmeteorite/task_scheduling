@@ -10,16 +10,18 @@ import threading
 import math
 import time
 import platform
+import pickle
 
 from concurrent.futures import ThreadPoolExecutor, Future
 from functools import partial
 from typing import Callable, Dict, Tuple, Optional, Any, List
-
-from ..common import logger, config
-from ..manager import task_status_manager
-from ..control import ThreadTaskManager
-from ..handling import TimeoutException, ThreadSuspender, StopException, ThreadingTimeout, ThreadTerminator
-from .utils import TaskCounter, retry_on_error_decorator_check
+from task_scheduling.common import logger, config
+from task_scheduling.manager import task_status_manager
+from task_scheduling.control import ThreadTaskManager
+from task_scheduling.handling import TimeoutException, ThreadSuspender, StopException, ThreadingTimeout, \
+    ThreadTerminator
+from task_scheduling.utils import store_task_result
+from task_scheduling.scheduler.utils import TaskCounter, retry_on_error_decorator_check
 
 # Create Manager instance
 _task_counter = TaskCounter("io_liner_task")
@@ -69,6 +71,8 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict]) -> An
                         result = func(*args, **kwargs)
 
         _task_manager.remove(task_id)
+        if config["network_storage_results"]:
+            store_task_result(task_id, pickle.dumps(result))
     except TimeoutException:
         logger.warning(f"task | {task_id} | timed out, forced termination")
         task_status_manager.add_task_status(task_id, None, "timeout", None, None, None, None, None)

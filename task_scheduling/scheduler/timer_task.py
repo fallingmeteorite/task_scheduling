@@ -9,17 +9,19 @@ import queue
 import threading
 import time
 import platform
+import pickle
 
 from concurrent.futures import ThreadPoolExecutor, Future
 from datetime import datetime, timedelta
 from functools import partial
 from typing import Callable, Dict, List, Tuple, Optional, Any
-
-from ..common import logger, config
-from ..manager import task_status_manager
-from ..control import ThreadTaskManager
-from ..handling import ThreadTerminator, StopException, ThreadingTimeout, TimeoutException, ThreadSuspender
-from .utils import retry_on_error_decorator_check
+from task_scheduling.common import logger, config
+from task_scheduling.manager import task_status_manager
+from task_scheduling.control import ThreadTaskManager
+from task_scheduling.handling import ThreadTerminator, StopException, ThreadingTimeout, TimeoutException, \
+    ThreadSuspender
+from task_scheduling.utils import store_task_result
+from task_scheduling.scheduler.utils import retry_on_error_decorator_check
 
 # Create Manager instance
 _task_manager = ThreadTaskManager()
@@ -66,6 +68,8 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
                     result = func(*args, **kwargs)
 
             _task_manager.remove(task_id)
+            if config["network_storage_results"]:
+                store_task_result(task_id, pickle.dumps(result))
 
     except TimeoutException:
         logger.warning(f"task | {task_id} | timed out, forced termination")
@@ -504,16 +508,24 @@ class TimerTask:
         Returns:
             Whether the task was successfully resumed.
         """
-        # Use lock protection for running tasks dictionary access
+        # Use a lock to protect access to and modification of the result dictionary.
         with self._lock:
             if task_id not in self._running_tasks:
                 logger.warning(f"task | {task_id} | does not exist or is already completed")
                 return False
 
-        _task_manager.resume_task(task_id)
-        task_status_manager.add_task_status(task_id, None, "running", None, None, None, None, None)
+        if not platform.system() == "Windows":
+            logger.warning(f"Pause and resume functionality is not supported on Linux and Mac!")
+            return False
 
-        return True
+        try:
+            _task_manager.resume_task(task_id)
+            task_status_manager.add_task_status(task_id, None, "running", None, None, None, None, "io_liner_task")
+            logger.info(f"task | {task_id} | resumed")
+            return True
+        except Exception as e:
+            logger.error(f"task | {task_id} | error during resume: {e}")
+            return False
 
     # Obtain the information returned by the corresponding task
     def get_task_result(self,
@@ -527,24 +539,13 @@ class TimerTask:
         Returns:
             Task return result, or None if the task is not completed or does not exist.
         """
-        # Use lock protection for results dictionary access and modification
+        # Use a lock to protect access to and modification of the result dictionary.
         with self._lock:
-            if task_id not in self._running_tasks:
-                logger.warning(f"task | {task_id} | does not exist or is already completed")
-                return False
-
-        if not platform.system() == "Windows":
-            logger.warning(f"Pause and resume functionality is not supported on Linux and Mac!")
-            return False
-
-        try:
-            _task_manager.resume_task(task_id)
-            task_status_manager.add_task_status(task_id, None, "running", None, None, None, None, "timer_task")
-            logger.info(f"task | {task_id} | resumed")
-            return True
-        except Exception as e:
-            logger.error(f"task | {task_id} | error during resume: {e}")
-            return False
+            if task_id in self._task_results:
+                result = self._task_results[task_id][0]
+                del self._task_results[task_id]
+                return result
+        return None
 
 
 timer_task = TimerTask()

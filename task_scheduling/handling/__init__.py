@@ -7,9 +7,9 @@ import sys
 
 # Prevent errors during multi-process initialization
 try:
-    from .pause_handling import ThreadSuspender
-    from .timeout_handling import ThreadingTimeout, TimeoutException
-    from .terminate_handling import ThreadTerminator, StopException
+    from task_scheduling.handling.pause_handling import ThreadSuspender
+    from task_scheduling.handling.timeout_handling import ThreadingTimeout, TimeoutException
+    from task_scheduling.handling.terminate_handling import ThreadTerminator, StopException
 except KeyboardInterrupt:
     sys.exit(0)
 

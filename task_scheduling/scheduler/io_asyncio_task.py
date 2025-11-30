@@ -10,16 +10,17 @@ import queue
 import threading
 import time
 import platform
+import pickle
 
 from typing import Dict, Tuple, Callable, Optional, Any, List
 from concurrent.futures import Future, CancelledError
 from functools import partial
-
-from ..common import logger, config
-from ..manager import task_status_manager
-from ..control import ThreadTaskManager
-from ..handling import ThreadSuspender
-from .utils import retry_on_error_decorator_check
+from task_scheduling.common import logger, config
+from task_scheduling.manager import task_status_manager
+from task_scheduling.control import ThreadTaskManager
+from task_scheduling.handling import ThreadSuspender
+from task_scheduling.utils import store_task_result
+from task_scheduling.scheduler.utils import retry_on_error_decorator_check
 
 # Create Manager instance
 _task_manager = ThreadTaskManager()
@@ -67,6 +68,8 @@ async def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> A
                     result = await func(*args, **kwargs)
 
         _task_manager.remove(task_id)
+        if config["network_storage_results"]:
+            store_task_result(task_id, pickle.dumps(result))
     except asyncio.TimeoutError:
         logger.warning(f"task | {task_id} | timed out, forced termination")
         task_status_manager.add_task_status(task_id, None, "timeout", None, None, None, None, None)

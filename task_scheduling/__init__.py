@@ -6,7 +6,7 @@ Initialize available methods
 import sys
 
 try:
-    from .common import configure_logger, ensure_config_loaded
+    from task_scheduling.common import configure_logger, ensure_config_loaded
 
     # Initialize logger configuration at module load
     configure_logger()

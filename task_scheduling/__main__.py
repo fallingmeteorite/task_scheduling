@@ -10,11 +10,11 @@ import os
 import shlex
 import sys
 
-from .task_creation import task_creation
-from .manager import task_scheduler
-from .webui import start_task_status_ui
-from .common import logger
-from .variable import *
+from task_scheduling.task_creation import task_creation
+from task_scheduling.manager import task_scheduler
+from task_scheduling.server_webui import start_task_status_ui
+from task_scheduling.common import logger
+from task_scheduling.variable import *
 
 
 def command_creation(task_name: str, command: str) -> str:

@@ -11,8 +11,7 @@ import gc
 
 from collections import OrderedDict, Counter
 from typing import Dict, Optional, Union
-
-from ..common import config, logger
+from task_scheduling.common import config, logger
 
 
 class TaskStatusManager:

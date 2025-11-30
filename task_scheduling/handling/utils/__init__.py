@@ -7,7 +7,7 @@ import sys
 
 # Prevent errors during multi-process initialization
 try:
-    from .timout_base import BaseTimeout, TimeoutException, base_timetable
+    from task_scheduling.handling.utils.timout_base import BaseTimeout, TimeoutException, base_timetable
 except KeyboardInterrupt:
     sys.exit(0)
 

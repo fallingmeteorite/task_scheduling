@@ -9,13 +9,13 @@ import os
 import time
 import json
 import threading
+import socket
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
-
-from ..common import logger, config
-from ..manager import task_status_manager, task_scheduler
-from ..scheduler import kill_api, pause_api, resume_api
+from task_scheduling.common import logger, config
+from task_scheduling.manager import task_status_manager, task_scheduler
+from task_scheduling.scheduler import kill_api, pause_api, resume_api
 
 # Global variable to control task addition
 _task_addition_enabled = True
@@ -293,6 +293,31 @@ def _handle_tasks(self):
         pass
 
 
+def is_port_available(port):
+    """Check if a port is available."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(1)
+            s.bind(('', port))
+            return True
+    except OSError:
+        return False
+
+
+def find_available_port(start_port=7999, max_attempts=100):
+    """Find an available port starting from start_port."""
+    port = start_port
+    attempts = 0
+
+    while attempts < max_attempts:
+        if is_port_available(port):
+            return port
+        port += 1
+        attempts += 1
+
+    raise RuntimeError(f"No available port found in range {start_port}-{start_port + max_attempts - 1}")
+
+
 class TaskControlHandler(BaseHTTPRequestHandler):
     """HTTP handler for task status information and control."""
 
@@ -334,7 +359,12 @@ class TaskControlHandler(BaseHTTPRequestHandler):
         try:
             with open(get_template_path(), 'r', encoding='utf-8') as f:
                 html = f.read()
-            self.wfile.write(html.encode('utf-8'))
+            try:
+                self.wfile.write(html.encode('utf-8'))
+            except (ConnectionAbortedError, BrokenPipeError, ConnectionResetError):
+                # The client has disconnected. This is normal and does not need to be recorded as an error.
+                logger.debug("Client disconnected before receiving response")
+
         except FileNotFoundError:
             self.send_error(404, "Template file not found")
 
@@ -457,8 +487,17 @@ class TaskControlHandler(BaseHTTPRequestHandler):
 class TaskStatusServer:
     """Server for displaying task status information."""
 
-    def __init__(self, port=8000):
+    def __init__(self, port=7999, max_port_attempts=999):
+        """
+        Initialize the task status server.
+
+        Args:
+            port (int): Starting port number
+            max_port_attempts (int): Maximum number of port attempts when default port is occupied
+        """
         self.port = port
+        self.max_port_attempts = max_port_attempts
+        self.actual_port = None  # Store the actual port used
         self.server = None
         self.thread = None
 
@@ -467,8 +506,10 @@ class TaskStatusServer:
 
         def run_server():
             """Start Service"""
-            self.server = HTTPServer(('', self.port), TaskControlHandler)
-            logger.info(f"Task status UI available at http://localhost:{self.port}")
+            # Find available port with max attempts limit
+            self.actual_port = find_available_port(self.port, self.max_port_attempts)
+            self.server = HTTPServer(('', self.actual_port), TaskControlHandler)
+            logger.info(f"Task status UI available at http://localhost:{self.actual_port}")
             self.server.serve_forever()
 
         self.thread = threading.Thread(target=run_server)
@@ -483,11 +524,22 @@ class TaskStatusServer:
         if self.thread:
             self.thread.join(timeout=1)
 
+    def get_actual_port(self):
+        """Get the actual port used by the server."""
+        return self.actual_port if self.actual_port else self.port
 
-def start_task_status_ui(port=8000):
+
+def start_task_status_ui(port=7999, max_port_attempts=100):
     """
     Start the task status web UI in a daemon thread.
+
+    Args:
+        port (int): Starting port number, will auto-increment if occupied
+        max_port_attempts (int): Maximum number of port attempts when default port is occupied
+
+    Returns:
+        TaskStatusServer: The server instance with actual port information
     """
-    server = TaskStatusServer(port)
+    server = TaskStatusServer(port, max_port_attempts)
     server.start()
     return server

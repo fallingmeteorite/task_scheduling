@@ -13,17 +13,20 @@ import time
 import platform
 import signal
 import multiprocessing
+import pickle
 
 from concurrent.futures import ProcessPoolExecutor, Future, BrokenExecutor
 from functools import partial
 from multiprocessing.managers import DictProxy
 from typing import Callable, Dict, Tuple, Optional, Any, List
-
-from ..common import logger, config
-from ..control import ProcessTaskManager
-from ..handling import ThreadTerminator, StopException, ThreadSuspender, TimeoutException, ThreadingTimeout
-from ..manager import task_status_manager, SharedTaskDict
-from .utils import exit_cleanup, TaskCounter, SharedStatusInfo, get_param_count, retry_on_error_decorator_check
+from task_scheduling.common import logger, config
+from task_scheduling.control import ProcessTaskManager
+from task_scheduling.handling import ThreadTerminator, StopException, ThreadSuspender, TimeoutException, \
+    ThreadingTimeout
+from task_scheduling.manager import task_status_manager, SharedTaskDict
+from task_scheduling.utils import store_task_result
+from task_scheduling.scheduler.utils import exit_cleanup, TaskCounter, SharedStatusInfo, get_param_count, \
+    retry_on_error_decorator_check
 
 _task_counter = TaskCounter("cpu_liner_task")
 _threadsuspender = ThreadSuspender()
@@ -105,6 +108,9 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict],
                             result = func(task_id, *args, **kwargs)
                         else:
                             result = func(*args, **kwargs)
+
+        if config["network_storage_results"]:
+            store_task_result(task_id, pickle.dumps(result))
 
     except (StopException, KeyboardInterrupt):
         logger.warning(f"task | {task_id} | cancelled, forced termination")

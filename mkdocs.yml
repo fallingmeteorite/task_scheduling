@@ -1,0 +1,31 @@
+site_name: task_scheduling
+site_url: https://fallingmeteorite.github.io/task_scheduling/
+site_description: 一个强大的任务调度Python库
+repo_url: https://github.com/fallingmeteorite/task_scheduling
+repo_name: fallingmeteorite/task_scheduling
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - toc.integrate
+
+nav:
+  - 首页: index.md
+  - 安装: installation.md
+  - 基础功能:
+    - 创建任务: basic/create_tasks.md
+    - 任务控制: basic/task_control.md
+    - 状态查询: basic/status_query.md
+    - 结果获取: basic/result_retrieval.md
+    - 任务禁用: basic/task_disabling.md
+    - 网页控制: basic/web_control.md
+    - 配置文件: basic/configuration.md
+  - 高级功能:
+    - 线程级任务: advanced/thread_tasks.md
+    - 任务树模式: advanced/task_tree.md
+    - 依赖型任务: advanced/dependent_tasks.md
+    - 任务重试: advanced/task_retry.md
+    - 分布式服务: advanced/distributed_service.md
+  - 忠告: advice.md

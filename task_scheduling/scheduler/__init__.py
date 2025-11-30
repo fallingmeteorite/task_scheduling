@@ -8,11 +8,11 @@ import sysconfig
 
 # Prevent errors during multi-process initialization
 try:
-    from .api import add_api, kill_api, pause_api, resume_api, get_result_api, shutdown_api, \
+    from task_scheduling.scheduler.api import add_api, kill_api, pause_api, resume_api, get_result_api, shutdown_api, \
         cleanup_results_api
 
     if sysconfig.get_config_var("Py_GIL_DISABLED") == 1:
-        from ..common import logger
+        from task_scheduling.common import logger
 
         logger.warning("Currently running in no GIL mode!")
 

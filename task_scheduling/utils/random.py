@@ -1,5 +1,11 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
+"""Random name generation utility.
+
+This module provides functions for generating unique random names
+with customizable prefixes using UUIDs.
+"""
+
 import uuid
 
 

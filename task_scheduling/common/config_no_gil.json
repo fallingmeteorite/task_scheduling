@@ -1,15 +1,16 @@
 {
   "cpu_asyncio_task": 30,
-  "io_asyncio_task": 40,
+  "io_asyncio_task": 20,
   "cpu_liner_task": 30,
   "io_liner_task": 60,
   "timer_task": 60,
-  "maximum_event_loop": 30,
+  "maximum_event_loop": 100,
   "max_idle_time": 300,
   "watch_dog_time": 300,
   "maximum_task_info_storage": 2000,
   "status_check_interval": 300,
   "maximum_result_storage": 2000,
-  "maximum_result_time_storage": 300,
-  "exception_thrown": false
+  "maximum_result_time_storage": 60,
+  "exception_thrown": false,
+  "network_storage_results": false
 }

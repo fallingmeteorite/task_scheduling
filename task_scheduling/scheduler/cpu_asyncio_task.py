@@ -13,17 +13,18 @@ import time
 import signal
 import platform
 import multiprocessing
+import pickle
 
 from concurrent.futures import ProcessPoolExecutor, Future, BrokenExecutor
 from functools import partial
 from multiprocessing.managers import DictProxy
 from typing import Callable, Dict, Tuple, Optional, Any, List
-
-from ..common import logger, config
-from ..manager import task_status_manager
-from ..control import ProcessTaskManager
-from ..handling import ThreadTerminator, StopException, ThreadSuspender
-from .utils import exit_cleanup, SharedStatusInfo, retry_on_error_decorator_check
+from task_scheduling.common import logger, config
+from task_scheduling.manager import task_status_manager
+from task_scheduling.control import ProcessTaskManager
+from task_scheduling.handling import ThreadTerminator, StopException, ThreadSuspender
+from task_scheduling.utils import store_task_result
+from task_scheduling.scheduler.utils import exit_cleanup, SharedStatusInfo, retry_on_error_decorator_check
 
 _threadsuspender = ThreadSuspender()
 _threadterminator = ThreadTerminator()
@@ -69,6 +70,9 @@ async def _execute_task_async(task: Tuple[bool, str, str, Callable, Tuple, Dict]
                     result = await func(task_id, *args, **kwargs)
                 else:
                     result = await func(*args, **kwargs)
+
+        if config["network_storage_results"]:
+            store_task_result(task_id, pickle.dumps(result))
 
     return result
 
