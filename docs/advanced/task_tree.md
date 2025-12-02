@@ -1,4 +1,4 @@
-## 任务树模式
+## 任务树模式(所有任务都会依附在一个主线程上,当主线程终止,所有依附于他的任务都会终止)
 
 task_group(share_info: Any, sharedtaskdict: Any, task_signal_transmission: Any,
 task_dict: Dict) -> None:

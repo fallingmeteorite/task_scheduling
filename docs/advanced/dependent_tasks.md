@@ -1,4 +1,4 @@
-## 依赖性任务
+## 依赖性任务(设置某个任务出现什么情况后执行的任务)
 
 task_dependency_manager(main_task_id: str, dependent_task: Callable, *args) -> None
 

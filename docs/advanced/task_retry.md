@@ -1,4 +1,4 @@
-## 重试装饰器
+## 重试装饰器(使用该装饰器后,任务触发对应报错后会尝试重新运行多次)
 
 retry_on_error(exceptions: Union[Type[Exception], Tuple[Type[Exception], ...], None], max_attempts: int, delay:
 Union[float, int]) -> Any

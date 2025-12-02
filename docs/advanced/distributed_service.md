@@ -1,4 +1,4 @@
-## 分布式服务器
+## 分布式服务器(客户端/中转服务器/主服务器模式)
 
 submit_function_task(delay: Union[int, None], daily_time: Union[str, None], function_type: str, timeout_processing:
 bool, task_name: str, func: Optional[Callable], priority: str, *args, **kwargs) -> Union[str, None]
