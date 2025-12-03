@@ -25,16 +25,18 @@
 **存储配置**
 
 - `maximum_task_info_storage: 2000` - 任务状态存储器中最大存储任务数
-- `status_check_interval: 300` - 多久检查存储器中任务状态是否正确(秒)
 - `maximum_result_storage: 1000` - 单个调度器最大储存返回结果数量
-- `maximum_result_time_storage: 300` - 多久清理一次返回结果储存(秒)
+- `maximum_result_time_storage: 20` - 当任务返回结果多久没有被取走会被清理(秒)
 
 **IP配置**
 
-- `proxy_ip: 7999` - 代理服务器ip
+- `proxy_ip: 127.0.0.1` - 代理服务器host
+- `proxy_host: 7999` - 代理服务器ip
 - `server_ip: 8000` - 主服务器ip
+- `server_host: 127.0.0.1` - 主服务器host
 - `webui_ip: 9000` - 网页控制端服务器ip
 - `get_ip: 10000` - 结果储存服务器ip
+- `get_host: 127.0.0.1` - 结果储存服务器host
 - `max_port_attempts: 999` - 主服务器和网页控制端服务器最大存在数量
 
 **其他配置**
