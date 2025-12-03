@@ -8,8 +8,8 @@ import sys
 
 # Prevent errors during multi-process initialization
 try:
-    from task_scheduling.client.client import submit_function_task
+    from task_scheduling.client.client import submit_task
 except KeyboardInterrupt:
     sys.exit(0)
 
-__all__ = ['submit_function_task']
+__all__ = ['submit_task']
