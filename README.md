@@ -13,12 +13,17 @@
 - 🔗 分布式服务支持
 - 📊 实时状态监控和结果查询
 
+## 文档
+
+完整使用说明和完整功能介绍请查看:
+https://fallingmeteorite.github.io/task_scheduling/
+
 ## 快速开始
 
 ### 安装
 
 ```bash
-pip install task_scheduling
+pip install --upgrade task_scheduling
 ```
 
 ### 基本使用
@@ -50,11 +55,6 @@ if __name__ == "__main__":
         except KeyboardInterrupt:
             task_scheduler.shutdown_scheduler()
 ```
-
-### 文档
-
-详细使用说明和完整功能请查看:
-https://fallingmeteorite.github.io/task_scheduling/
 
 ### 许可证
 
