@@ -18,7 +18,7 @@ import time
 from task_scheduling.utils import retry_on_error
 
 
-@retry_on_error(exceptions=(TypeError), max_attempts=3, delay=1.0)
+@retry_on_error(exceptions=TypeError, max_attempts=3, delay=1.0)
 def linear_task(input_info):
     while True:
         print(input_info)
