@@ -3,6 +3,10 @@
 task_group(share_info: Any, sharedtaskdict: Any, task_signal_transmission: Any,
 task_dict: Dict) -> None:
 
+- 警告:
+
+该功能没法运行在分布式服务器模式
+
 - 功能说明:
 
 字典中的任务名字将会以`task_group_name|task_name`显示,当名字任务为`task_group_name`被结束,所有的以
