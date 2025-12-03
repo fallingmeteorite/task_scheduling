@@ -13,24 +13,122 @@ Key Features:
     - Error handling and logging
 
 Functions:
-    submit_function_task: Main function for submitting task execution requests
+    submit_task: Main function for submitting task execution requests
 
 Global Variables:
     _serializer: Global TaskSerializer instance for task data preparation
 """
-
+import inspect
+import time
 import uuid
 
-from typing import Callable, Optional, Union
+from typing import Dict, Any, Callable, Optional, Union
 from task_scheduling.common import logger
-from task_scheduling.client.utils import TaskSerializer, send_request
+from task_scheduling.client.utils import send_request
 from task_scheduling.utils import wait_branch_thread_ended_check
 
-# Create global serializer instance for consistent task serialization
-_serializer = TaskSerializer()
+
+def extract_function_info(func: Optional[Callable]) -> tuple[str, str]:
+    """
+    Extract function source code and name for remote execution.
+
+    Uses Python's inspect module to retrieve the source code of callable functions
+    to enable execution in remote environments.
+
+    Args:
+        func: Callable function object to analyze and extract
+
+    Returns:
+        tuple: Contains (function_code, function_name) as strings
+              Returns empty strings if extraction fails
+
+    Raises:
+        Logs warnings for non-callable objects or extraction failures
+    """
+    function_code = ""
+    function_name = ""
+
+    if callable(func):
+        try:
+            function_code = inspect.getsource(func)
+            function_name = func.__name__
+        except (TypeError, OSError) as error:
+            logger.error(f"Failed to extract function source: {error}")
+
+    return function_code, function_name
 
 
-def submit_function_task(
+def create_task_data(
+        task_id: str,
+        task_name: str,
+        function_code: str,
+        function_name: str,
+        delay: Union[int, None],
+        daily_time: Union[str, None],
+        function_type: str,
+        timeout_processing: bool,
+        priority: str,
+        *args, **kwargs) -> Dict[str, Any]:
+    """
+    Create comprehensive task data package for serialization.
+
+    Constructs a complete task dictionary containing all necessary information
+    for remote execution including timing, priority, and function details.
+
+    Args:
+        task_id: Unique task identifier string
+        task_name: Descriptive name for the task
+        function_code: Source code of the function to execute
+        function_name: Name of the function to execute
+        delay: Optional delay in seconds before execution
+        daily_time: Optional daily scheduled time string (HH:MM format)
+        function_type: Type classification of function (default: "normal")
+        timeout_processing: Flag indicating if timeout processing is enabled
+        priority: Task priority level (default: "normal")
+        *args: Positional arguments to pass to the function
+        **kwargs: Keyword arguments to pass to the function
+
+    Returns:
+        Dict[str, Any]: Complete task data dictionary ready for serialization
+    """
+    task_data = {
+        'task_id': task_id,
+        'task_name': task_name,
+        'delay': delay,
+        'daily_time': daily_time,
+        'function_type': function_type,
+        'timeout_processing': timeout_processing,
+        'priority': priority,
+        'function_code': function_code,
+        'function_name': function_name,
+        'args': args,
+        'kwargs': kwargs,
+        'submit_time': time.time(),  # Timestamp when task was created
+    }
+    return task_data
+
+
+def create_request_payload(task_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Create proxy server request payload with proper message type.
+
+    Wraps task data in a standardized request structure that identifies
+    the message type for the proxy server's request handler.
+
+    Args:
+        task_data: Complete task data dictionary from create_task_data()
+
+    Returns:
+        Dict[str, Any]: Request payload ready for network transmission
+    """
+    payload = {
+        'type': 'client_submit_task',  # Identifies message type to proxy
+        'task_data': task_data,
+    }
+    return payload
+
+
+def submit_task(
         delay: Union[int, None],
         daily_time: Union[str, None],
         function_type: str,
@@ -72,6 +170,9 @@ def submit_function_task(
             logger.error("Experimental tasks must specify function type as FUNCTION_TYPE_CPU!")
             return None
 
+    # Generate unique task identifier for tracking
+    task_id = str(uuid.uuid4())
+
     try:
         # Validate that a callable function is provided
         if not func or not callable(func):
@@ -79,17 +180,14 @@ def submit_function_task(
             return None
 
         # Extract function information using serializer
-        function_code, function_name = _serializer.extract_function_info(func)
+        function_code, function_name = extract_function_info(func)
 
         if not function_code:
             logger.error(f"Empty function code extracted for task '{task_name}'")
             return None
 
-        # Generate unique task identifier for tracking
-        task_id = str(uuid.uuid4())
-
         # Create comprehensive task data package
-        task_data = _serializer.create_task_data(
+        task_data = create_task_data(
             task_id,
             task_name,
             function_code,
@@ -103,7 +201,7 @@ def submit_function_task(
         )
 
         # Create request payload for proxy server
-        request_payload = _serializer.create_request_payload(task_data)
+        request_payload = create_request_payload(task_data)
 
         # Send request asynchronously (fire-and-forget)
         send_request(request_payload)
