@@ -1,2 +1,1 @@
-include task_scheduling/common/config_gil.json
-include task_scheduling/common/config_no_gil.json
+include task_scheduling/common/config.json
