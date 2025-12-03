@@ -34,7 +34,6 @@ Global Variables:
 
 import os
 import json
-import sysconfig
 
 from functools import lru_cache
 from typing import Dict, Any, Optional
@@ -70,10 +69,7 @@ def _get_default_config_path() -> str:
     else:
         config_dir = _get_package_directory()
 
-    if sysconfig.get_config_var("Py_GIL_DISABLED") == 1:
-        return os.path.join(config_dir, 'config_no_gil.json')
-    else:
-        return os.path.join(config_dir, 'config_gil.json')
+    return os.path.join(config_dir, 'config.json')
 
 
 def _load_config(_file_path: Optional[str] = None) -> bool:
