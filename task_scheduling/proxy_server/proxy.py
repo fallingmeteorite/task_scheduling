@@ -1,22 +1,8 @@
 # -*- coding: utf-8 -*-
 # Author: fallingmeteorite
 """
-Proxy Server Module
-
-This module provides the main proxy server functionality that coordinates between
-task managers, server managers, and network communications.
-
-Key Features:
-    - Client connection handling and message routing
-    - Task distribution to available servers
-    - Server health monitoring and management
-    - Graceful shutdown and resource cleanup
-
-Classes:
-    ProxyServer: Main proxy server class coordinating all operations
-
-Global Variables:
-    proxy_server: Global proxy server instance
+Proxy Server Module - Integrated Version
+Simplified version with reduced log output
 """
 
 import time
@@ -24,26 +10,33 @@ import socket
 import threading
 import signal
 
-from typing import Dict
+from typing import Dict, Any, Optional, List
 from task_scheduling.common import logger, config
-from task_scheduling.proxy_server.utils import NetworkManager, ServerManager, TaskManager
+from task_scheduling.proxy_server.utils import NetworkManager
 
 
 class ProxyServer:
-    """Main Proxy Server - Coordinates all managers"""
+    """Integrated Proxy Server - Simplified logging version"""
 
     def __init__(self):
+        self.dispatcher_thread = None
         self.server_socket = None
         self.health_thread = None
-        self.host = "localhost"
+        self.host = config["proxy_host"]
         self.port = config["proxy_ip"]
         self.running = False
         self.shutdown_event = threading.Event()
 
-        # Initialize managers
+        # Initialize network manager
         self.network = NetworkManager()
-        self.tasks = TaskManager()
-        self.servers = ServerManager()
+
+        # Task management
+        self.task_queue: List[Dict[str, Any]] = []
+        self.task_history: Dict[str, Dict] = {}
+
+        # Server management
+        self.servers: Dict[int, Dict[str, Any]] = {}
+        self._rr_index = 0  # Round-robin index
 
         # Message handlers
         self.message_handlers = {
@@ -52,23 +45,157 @@ class ProxyServer:
             'server_heartbeat': self._handle_heartbeat,
         }
 
-        # Setup signal handlers
-        self._setup_signal_handlers()
-
-    def _setup_signal_handlers(self):
-        """Setup signal handlers"""
+        # Signal handling
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
 
+    # Task management methods
+    def submit_task(self, task_data: Dict) -> str:
+        """Submit a task for processing"""
+        task_id = task_data.get('task_id')
+        if not task_id:
+            return ""
+
+        task_data.update({
+            'submit_time': time.time(),
+            'queue_time': time.time(),
+            'status': 'queued'
+        })
+
+        self.task_queue.append(task_data)
+        self.task_history[task_id] = task_data
+        return task_id
+
+    def validate_task_data(self, task_data: Dict) -> bool:
+        """Validate task data completeness"""
+        required_fields = ['task_id', 'task_name', 'function_code', 'function_name']
+        return all(field in task_data for field in required_fields)
+
+    def get_pending_task(self) -> Optional[Dict]:
+        """Get next pending task from queue"""
+        return self.task_queue.pop(0) if self.task_queue else None
+
+    def requeue_task(self, task_data: Dict) -> None:
+        """Requeue a task for retry"""
+        retry_count = task_data.get('retry_count', 0) + 1
+        task_data.update({
+            'retry_count': retry_count,
+            'last_retry': time.time(),
+            'status': 'retrying'
+        })
+        self.task_queue.insert(0, task_data)
+
+    def complete_task(self, task_id: str, result: Any = None) -> None:
+        """Mark a task as completed"""
+        if task_id in self.task_history:
+            self.task_history[task_id].update({
+                'status': 'completed',
+                'complete_time': time.time(),
+                'result': result
+            })
+
+    def get_task_by_id(self, task_id: str) -> Optional[Dict]:
+        """Get task by ID from history"""
+        return self.task_history.get(task_id)
+
+    def get_task_stats(self) -> Dict:
+        """Get task statistics"""
+        return {
+            'queued': len(self.task_queue),
+            'total_history': len(self.task_history),
+            'completed': len([t for t in self.task_history.values() if t.get('status') == 'completed'])
+        }
+
+    # Server management methods
+    def register_server(self, server_port: int, host: str, addr: tuple) -> None:
+        """Register a new server with the proxy"""
+        if server_port not in self.servers:
+            self.servers[server_port] = {
+                'host': host,
+                'port': server_port,
+                'address': addr,
+                'last_heartbeat': time.time(),
+                'active': True,
+                'health_score': 100
+            }
+            logger.info(f"Server registered: {host}:{server_port}")
+
+    def update_heartbeat(self, server_port: int) -> None:
+        """Update server heartbeat timestamp to indicate it's still alive"""
+        if server_port in self.servers:
+            self.servers[server_port]['last_heartbeat'] = time.time()
+
+    def mark_server_inactive(self, server_port: int) -> None:
+        """Mark server as inactive so it won't receive new tasks"""
+        if server_port in self.servers:
+            self.servers[server_port]['active'] = False
+            logger.info(f"Server marked inactive: {server_port}")
+
+    def select_best_server(self) -> Optional[Dict]:
+        """Select best available server using round-robin algorithm"""
+        active_servers = [
+            (port, info) for port, info in self.servers.items()
+            if info['active'] and time.time() - info['last_heartbeat'] < 60
+        ]
+
+        if not active_servers:
+            logger.info("No active servers available")
+            return None
+
+        server_port, server_info = active_servers[self._rr_index % len(active_servers)]
+        self._rr_index = (self._rr_index + 1) % len(active_servers)
+        return server_info
+
+    def health_check_all(self) -> int:
+        """Perform health check on all registered servers"""
+        active_count = 0
+
+        for server_port, server_info in self.servers.items():
+            try:
+                # Send health check request to server
+                response = self.network.health_check(server_info)
+
+                if response and 'health_score' in response:
+                    health_score = response['health_score']
+                    server_info['health_score'] = health_score
+                    server_info['active'] = health_score > 50
+
+                    if health_score > 50:
+                        active_count += 1
+                        logger.info(f"Server {server_port} health check passed: score={health_score}")
+                    else:
+                        logger.info(f"Server {server_port} health check failed: score={health_score}")
+                else:
+                    server_info['health_score'] = 0
+                    server_info['active'] = False
+                    logger.info(f"Server {server_port} health check failed: no response")
+
+            except Exception as e:
+                server_info['health_score'] = 0
+                server_info['active'] = False
+                logger.info(f"Server {server_port} health check error: {e}")
+
+        logger.info(f"Health check completed: {active_count}/{len(self.servers)} servers active")
+        return active_count
+
+    def get_server_stats(self) -> Dict:
+        """Get server statistics"""
+        active_servers = [s for s in self.servers.values() if s['active']]
+        return {
+            'total_servers': len(self.servers),
+            'active_servers': len(active_servers),
+            'servers': list(self.servers.keys())
+        }
+
+    # Signal handling
     def _signal_handler(self, signum, frame):
-        """Handle shutdown signals"""
-        logger.debug(f"Received signal, gracefully shutting down server...")
+        """Handle shutdown signals (Ctrl+C, termination signals)"""
         self.stop()
 
+    # Server startup and operation
     def start(self):
-        """Start the server"""
+        """Start the proxy server and all its components"""
         if self.running:
-            logger.warning("Server is already running")
             return
 
         self.running = True
@@ -83,21 +210,15 @@ class ProxyServer:
 
             logger.info(f"Proxy server started on {self.host}:{self.port}")
 
-            # Start task dispatcher thread
-            self.dispatcher_thread = threading.Thread(target=self._task_dispatcher_loop)
-            self.dispatcher_thread.daemon = False
-            self.dispatcher_thread.name = "TaskDispatcher"
+            # Start task dispatcher thread - handles distributing tasks to servers
+            self.dispatcher_thread = threading.Thread(target=self._task_dispatcher_loop, daemon=True)
             self.dispatcher_thread.start()
 
-            # Start health check thread
-            self.health_thread = threading.Thread(target=self._health_check_loop)
-            self.health_thread.daemon = False
-            self.health_thread.name = "HealthChecker"
+            # Start health check thread - monitors server health periodically
+            self.health_thread = threading.Thread(target=self._health_check_loop, daemon=True)
             self.health_thread.start()
 
-            logger.info("Server startup completed. Press Ctrl+C to stop the server.")
-
-            # Main connection loop
+            # Main connection loop - accepts incoming connections
             self._connection_loop()
 
         except Exception as e:
@@ -105,7 +226,7 @@ class ProxyServer:
             self.stop()
 
     def _connection_loop(self):
-        """Main connection handling loop"""
+        """Main connection handling loop - accepts client and server connections"""
         while self.running and not self.shutdown_event.is_set():
             try:
                 client_sock, addr = self.server_socket.accept()
@@ -121,16 +242,14 @@ class ProxyServer:
 
             except socket.timeout:
                 continue
-            except OSError as e:
+            except OSError:
                 if self.running and not self.shutdown_event.is_set():
-                    logger.error(f"Connection acceptance error: {e}")
-                break
-            except Exception as e:
-                if self.running and not self.shutdown_event.is_set():
-                    logger.error(f"Unknown connection error: {e}")
+                    break
+            except Exception:
+                continue
 
     def _handle_client(self, sock: socket.socket, addr: tuple):
-        """Handle client connection"""
+        """Handle client connection - process incoming messages"""
         if self.shutdown_event.is_set():
             sock.close()
             return
@@ -141,107 +260,78 @@ class ProxyServer:
                 handler = self.message_handlers.get(message['type'])
                 if handler:
                     handler(message, addr)
-        except Exception as e:
-            if not self.shutdown_event.is_set():
-                logger.error(f"Error handling client {addr}: {e}")
+        except Exception:
+            pass
         finally:
             sock.close()
 
     def _task_dispatcher_loop(self):
-        """Task dispatcher main loop"""
-        logger.debug("Task dispatcher started")
-        empty_cycles = 0
+        """Task dispatcher main loop - distributes tasks to available servers"""
         while self.running and not self.shutdown_event.is_set():
             try:
-                task = self.tasks.get_pending_task()
+                task = self.get_pending_task()
                 if task:
-                    empty_cycles = 0
                     if self.shutdown_event.is_set():
-                        self.tasks.requeue_task(task)
+                        self.requeue_task(task)
                         continue
 
-                    server = self.servers.select_best_server()
+                    server = self.select_best_server()
                     if server:
                         success = self.network.send_to_server(server, {
                             'type': 'execute_task',
                             'task_data': task
                         })
-                        if success:
-                            task_id = task.get('task_id', 'unknown')
-                            logger.debug(f"Task dispatched successfully: {task_id} -> Server {server['port']}")
-                        else:
-                            self.tasks.requeue_task(task)
-                            self.servers.mark_server_inactive(server['port'])
-                            logger.debug(f"Task dispatch failed, server {server['port']} marked as inactive")
+                        if not success:
+                            self.requeue_task(task)
+                            self.mark_server_inactive(server['port'])
+                            logger.info(f"Failed to send task to server {server['port']}, marked inactive")
                     else:
-                        self.tasks.requeue_task(task)
+                        self.requeue_task(task)
                         if not self.shutdown_event.is_set():
-                            logger.debug("No available servers, task requeued")
                             time.sleep(2)
                 else:
-                    empty_cycles += 1
-                    if empty_cycles > 10:  # Extend sleep after 10 empty cycles
-                        time.sleep(0.5)
-                    else:
-                        time.sleep(0.1)
+                    time.sleep(0.1)
 
-            except Exception as e:
-                if not self.shutdown_event.is_set():
-                    logger.error(f"Task dispatcher error: {e}")
+            except Exception:
                 time.sleep(0.1)
 
-        logger.debug("Task dispatcher stopped")
-
     def _health_check_loop(self):
-        """Regular health check loop"""
-        logger.debug("Health checker started")
-
+        """Regular health check loop - monitors server health every 30 seconds"""
         while self.running and not self.shutdown_event.is_set():
             try:
-                # Check if there are servers to monitor
-                if not self.servers.servers:
-                    logger.debug("No registered servers, waiting 30 seconds before rechecking...")
-                    # Check shutdown event during wait
-                    for _ in range(300):  # 30 seconds, checking every 0.1 seconds
+                if not self.servers:
+                    # Wait longer if no servers are registered
+                    for _ in range(300):
                         if self.shutdown_event.is_set():
                             break
                         time.sleep(0.1)
                     continue
 
-                logger.warning("Performing server health checks...")
-                active_count = self.servers.health_check_all(self.network)
-                logger.debug(f"Health check completed, active servers: {active_count}")
+                # Perform health check on all servers
+                active_count = self.health_check_all()
 
                 # Adjust check interval based on active server count
                 if active_count == 0:
-                    check_interval = 10  # Check every 10 seconds if no active servers
-                    logger.debug("No active servers, rechecking in 10 seconds")
+                    check_interval = 10  # Check more frequently if no active servers
                 else:
-                    check_interval = 30  # Check every 30 seconds with active servers
-                    logger.debug(f"Active servers: {active_count}, next check in 30 seconds")
+                    check_interval = 30  # Normal check interval
 
-                # Interruptible wait
+                # Interruptible wait for next health check
                 for _ in range(check_interval * 10):
                     if self.shutdown_event.is_set():
                         break
                     time.sleep(0.1)
 
-            except Exception as e:
-                logger.error(f"Health check loop error: {e}")
-                # Wait 5 seconds on error
+            except Exception:
+                # Wait 5 seconds on error before retrying
                 for _ in range(50):
                     if self.shutdown_event.is_set():
                         break
                     time.sleep(0.1)
 
-        logger.warning("Health checker stopped")
-
     def _check_server_health(self, server_port: int, host: str) -> bool:
-        """Check server health status during registration"""
+        """Check server health during registration - ensures only healthy servers are registered"""
         try:
-            logger.debug(f"Checking health of server {host}:{server_port} during registration...")
-
-            # Send health check request
             server_info = {'host': host, 'port': server_port}
             success = self.network.send_to_server(server_info, {
                 'type': 'health_check',
@@ -250,34 +340,31 @@ class ProxyServer:
 
             if success:
                 logger.info(f"Server {host}:{server_port} passed initial health check")
-                return True
             else:
-                logger.warning(f"Server {host}:{server_port} failed initial health check")
-                return False
+                logger.info(f"Server {host}:{server_port} failed initial health check")
 
+            return success
         except Exception as e:
-            logger.error(f"Health check error for server {host}:{server_port}: {e}")
+            logger.info(f"Server {host}:{server_port} health check error: {e}")
             return False
 
     # Message handler functions
     def _handle_task_submission(self, message: Dict, addr: tuple):
-        """Handle task submission from clients"""
+        """Handle task submission from clients - validates and queues tasks"""
         if self.shutdown_event.is_set():
             return
 
         task_data = message.get('task_data', {})
-
-        # Validate task data
-        if not self.tasks.validate_task_data(task_data):
-            logger.error(f"Task data validation failed from {addr}")
+        if not self.validate_task_data(task_data):
+            logger.info(f"Invalid task data received from {addr}")
             return
 
-        task_id = self.tasks.submit_task(task_data)
+        task_id = self.submit_task(task_data)
         if task_id:
-            logger.debug(f"Received task from {addr}: {task_data['task_name']} (ID: {task_id})")
+            logger.info(f"Task submitted: {task_data['task_name']} (ID: {task_id}) from {addr}")
 
     def _handle_server_register(self, message: Dict, addr: tuple):
-        """Handle server registration with initial health check"""
+        """Handle server registration - performs health check before registration"""
         if self.shutdown_event.is_set():
             return
 
@@ -285,68 +372,45 @@ class ProxyServer:
         if server_port:
             host = message.get('host', addr[0])
 
-            # Check if already registered
-            if server_port in self.servers.servers:
+            if server_port in self.servers:
                 # Update heartbeat for existing server
-                self.servers.update_heartbeat(server_port)
-                logger.debug(f"Server {host}:{server_port} heartbeat updated")
+                self.update_heartbeat(server_port)
+                logger.info(f"Server {host}:{server_port} heartbeat updated")
             else:
                 # Perform health check for new server registration
                 logger.info(f"New server registration attempt: {host}:{server_port}")
 
                 if self._check_server_health(server_port, host):
                     # Health check passed, register the server
-                    self.servers.register_server(server_port, host, addr)
-                    logger.info(f"Server {host}:{server_port} registered successfully")
+                    self.register_server(server_port, host, addr)
                 else:
-                    # Health check failed, log warning
-                    logger.warning(f"Server {host}:{server_port} registration rejected due to health check failure")
+                    # Health check failed
+                    logger.info(f"Server {host}:{server_port} registration rejected - health check failed")
 
     def _handle_heartbeat(self, message: Dict, addr: tuple):
-        """Handle heartbeat messages from servers"""
+        """Handle heartbeat messages from servers - keeps server status up to date"""
         if self.shutdown_event.is_set():
             return
 
         server_port = message.get('server_port')
-        if server_port in self.servers.servers:
-            self.servers.update_heartbeat(server_port)
-            logger.debug(f"Server {server_port} heartbeat received")
+        if server_port in self.servers:
+            self.update_heartbeat(server_port)
+            logger.info(f"Server {server_port} heartbeat received")
 
     def stop(self):
-        """Stop server - graceful shutdown"""
+        """Stop server gracefully - shuts down all components"""
         if not self.running:
             return
 
-        logger.warning("Starting server shutdown...")
+        logger.info("Starting server shutdown...")
         self.running = False
         self.shutdown_event.set()
 
-        # Close server socket
         if hasattr(self, 'server_socket'):
             self.server_socket.close()
 
-        # Wait for threads to finish (with timeout)
-        threads_to_wait = []
-        if hasattr(self, 'dispatcher_thread') and self.dispatcher_thread.is_alive():
-            threads_to_wait.append(self.dispatcher_thread)
-        if hasattr(self, 'health_thread') and self.health_thread.is_alive():
-            threads_to_wait.append(self.health_thread)
-
-        # Wait for threads to finish
-        for thread in threads_to_wait:
-            if thread.is_alive():
-                thread.join(timeout=0.1)
-                logger.warning(f"Warning: {thread.name} thread did not finish within timeout")
-
-        logger.warning(f"Server stopped")
-
-    def wait_for_shutdown(self):
-        """Wait for server to fully shutdown"""
-        if hasattr(self, 'dispatcher_thread'):
-            self.dispatcher_thread.join(timeout=0.1)
-        if hasattr(self, 'health_thread'):
-            self.health_thread.join(timeout=0.1)
+        logger.info("Server stopped")
 
 
-# Global instance and exit handling
+# Global instance
 proxy_server = ProxyServer()

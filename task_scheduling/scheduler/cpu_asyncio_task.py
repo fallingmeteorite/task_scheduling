@@ -71,9 +71,6 @@ async def _execute_task_async(task: Tuple[bool, str, str, Callable, Tuple, Dict]
                 else:
                     result = await func(*args, **kwargs)
 
-        if config["network_storage_results"]:
-            store_task_result(task_id, pickle.dumps(result))
-
     return result
 
 
@@ -400,11 +397,20 @@ class CpuAsyncioTask:
                     shared_status_info_asyncio.task_status_queue.put(
                         ("completed", task_id, None, None, None, None, None))
                     if result is not None:
-                        self._task_results[task_id] = [result, time.time()]
+                        if config["network_storage_results"]:
+                            store_task_result(task_id, pickle.dumps(result))
+                        else:
+                            self._task_results[task_id] = [result, time.time()]
                     else:
-                        self._task_results[task_id] = ["completed action", time.time()]
+                        if config["network_storage_results"]:
+                            store_task_result(task_id, pickle.dumps(result))
+                        else:
+                            self._task_results[task_id] = ["completed action", time.time()]
                 else:
-                    self._task_results[task_id] = [result, time.time()]
+                    if config["network_storage_results"]:
+                        store_task_result(task_id, pickle.dumps(result))
+                    else:
+                        self._task_results[task_id] = [result, time.time()]
 
                 # Make sure the Future object is deleted
                 if task_id in self._running_tasks:

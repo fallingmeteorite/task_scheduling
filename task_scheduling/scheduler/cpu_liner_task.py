@@ -109,9 +109,6 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict],
                         else:
                             result = func(*args, **kwargs)
 
-        if config["network_storage_results"]:
-            store_task_result(task_id, pickle.dumps(result))
-
     except (StopException, KeyboardInterrupt):
         logger.warning(f"task | {task_id} | cancelled, forced termination")
         task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
@@ -397,6 +394,7 @@ class CpuLinerTask:
             future: Future object corresponding to the task.
         """
         result = None
+
         try:
             result = future.result()  # Get the task result, where the exception will be thrown
 
@@ -420,11 +418,20 @@ class CpuLinerTask:
                 if result not in ["timeout action", "cancelled action", "failed action"]:
                     shared_status_info_liner.task_status_queue.put(("completed", task_id, None, None, None, None, None))
                     if result is not None:
-                        self._task_results[task_id] = [result, time.time()]
+                        if config["network_storage_results"]:
+                            store_task_result(task_id, pickle.dumps(result))
+                        else:
+                            self._task_results[task_id] = [result, time.time()]
                     else:
-                        self._task_results[task_id] = ["completed action", time.time()]
+                        if config["network_storage_results"]:
+                            store_task_result(task_id, pickle.dumps(result))
+                        else:
+                            self._task_results[task_id] = ["completed action", time.time()]
                 else:
-                    self._task_results[task_id] = [result, time.time()]
+                    if config["network_storage_results"]:
+                        store_task_result(task_id, pickle.dumps(result))
+                    else:
+                        self._task_results[task_id] = [result, time.time()]
 
                 # Make sure the Future object is deleted
                 if task_id in self._running_tasks:

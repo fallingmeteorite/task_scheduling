@@ -9,9 +9,10 @@ import queue
 import threading
 import time
 import signal
+import gc
 
 from typing import Callable, List, Optional, Union
-from task_scheduling.common import logger, config
+from task_scheduling.common import logger
 from task_scheduling.mark import task_function_type
 from task_scheduling.manager import task_status_manager
 
@@ -24,9 +25,9 @@ class TaskScheduler:
     """
     __slots__ = ['ban_task_names', 'core_task_queue',
                  'allocator_running', 'allocator_started', 'allocator_thread',
-                 'timeout_check_interval', '_timeout_checker',
                  '_task_event', '_lock', '_shutdown_lock',
-                 '_allow_task_addition']
+                 '_allow_task_addition',
+                 '_task_counter']
 
     def __init__(self) -> None:
         self.ban_task_names: List[str] = []
@@ -34,12 +35,11 @@ class TaskScheduler:
         self.allocator_running: bool = False
         self.allocator_started: bool = False
         self.allocator_thread: Optional[threading.Thread] = None
-        self.timeout_check_interval: int = config["status_check_interval"]
-        self._timeout_checker: Optional[threading.Timer] = None
         self._task_event = threading.Event()  # Add an event for task notification
         self._lock = threading.RLock()  # Reentrant lock for thread safety
         self._shutdown_lock = threading.Lock()  # Lock for shutdown operation
         self._allow_task_addition: bool = True
+        self._task_counter: int = 0
 
     def add_task(self,
                  delay: Union[int, None],
@@ -95,6 +95,9 @@ class TaskScheduler:
                                       priority,
                                       args,
                                       kwargs))
+            self._task_counter += 1
+            if self._task_counter >= 40:
+                logger.warning(f"Garbage collection performed. A total of <{gc.collect()}> objects were recycled.")
 
             self._task_event.set()  # Wake up the allocator thread
             task_status_manager.add_task_status(task_id, task_name, "queuing", None, None, None, timeout_processing,
@@ -113,9 +116,6 @@ class TaskScheduler:
         from task_scheduling.scheduler import add_api, cleanup_results_api
 
         threading.Thread(target=cleanup_results_api, daemon=True).start()
-
-        if self._timeout_checker is None:
-            self._start_timeout_checker()
 
         while self.allocator_running:
             if not self._allow_task_addition:
@@ -240,46 +240,6 @@ class TaskScheduler:
             else:
                 logger.warning(f"Task name '{task_name}' is not in the ban list.")
 
-    def _check_timeouts(self) -> None:
-        """
-        Check for tasks that have exceeded their timeout time based on task start times.
-        """
-        # Avoid import issues
-        from task_scheduling.scheduler import kill_api
-        logger.warning("Start checking the status of all tasks and fix them")
-        current_time = time.time()
-
-        # Use task_status_manager's thread-safe method to get all statuses
-        all_task_statuses = task_status_manager.get_all_task_statuses()
-
-        for task_id, task_status in all_task_statuses.items():
-            if task_status['status'] == "running" and task_status['is_timeout_enabled']:
-                if current_time - task_status['start_time'] > config["watch_dog_time"]:
-                    # Stop task
-                    kill_api(task_id, task_status['task_type'])
-
-        self._start_timeout_checker()  # Restart the timer
-
-    def _start_timeout_checker(self) -> None:
-        """
-        Start a timer that will periodically check for timeout tasks.
-        """
-        with self._lock:
-            if self._timeout_checker is not None:
-                self._timeout_checker.cancel()
-            self._timeout_checker = threading.Timer(self.timeout_check_interval, self._check_timeouts)
-            self._timeout_checker.daemon = True
-            self._timeout_checker.start()
-
-    def _stop_timeout_checker(self) -> None:
-        """
-        Stop the timeout checker timer if it is running.
-        """
-        with self._lock:
-            if self._timeout_checker is not None:
-                self._timeout_checker.cancel()
-                self._timeout_checker = None
-
     def shutdown_scheduler(self, signum=None, frame=None) -> None:
         """
         Shutdown the scheduler, stop all tasks, and release resources.
@@ -298,9 +258,6 @@ class TaskScheduler:
 
             if self.allocator_thread and self.allocator_thread.is_alive():
                 self.allocator_thread.join(timeout=1.0)
-
-            # Stop the timeout checker
-            self._stop_timeout_checker()
 
             # Clear the core task queue
             with self._lock:

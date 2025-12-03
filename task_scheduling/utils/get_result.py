@@ -12,23 +12,21 @@ import pickle
 from task_scheduling.common import config
 
 
-async def get_task_result(task_id: str, timeout: float = 30.0):
+async def get_task_result(task_id: str):
     """Get task result (asynchronous function)
 
     Args:
         task_id: Task ID
-        timeout: Timeout in seconds
 
     Returns:
         Serialized result data, returns None if not found
     """
     request = {
         'action': 'get',
-        'task_id': task_id,
-        'timeout': timeout
+        'task_id': task_id
     }
 
-    reader, writer = await asyncio.open_connection('localhost', config["get_ip"])
+    reader, writer = await asyncio.open_connection(config["get_host"], config["get_ip"])
 
     request_data = pickle.dumps(request)
     writer.write(len(request_data).to_bytes(4, 'big'))

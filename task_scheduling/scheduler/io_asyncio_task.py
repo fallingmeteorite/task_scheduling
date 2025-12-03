@@ -68,8 +68,7 @@ async def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> A
                     result = await func(*args, **kwargs)
 
         _task_manager.remove(task_id)
-        if config["network_storage_results"]:
-            store_task_result(task_id, pickle.dumps(result))
+
     except asyncio.TimeoutError:
         logger.warning(f"task | {task_id} | timed out, forced termination")
         task_status_manager.add_task_status(task_id, None, "timeout", None, None, None, None, None)
@@ -381,9 +380,11 @@ class IoAsyncioTask:
             future: Future object corresponding to the task.
         """
         try:
+
             result = future.result()
         except CancelledError:
             result = "cancelled action"
+
         except Exception as error:
             if config["exception_thrown"]:
                 raise
@@ -396,11 +397,20 @@ class IoAsyncioTask:
         with self._lock:
             if result not in ["timeout action", "cancelled action", "failed action"]:
                 if result is not None:
-                    self._task_results[task_id] = [result, time.time()]
+                    if config["network_storage_results"]:
+                        store_task_result(task_id, pickle.dumps(result))
+                    else:
+                        self._task_results[task_id] = [result, time.time()]
                 else:
-                    self._task_results[task_id] = ["completed action", time.time()]
+                    if config["network_storage_results"]:
+                        store_task_result(task_id, pickle.dumps(result))
+                    else:
+                        self._task_results[task_id] = ["completed action", time.time()]
             else:
-                self._task_results[task_id] = [result, time.time()]
+                if config["network_storage_results"]:
+                    store_task_result(task_id, pickle.dumps(result))
+                else:
+                    self._task_results[task_id] = [result, time.time()]
 
             # Remove the task from running tasks dictionary
             if task_id in self._running_tasks:

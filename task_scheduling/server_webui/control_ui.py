@@ -26,8 +26,6 @@ def _stop_task_addition():
     Stop task addition
     """
     try:
-        # Call your task addition stop API here
-        # Example: return stop_task_addition_api()
         global _task_addition_enabled
         _task_addition_enabled = False
         task_scheduler._stop_task_addition()
@@ -43,8 +41,6 @@ def _resume_task_addition():
     Resume task addition
     """
     try:
-        # Call your task addition resume API here
-        # Example: return resume_task_addition_api()
         global _task_addition_enabled
         _task_addition_enabled = True
         task_scheduler._resume_task_addition()
@@ -76,16 +72,17 @@ def format_tasks_info(tasks_dict):
     """
     Format task information into a readable string with statistics.
     """
+    # Use internal helper to process task information
     tasks_queue_size = 0
     running_tasks_count = 0
     failed_tasks_count = 0
     completed_tasks_count = 0
-
     formatted_tasks = []
 
     for task_id, task_info in tasks_dict.items():
         status = task_info.get('status', 'unknown')
 
+        # Count tasks by status
         if status == 'running':
             running_tasks_count += 1
         elif status == 'failed':
@@ -95,16 +92,28 @@ def format_tasks_info(tasks_dict):
         elif status in ['waiting', 'queuing']:
             tasks_queue_size += 1
 
-        task_str = _format_single_task(task_id, task_info)
+        # Format individual task
+        task_name = task_info.get('task_name', 'Unknown')
+        task_type = task_info.get('task_type', 'Unknown')
+        elapsed_time = _calculate_elapsed_time(task_info)
+        error_info = task_info.get('error_info')
+
+        task_str = (f"name: {task_name}, id: {task_id}, "
+                    f"status: {status}, elapsed time: {elapsed_time}, task_type: {task_type}")
+
+        if error_info is not None:
+            task_str += f"\n  error_info: {error_info}"
+
         formatted_tasks.append(task_str)
 
-    stats_header = _create_stats_header(
-        total_tasks=len(tasks_dict),
-        queue_size=tasks_queue_size,
-        running_count=running_tasks_count,
-        failed_count=failed_tasks_count,
-        completed_count=completed_tasks_count
-    )
+    # Create statistics header
+    total_tasks = len(tasks_dict)
+    stats_header = (f"Task Statistics:\n"
+                    f"  Total Tasks: {total_tasks}\n"
+                    f"  Queued: {tasks_queue_size}\n"
+                    f"  Running: {running_tasks_count}\n"
+                    f"  Completed: {completed_tasks_count}\n"
+                    f"  Failed: {failed_tasks_count}")
 
     output = stats_header
     if formatted_tasks:
@@ -113,24 +122,55 @@ def format_tasks_info(tasks_dict):
     return output
 
 
-def _format_single_task(task_id, task_info):
+def get_tasks_info():
     """
-    Format information for a single task.
+    Get task information as structured data.
     """
-    task_name = task_info.get('task_name', 'Unknown')
-    status = task_info.get('status', 'unknown')
-    task_type = task_info.get('task_type', 'Unknown')
+    tasks_dict = task_status_manager._task_status_dict
 
-    elapsed_time = _calculate_elapsed_time(task_info)
+    # Calculate statistics
+    tasks_queue_size = 0
+    running_tasks_count = 0
+    failed_tasks_count = 0
+    completed_tasks_count = 0
+    tasks = []
 
-    task_str = (f"name: {task_name}, id: {task_id}, "
-                f"status: {status}, elapsed time: {elapsed_time}, task_type: {task_type}")
+    for task_id, task_info in tasks_dict.items():
+        status = task_info.get('status', 'unknown')
 
-    error_info = task_info.get('error_info')
-    if error_info is not None:
-        task_str += f"\n  error_info: {error_info}"
+        # Count tasks by status
+        if status == 'running':
+            running_tasks_count += 1
+        elif status == 'failed':
+            failed_tasks_count += 1
+        elif status == 'completed':
+            completed_tasks_count += 1
+        elif status in ['waiting', 'queuing']:
+            tasks_queue_size += 1
 
-    return task_str
+        # Create task object
+        task_obj = {
+            'id': task_id,
+            'name': task_info.get('task_name', 'Unknown'),
+            'status': status.upper(),
+            'type': task_info.get('task_type', 'Unknown'),
+            'duration': _calculate_elapsed_time_seconds(task_info)
+        }
+
+        # Add error message if exists
+        error_info = task_info.get('error_info')
+        if error_info is not None:
+            task_obj['error_info'] = str(error_info)
+
+        tasks.append(task_obj)
+
+    return {
+        'queue_size': tasks_queue_size,
+        'running_count': running_tasks_count,
+        'failed_count': failed_tasks_count,
+        'completed_count': completed_tasks_count,
+        'tasks': tasks
+    }
 
 
 def _calculate_elapsed_time(task_info):
@@ -157,6 +197,30 @@ def _calculate_elapsed_time(task_info):
         return f"{elapsed * 1000:.1f}ms"
     else:
         return f"{elapsed:.2f}s"
+
+
+def _calculate_elapsed_time_seconds(task_info):
+    """
+    Calculate elapsed time in seconds for JSON output.
+    """
+    # Reuse the logic from _calculate_elapsed_time but return seconds
+    start_time = task_info.get('start_time')
+    end_time = task_info.get('end_time')
+    current_time = time.time()
+
+    if start_time is None:
+        return 0
+
+    if end_time is None:
+        elapsed = current_time - start_time
+    else:
+        elapsed = end_time - start_time
+
+    # Check Timeout
+    if elapsed > config.get("watch_dog_time", float('inf')):
+        return -1  # Special value indicates timeout
+
+    return elapsed
 
 
 def _create_stats_header(total_tasks, queue_size, running_count, failed_count, completed_count):
@@ -204,93 +268,6 @@ def _resume_task(task_id, task_type):
 def get_template_path():
     """Get the absolute path to the template file."""
     return os.path.join(os.path.dirname(__file__), 'ui.html')
-
-
-def get_tasks_info():
-    """
-    Get task information as structured data.
-    """
-    tasks_dict = task_status_manager._task_status_dict
-
-    # Directly Build Structured Data
-    tasks_queue_size = 0
-    running_tasks_count = 0
-    failed_tasks_count = 0
-    completed_tasks_count = 0
-
-    tasks = []
-
-    for task_id, task_info in tasks_dict.items():
-        status = task_info.get('status', 'unknown')
-
-        if status == 'running':
-            running_tasks_count += 1
-        elif status == 'failed':
-            failed_tasks_count += 1
-        elif status == 'completed':
-            completed_tasks_count += 1
-        elif status in ['waiting', 'queuing']:
-            tasks_queue_size += 1
-
-        # Construct Task Object
-        task_obj = {
-            'id': task_id,
-            'name': task_info.get('task_name', 'Unknown'),
-            'status': status.upper(),
-            'type': task_info.get('task_type', 'Unknown'),
-            'duration': _calculate_elapsed_time_seconds(task_info)
-        }
-
-        # Add error message
-        error_info = task_info.get('error_info')
-        if error_info is not None:
-            task_obj['error_info'] = str(error_info)
-
-        tasks.append(task_obj)
-
-    return {
-        'queue_size': tasks_queue_size,
-        'running_count': running_tasks_count,
-        'failed_count': failed_tasks_count,
-        'completed_count': completed_tasks_count,
-        'tasks': tasks
-    }
-
-
-def _calculate_elapsed_time_seconds(task_info):
-    """
-    Calculate elapsed time in seconds for JSON output.
-    """
-    start_time = task_info.get('start_time')
-    end_time = task_info.get('end_time')
-    current_time = time.time()
-
-    if start_time is None:
-        return 0
-
-    if end_time is None:
-        elapsed = current_time - start_time
-    else:
-        elapsed = end_time - start_time
-
-    # Check Timeout
-    if elapsed > config.get("watch_dog_time", float('inf')):
-        return -1  # Special value indicates timeout
-
-    return elapsed
-
-
-def _handle_tasks(self):
-    """Serve task information as JSON."""
-    tasks_info = get_tasks_info()  # Now directly return structured data
-
-    self.send_response(200)
-    self.send_header('Content-type', 'application/json')
-    self.end_headers()
-    try:
-        self.wfile.write(json.dumps(tasks_info).encode('utf-8'))
-    except ConnectionAbortedError:
-        pass
 
 
 def is_port_available(port):

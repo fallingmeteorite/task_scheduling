@@ -71,8 +71,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict]) -> An
                         result = func(*args, **kwargs)
 
         _task_manager.remove(task_id)
-        if config["network_storage_results"]:
-            store_task_result(task_id, pickle.dumps(result))
+
     except TimeoutException:
         logger.warning(f"task | {task_id} | timed out, forced termination")
         task_status_manager.add_task_status(task_id, None, "timeout", None, None, None, None, None)
@@ -319,26 +318,42 @@ class IoLinerTask:
             future: Future object corresponding to the task.
         """
         result = None
+
         try:
             result = future.result()  # Get task result, exceptions will be raised here
+
         except StopException:
             logger.warning(f"task | {task_id} | was cancelled")
             task_status_manager.add_task_status(task_id, None, "cancelled", None, None, None, None, None)
             result = "cancelled action"
+
         except Exception as error:
             # Other exceptions have already been handled in _execute_task.
             task_status_manager.add_task_status(task_id, None, "cancelled", None, None, error, None, None)
             result = "failed action"
+
         finally:
             # Store task return results - Use a lock to protect the result dictionary
             with self._lock:
                 if result not in ["timeout action", "cancelled action", "failed action"]:
                     if result is not None:
-                        self._task_results[task_id] = [result, time.time()]
+                        if config["network_storage_results"]:
+                            store_task_result(task_id, pickle.dumps(result))
+                        else:
+                            if config["network_storage_results"]:
+                                store_task_result(task_id, pickle.dumps(result))
+                            else:
+                                self._task_results[task_id] = [result, time.time()]
                     else:
-                        self._task_results[task_id] = ["completed action", time.time()]
+                        if config["network_storage_results"]:
+                            store_task_result(task_id, pickle.dumps(result))
+                        else:
+                            self._task_results[task_id] = ["completed action", time.time()]
                 else:
-                    self._task_results[task_id] = [result, time.time()]
+                    if config["network_storage_results"]:
+                        store_task_result(task_id, pickle.dumps(result))
+                    else:
+                        self._task_results[task_id] = [result, time.time()]
 
                 # Remove from the running task dictionary - already under lock protection
                 if task_id in self._running_tasks:

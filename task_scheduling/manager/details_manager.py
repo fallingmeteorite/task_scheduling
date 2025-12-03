@@ -5,7 +5,6 @@
 This module provides a thread-safe task status manager for tracking and managing
 the status of various tasks in a multithreaded environment.
 """
-import time
 import threading
 import gc
 
@@ -140,24 +139,6 @@ class TaskStatusManager:
         with self._lock:
             return self._task_status_dict.get(task_id)
 
-    def get_task_type(self,
-                      task_id: str) -> Optional[Dict[str, Optional[Union[str, float, bool]]]]:
-        """
-        Retrieve task status information by task ID.
-
-        Args:
-            task_id: Task ID.
-
-        Returns:
-            Task Type
-        """
-        while True:
-            time.sleep(0.01)
-            with self._lock:
-                task_info = self._task_status_dict.get(task_id)
-                if task_info and task_info["task_type"] != "NAN":
-                    return task_info["task_type"]
-
     def get_all_task_statuses(self) -> Dict[str, Dict[str, Optional[Union[str, float, bool]]]]:
         """
         Retrieve all task status information.
@@ -210,6 +191,23 @@ class TaskStatusManager:
 
             # Count occurrences and return as ordered dictionary
             return OrderedDict(Counter(values).most_common())
+
+    def get_task_type(self,
+                      task_id: str) -> Union[str, None]:
+        """
+        Retrieve task status information by task ID.
+
+        Args:
+            task_id: Task ID.
+
+        Returns:
+            Task Type
+        """
+        with self._lock:
+            task_info = self._task_status_dict.get(task_id)
+            if task_info and task_info["task_type"] != "NAN":
+                return task_info["task_type"]
+            return None
 
     def details_manager_shutdown(self) -> None:
         """Reset all variables"""

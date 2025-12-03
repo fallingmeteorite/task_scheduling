@@ -9,15 +9,15 @@ to a remote server using custom protocol over TCP sockets.
 import asyncio
 import pickle
 
+from task_scheduling.common import config
 
-def store_task_result(task_id: str, serialized_result: bytes, host='localhost', port=7998):
+
+def store_task_result(task_id: str, serialized_result: bytes):
     """Store task result (synchronous function)
 
     Args:
         task_id: Task ID
         serialized_result: Already serialized task result
-        host: Server host address
-        port: Server port number
     """
 
     async def _async_store():
@@ -27,7 +27,7 @@ def store_task_result(task_id: str, serialized_result: bytes, host='localhost', 
             'serialized_result': serialized_result
         }
 
-        reader, writer = await asyncio.open_connection(host, port)
+        reader, writer = await asyncio.open_connection(config["get_host"], config["get_ip"])
 
         request_data = pickle.dumps(request)
         writer.write(len(request_data).to_bytes(4, 'big'))

@@ -26,9 +26,9 @@ class TaskServer:
         """
         Initialize task server.
         """
-        self.host = "localhost"
+        self.host = config["server_host"]
         self.port = config["server_ip"]
-        self.broker_host = "localhost"
+        self.broker_host = config["proxy_host"]
         self.broker_port = config["proxy_ip"]
         self.max_port_attempts = config["max_port_attempts"]
         self.running = True
@@ -134,7 +134,6 @@ class TaskServer:
 
             except OSError as e:
                 if e.errno in [48, 98]:
-                    logger.debug(f"Port {current_port} is occupied, trying next port...")
                     current_port += 1
                     attempts += 1
                 else:
@@ -147,19 +146,11 @@ class TaskServer:
         Handle health check requests from broker server - fixed version.
         """
         try:
-            logger.debug("Health check request received, starting detection...")
-
-            # Immediately send health check response without waiting to receive message
-            # because the broker server may have sent a message, but we don't need to read it
             health_score = self.core.get_health_status()
-
-            # Create and send health response
             health_response = self.create_health_message(health_score)
 
             if self.send_message(client_socket, health_response):
-                logger.debug(f"Health response sent successfully, score: {health_score}%")
-            else:
-                logger.error("Health response sending failed")
+                logger.debug(f"Health response sent, score: {health_score}%")
 
         except Exception as error:
             logger.error(f"Error handling health check: {error}")
@@ -175,27 +166,21 @@ class TaskServer:
             return
 
         try:
-            logger.debug(f"Starting to handle connection from {addr}")
-
             # Receive message (with shorter timeout)
             message = self.receive_message(client_socket, timeout=2.0)
 
             if message:
                 message_type = message.get('type', '')
-                logger.debug(f"Received message type from {addr}: '{message_type}'")
 
                 if message_type == 'health_check':
-                    logger.debug(f"Health check request from {addr}")
                     self._handle_health_check(client_socket)
                 elif message_type == 'execute_task':
-                    logger.debug(f"Task execution request from {addr}")
                     self._handle_task_message(client_socket, addr, message)
                 else:
-                    logger.debug(f"Unknown message type: {message_type}")
+                    logger.warning(f"Unknown message type from {addr}: {message_type}")
                     client_socket.close()
             else:
                 # No message received, treat as health check connection
-                logger.debug(f"No clear message received, treating as health check from {addr}")
                 self._handle_health_check(client_socket)
 
         except Exception as error:
@@ -209,14 +194,17 @@ class TaskServer:
         try:
             task_data = message.get('task_data', {})
             task_name = task_data.get('task_name', 'Unknown task')
+            logger.info(f"Executing task: {task_name} from {addr}")
+
             # Execute task
             self.core.execute_received_task(task_data)
+
+            logger.info(f"Task {task_name} completed")
 
         except Exception as error:
             logger.error(f"Error handling task message: {error}")
         finally:
             client_socket.close()
-            logger.debug(f"Task processing completed, closing connection with {addr}")
 
     def start(self) -> None:
         """
@@ -248,7 +236,7 @@ class TaskServer:
                     'host': self.host
                 }
                 self.broker_socket.send(pickle.dumps(register_message))
-                logger.debug(f"Registered with broker server: {self.broker_host}:{self.broker_port}")
+                logger.info(f"Registered with broker server at {self.broker_host}:{self.broker_port}")
 
             except Exception as e:
                 logger.error(f"Failed to connect to broker: {e}")
@@ -265,11 +253,10 @@ class TaskServer:
         """
         Accept incoming connections from broker and clients.
         """
-        logger.debug("Starting to accept connections...")
+        logger.info("Server ready to accept connections")
         while self.running and not self.shutdown_event.is_set():
             try:
                 client_socket, addr = self.server_socket.accept()
-                logger.debug(f"Connection received from {addr}")
 
                 client_thread = threading.Thread(
                     target=self._handle_client_connection,
