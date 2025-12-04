@@ -6,21 +6,15 @@ This module provides decorators and functions for managing branch threads
 with proper lifecycle control, timeout handling, and synchronization.
 """
 
-import time
-import uuid
-import threading
 
-from functools import wraps
-from typing import Any, Callable
-from task_scheduling.common import logger, config
-
-
-def wait_ended() -> None:
+def wait_ended():
     """Wait for all branch threads to complete before main thread exits.
 
     Prevents errors caused by branch threads still running after the main thread ends
     by blocking until the thread count reaches an acceptable level.
     """
+    import threading
+    import time
     # Prevent errors caused by branch threads still running after the main thread ends
     while True:
         if threading.active_count() <= 2:
@@ -28,7 +22,7 @@ def wait_ended() -> None:
         time.sleep(0.01)
 
 
-def branch_thread_control(share_info: Any, _sharedtaskdict: Any, timeout_processing: bool, task_name: str) -> Any:
+def branch_thread_control(share_info, _sharedtaskdict, timeout_processing, task_name):
     """Create a decorator for controlling branch thread execution with proper lifecycle management.
 
     Args:
@@ -40,10 +34,15 @@ def branch_thread_control(share_info: Any, _sharedtaskdict: Any, timeout_process
     Returns:
         A decorator function that wraps the target function with thread control
     """
+    from task_scheduling.common import logger, config
+    from functools import wraps
+    import time
+    import uuid
+
     (task_group_name, task_manager, _threadterminator, StopException, ThreadingTimeout, TimeoutException,
      _threadsuspender, task_status_queue) = share_info
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func):
         """Decorator function that adds thread control to the target function.
 
         Args:
@@ -54,7 +53,7 @@ def branch_thread_control(share_info: Any, _sharedtaskdict: Any, timeout_process
         """
 
         @wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
+        def wrapper(*args, **kwargs):
             """Wrapper function that implements thread control logic.
 
             Args:
@@ -110,7 +109,7 @@ def branch_thread_control(share_info: Any, _sharedtaskdict: Any, timeout_process
     return decorator
 
 
-def wait_branch_thread_ended(func: Callable) -> Callable:
+def wait_branch_thread_ended(func):
     """Decorator to wait for branch threads to end before function returns.
 
     Args:
@@ -119,9 +118,24 @@ def wait_branch_thread_ended(func: Callable) -> Callable:
     Returns:
         Decorated function that waits for branch threads before returning
     """
+    from functools import wraps
+
+    def wait_ended():
+        """Wait for all branch threads to complete before main thread exits.
+
+        Prevents errors caused by branch threads still running after the main thread ends
+        by blocking until the thread count reaches an acceptable level.
+        """
+        import threading
+        import time
+        # Prevent errors caused by branch threads still running after the main thread ends
+        while True:
+            if threading.active_count() <= 2:
+                break
+            time.sleep(0.01)
 
     @wraps(func)
-    def wrapper(*args, **kwargs) -> Any:
+    def wrapper(*args, **kwargs):
         """Wrapper function that waits for branch threads after execution.
 
         Args:

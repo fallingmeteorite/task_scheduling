@@ -5,23 +5,23 @@
 This module provides a task scheduler for timer-based tasks with support for
 delayed execution and daily recurring tasks using priority queues.
 """
+import pickle
+import platform
 import queue
 import threading
 import time
-import platform
-import pickle
-
 from concurrent.futures import ThreadPoolExecutor, Future
 from datetime import datetime, timedelta
 from functools import partial
 from typing import Callable, Dict, List, Tuple, Optional, Any
+
 from task_scheduling.common import logger, config
-from task_scheduling.manager import task_status_manager
 from task_scheduling.control import ThreadTaskManager
 from task_scheduling.handling import ThreadTerminator, StopException, ThreadingTimeout, TimeoutException, \
     ThreadSuspender
-from task_scheduling.utils import store_task_result
+from task_scheduling.manager import task_status_manager
 from task_scheduling.scheduler.utils import retry_on_error_decorator_check
+from task_scheduling.result_server import store_task_result
 
 # Create Manager instance
 _task_manager = ThreadTaskManager()

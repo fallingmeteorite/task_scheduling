@@ -16,11 +16,12 @@ The manager is designed to work with multiprocessing tasks and provides:
 Key Components:
     ProcessTaskManager: Main class for managing process tasks with monitoring capabilities
 """
+import platform
 import threading
 import time
-import platform
-
 from typing import Dict, Any, Union
+
+from task_scheduling.common import config
 
 
 class ProcessTaskManager:
@@ -144,28 +145,26 @@ class ProcessTaskManager:
 
     def _monitor_loop(self) -> None:
         """Monitor the task queue for control commands and process them."""
-        MAX_FAIL_COUNT = 5  # Maximum failure threshold
-
         while self._running:
             try:
-                if not self._task_queue:
-                    time.sleep(0.01)
-                    continue
-
                 # Create a copy of items to avoid modification during iteration
-                items_copy = list(self._task_queue.items())
-                for task_id, actions in items_copy:
+                task_items = self._task_queue.copy()
+
+                for task_id, actions in task_items:
                     if not self.exists(task_id):
+
                         # Initialize or increase the failure count
                         if task_id not in self._fail_count_dict:
                             self._fail_count_dict[task_id] = 1
                         else:
                             self._fail_count_dict[task_id] += 1
                             # If the maximum number of failures is exceeded, perform cleanup
-                            if self._fail_count_dict[task_id] >= MAX_FAIL_COUNT:
+                            if self._fail_count_dict[task_id] >= config["maximum_retry_number"]:
+
                                 # Remove this nonexistent task from the task queue
                                 if task_id in self._task_queue:
                                     del self._task_queue[task_id]
+
                                 # Remove from failure count
                                 if task_id in self._fail_count_dict:
                                     del self._fail_count_dict[task_id]
@@ -180,9 +179,10 @@ class ProcessTaskManager:
                             self.pause_task(task_id)
                         elif action == "resume":
                             self.resume_task(task_id)
+
                     # Remove from queue since we're processing it
                     del self._task_queue[task_id]
 
                 time.sleep(0.01)
-            except (BrokenPipeError, EOFError):
-                break
+            except (BrokenPipeError, EOFError, KeyError):
+                pass

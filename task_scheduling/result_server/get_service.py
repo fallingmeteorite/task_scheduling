@@ -7,10 +7,12 @@ using pickle serialization over asyncio streams.
 """
 
 import asyncio
-import pickle
 import threading
 import time
 from typing import Dict, Any, Optional, Tuple
+
+import dill
+
 from task_scheduling.common import logger, config
 
 
@@ -38,7 +40,7 @@ class ResultServer:
             task_id: Unique identifier for the task
             serialized_result: Pickle-serialized task result
         """
-        result = pickle.loads(serialized_result)
+        result = dill.loads(serialized_result)
         async with self.lock:
             self.tasks[task_id] = (result, time.time())
 
@@ -62,7 +64,7 @@ class ResultServer:
             async with self.lock:
                 if task_id in self.tasks:
                     result, _ = self.tasks.pop(task_id)  # Retrieve and remove
-                    return pickle.dumps(result)
+                    return dill.dumps(result)
 
             await asyncio.sleep(poll_interval)
 
@@ -154,7 +156,7 @@ class ResultServer:
                 return
 
             # Deserialize request
-            request = pickle.loads(data)
+            request = dill.loads(data)
             action = request['action']
             task_id = request.get('task_id')
 
@@ -195,7 +197,7 @@ class ResultServer:
                 response = {'status': 'error', 'message': f'Unknown action: {action}'}
 
             # Serialize and send response
-            response_data = pickle.dumps(response)
+            response_data = dill.dumps(response)
             writer.write(len(response_data).to_bytes(4, 'big'))
             writer.write(response_data)
             await writer.drain()
@@ -203,7 +205,7 @@ class ResultServer:
         except Exception as error:
             logger.error(f"Client connection error: {error}")
             # Send error response
-            error_response = pickle.dumps({'status': 'error', 'message': str(error)})
+            error_response = dill.dumps({'status': 'error', 'message': str(error)})
             writer.write(len(error_response).to_bytes(4, 'big'))
             writer.write(error_response)
             await writer.drain()

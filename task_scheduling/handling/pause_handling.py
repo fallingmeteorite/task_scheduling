@@ -6,11 +6,10 @@ Thread suspension and control utility.
 This module provides a platform-agnostic way to suspend and resume threads
 using context managers for safe resource management.
 """
-import sys
-import threading
 import ctypes
 import platform
-
+import sys
+import threading
 from contextlib import contextmanager
 from typing import Dict
 

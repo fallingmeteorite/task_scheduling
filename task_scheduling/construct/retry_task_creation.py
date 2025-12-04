@@ -6,17 +6,11 @@ This module provides a decorator for automatically retrying functions when
 specific exceptions occur, with configurable retry attempts and delays.
 """
 
-import time
-import functools
-
-from typing import Union, Type, Tuple, Callable, Any
-from task_scheduling.common import logger
-
 
 def retry_on_error(
-        exceptions: Union[Type[Exception], Tuple[Type[Exception], ...], None] = None,
-        max_attempts: int = 3,
-        delay: Union[float, int] = 1) -> Callable:
+        exceptions,
+        max_attempts,
+        delay):
     """
     Decorator for retrying tasks when specific exceptions occur.
 
@@ -28,6 +22,10 @@ def retry_on_error(
     Returns:
         A decorator that wraps the function with retry logic.
     """
+    import functools
+    import time
+    from typing import Callable, Any
+
     if exceptions is None:
         exceptions = Exception
 
@@ -56,23 +54,20 @@ def retry_on_error(
                 Exception: The last exception encountered if all retries fail.
             """
             current_delay = delay
-
-            for attempt in range(1, max_attempts + 1):
+            attempt = 0
+            while True:
                 try:
                     return func(*args[1:], **kwargs)
                 except exceptions as error:
                     if attempt == max_attempts:
-                        logger.error(f"Task |{args[0]}| failed after {max_attempts} attempts: {error}")
                         raise error
 
+                    attempt += 1
                     time.sleep(current_delay)
                     # Optional: Implement exponential backoff
-                    # current_delay *= 2
                 except Exception as error:
                     # Caught an exception that is not in the retry list
-                    logger.error(f"Unhandled error type: {type(error).__name__}, message: {error}")
                     raise error
-            return None
 
         # Mark the function as decorated for identification
         wrapper._decorated_by = 'retry_on_error_decorator'

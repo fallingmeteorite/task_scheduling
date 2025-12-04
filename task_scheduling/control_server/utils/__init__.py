@@ -3,14 +3,12 @@
 """
 Initialize available methods
 """
-
 import sys
 
 # Prevent errors during multi-process initialization
 try:
-    from task_scheduling.client.rpc_client import RPCClient
-    from task_scheduling.client.submit import submit_task
+    from task_scheduling.control_server.utils.core import NetworkHandler
 except KeyboardInterrupt:
     sys.exit(0)
 
-__all__ = ['RPCClient', 'submit_task']
+__all__ = ['NetworkHandler']

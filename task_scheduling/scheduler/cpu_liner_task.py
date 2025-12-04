@@ -12,7 +12,6 @@ import threading
 import time
 import platform
 import signal
-import multiprocessing
 import pickle
 
 from concurrent.futures import ProcessPoolExecutor, Future, BrokenExecutor
@@ -24,9 +23,9 @@ from task_scheduling.control import ProcessTaskManager
 from task_scheduling.handling import ThreadTerminator, StopException, ThreadSuspender, TimeoutException, \
     ThreadingTimeout
 from task_scheduling.manager import task_status_manager, SharedTaskDict
-from task_scheduling.utils import store_task_result
+from task_scheduling.result_server import store_task_result
 from task_scheduling.scheduler.utils import exit_cleanup, TaskCounter, SharedStatusInfo, get_param_count, \
-    retry_on_error_decorator_check
+    retry_on_error_decorator_check, DillProcessPoolExecutor
 
 _task_counter = TaskCounter("cpu_liner_task")
 _threadsuspender = ThreadSuspender()
@@ -349,8 +348,9 @@ class CpuLinerTask:
         """
         Scheduler function, fetch tasks from the task queue and submit them to the process pool for execution.
         """
-        with ProcessPoolExecutor(max_workers=int(config["cpu_liner_task"] + math.ceil(config["cpu_liner_task"] / 2)),
-                                 initializer=exit_cleanup, mp_context=multiprocessing.get_context('spawn')) as executor:
+        with DillProcessPoolExecutor(max_workers=int(config["cpu_liner_task"] + math.ceil(config["cpu_liner_task"] / 2)),
+                                 initializer=exit_cleanup) as executor:
+
             self._executor = executor
             while not self._scheduler_stop_event.is_set():
                 with self._condition:

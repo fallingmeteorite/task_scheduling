@@ -5,11 +5,11 @@
 This module provides a thread-safe task status manager for tracking and managing
 the status of various tasks in a multithreaded environment.
 """
-import threading
 import gc
-
+import threading
 from collections import OrderedDict, Counter
 from typing import Dict, Optional, Union
+
 from task_scheduling.common import config, logger
 
 

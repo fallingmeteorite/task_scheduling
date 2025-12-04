@@ -7,8 +7,8 @@ import sys
 
 # Prevent errors during multi-process initialization
 try:
-    from task_scheduling.mark.mark_edit import task_function_type
+    from task_scheduling.main_server.server import TaskServer
 except KeyboardInterrupt:
     sys.exit(0)
 
-__all__ = ['task_function_type']
+__all__ = ['TaskServer']

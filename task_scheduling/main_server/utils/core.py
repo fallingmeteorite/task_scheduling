@@ -8,15 +8,16 @@ health monitoring, and connection handling.
 """
 
 import socket
-import pickle
-import time
 import threading
-
+import time
 from typing import Dict, Any, Callable, Tuple, Union, Optional
+
+import dill
+
 from task_scheduling.common import logger, config
-from task_scheduling.utils import is_async_function
 from task_scheduling.manager import task_scheduler
 from task_scheduling.server_webui import get_tasks_info, start_task_status_ui
+from task_scheduling.utils import is_async_function
 
 
 class NetworkUtils:
@@ -70,7 +71,7 @@ class NetworkUtils:
                 'host': server_host
             }
 
-            data = pickle.dumps(register_msg)
+            data = dill.dumps(register_msg)
             broker_socket.send(data)
 
             logger.info(f"Server registered with broker: {server_host}:{server_port}")
@@ -93,7 +94,7 @@ class NetworkUtils:
             bool: True if send successful, False otherwise
         """
         try:
-            data = pickle.dumps(message)
+            data = dill.dumps(message)
             data_length = len(data)
 
             # Send length first (4 bytes), then data
@@ -171,7 +172,7 @@ class NetworkUtils:
                 return None
 
             # Parse message
-            message = pickle.loads(message_data)
+            message = dill.loads(message_data)
             return message
 
         except Exception as e:
@@ -201,9 +202,9 @@ class NetworkUtils:
                     message_data += chunk
                     # Try to parse pickle to check if message is complete
                     try:
-                        message = pickle.loads(message_data)
+                        message = dill.loads(message_data)
                         return message
-                    except (pickle.UnpicklingError, EOFError):
+                    except (dill.UnpicklingError, EOFError):
                         # Message not complete yet, continue receiving
                         continue
                 except socket.timeout:
@@ -213,9 +214,9 @@ class NetworkUtils:
             # Final parsing attempt
             if message_data:
                 try:
-                    message = pickle.loads(message_data)
+                    message = dill.loads(message_data)
                     return message
-                except (pickle.UnpicklingError, EOFError) as e:
+                except (dill.UnpicklingError, EOFError) as e:
                     logger.error(f"Failed to parse direct pickle data: {e}")
                     return None
 

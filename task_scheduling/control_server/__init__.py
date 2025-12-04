@@ -7,8 +7,8 @@ import sys
 
 # Prevent errors during multi-process initialization
 try:
-    from task_scheduling.server.utils.core import TaskServerCore, task_submit
+    from task_scheduling.control_server.control import RPCServer
 except KeyboardInterrupt:
     sys.exit(0)
 
-__all__ = ['TaskServerCore', 'task_submit']
+__all__ = ['RPCServer']

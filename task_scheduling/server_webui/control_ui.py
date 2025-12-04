@@ -5,14 +5,14 @@
 This module provides a web-based user interface for monitoring task status,
 controlling task execution, and managing task scheduling through HTTP endpoints.
 """
-import os
-import time
 import json
-import threading
+import os
 import socket
-
+import threading
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
+
 from task_scheduling.common import logger, config
 from task_scheduling.manager import task_status_manager, task_scheduler
 from task_scheduling.scheduler import kill_api, pause_api, resume_api
@@ -186,11 +186,11 @@ def _calculate_elapsed_time(task_info):
 
     if end_time is None:
         elapsed = current_time - start_time
-        if elapsed > config.get("watch_dog_time", float('inf')):
+        if elapsed > config["watch_dog_time"]:
             return "timeout"
     else:
         elapsed = end_time - start_time
-        if elapsed > config.get("watch_dog_time", float('inf')):
+        if elapsed > config["watch_dog_time"]:
             return "timeout"
 
     if elapsed < 0.1:
@@ -217,7 +217,7 @@ def _calculate_elapsed_time_seconds(task_info):
         elapsed = end_time - start_time
 
     # Check Timeout
-    if elapsed > config.get("watch_dog_time", float('inf')):
+    if elapsed > config["watch_dog_time"]:
         return -1  # Special value indicates timeout
 
     return elapsed
@@ -270,29 +270,29 @@ def get_template_path():
     return os.path.join(os.path.dirname(__file__), 'ui.html')
 
 
-def is_port_available(port):
-    """Check if a port is available."""
+def is_port_available(host, port):
+    """Check if a port is available on the specified host."""
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.settimeout(1)
-            s.bind(('', port))
+            s.bind((host, port))
             return True
     except OSError:
         return False
 
 
-def find_available_port(start_port, max_attempts):
-    """Find an available port starting from start_port."""
+def find_available_port(host, start_port, max_attempts):
+    """Find an available port starting from start_port on the specified host."""
     port = start_port
     attempts = 0
 
     while attempts < max_attempts:
-        if is_port_available(port):
+        if is_port_available(host, port):
             return port
         port += 1
         attempts += 1
 
-    raise RuntimeError(f"No available port found in range {start_port}-{start_port + max_attempts - 1}")
+    raise RuntimeError(f"No available port found on {host} in range {start_port}-{start_port + max_attempts - 1}")
 
 
 class TaskControlHandler(BaseHTTPRequestHandler):
@@ -464,11 +464,17 @@ class TaskControlHandler(BaseHTTPRequestHandler):
 class TaskStatusServer:
     """Server for displaying task status information."""
 
-    def __init__(self):
+    def __init__(self, host=''):
         """
         Initialize the task status server.
+
+        Args:
+            host (str): Host to bind to. Default '' means all interfaces.
+                        Use '127.0.0.1' for localhost only.
+                        Use '0.0.0.0' for all interfaces.
         """
-        self.port = config["webui_ip"]
+        self.host = host
+        self.port = config["webui_ip"]  # 注意：config["webui_ip"] 可能实际上是端口号
         self.max_port_attempts = config["max_port_attempts"]
         self.actual_port = None  # Store the actual port used
         self.server = None
@@ -480,9 +486,11 @@ class TaskStatusServer:
         def run_server():
             """Start Service"""
             # Find available port with max attempts limit
-            self.actual_port = find_available_port(self.port, self.max_port_attempts)
-            self.server = HTTPServer(('', self.actual_port), TaskControlHandler)
-            logger.info(f"Task status UI available at http://localhost:{self.actual_port}")
+            self.actual_port = find_available_port(self.host, self.port, self.max_port_attempts)
+            self.server = HTTPServer((self.host, self.actual_port), TaskControlHandler)
+
+            logger.info(f"Task status UI available at http://{self.host}:{self.actual_port}")
+
             self.server.serve_forever()
 
         self.thread = threading.Thread(target=run_server)
@@ -502,17 +510,22 @@ class TaskStatusServer:
         return self.actual_port if self.actual_port else self.port
 
 
-def start_task_status_ui(port=7999, max_port_attempts=100):
+def start_task_status_ui(host='', port=7999, max_port_attempts=100):
     """
     Start the task status web UI in a daemon thread.
 
     Args:
+        host (str): Host to bind to. Default '' means all interfaces.
+                    Use '127.0.0.1' for localhost only.
+                    Use '0.0.0.0' for all interfaces.
         port (int): Starting port number, will auto-increment if occupied
         max_port_attempts (int): Maximum number of port attempts when default port is occupied
 
     Returns:
         TaskStatusServer: The server instance with actual port information
     """
-    server = TaskStatusServer()
+    server = TaskStatusServer(host=config["webui_host"])
+    server.port = port  # Port in override configuration
+    server.max_port_attempts = max_port_attempts
     server.start()
     return server

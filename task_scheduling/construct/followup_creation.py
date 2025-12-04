@@ -8,14 +8,14 @@ and triggering dependent tasks based on main task completion status.
 
 import asyncio
 import threading
-
 from typing import Callable
-from task_scheduling.common import logger
-from task_scheduling.scheduler import get_result_api
-from task_scheduling.manager import task_status_manager
-from task_scheduling.task_creation import task_creation
+
 from task_scheduling.client import submit_task
-from task_scheduling.utils import get_task_result
+from task_scheduling.common import logger
+from task_scheduling.manager import task_status_manager
+from task_scheduling.result_server import get_task_result
+from task_scheduling.scheduler import get_result_api
+from task_scheduling.task_creation import task_creation
 
 
 async def _wait_main_task_result_local(condition: str, main_task_id: str,

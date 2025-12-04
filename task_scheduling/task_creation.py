@@ -5,12 +5,12 @@
 This module provides functions for creating and managing different types of tasks
 including asynchronous, linear, and timer-based tasks with proper type handling.
 """
-import uuid
 import signal
-
+import uuid
 from typing import Callable, Union
-from task_scheduling.manager import task_scheduler
+
 from task_scheduling.common import logger
+from task_scheduling.manager import task_scheduler
 from task_scheduling.utils import is_async_function, wait_branch_thread_ended_check
 
 

@@ -10,14 +10,18 @@
   "maximum_task_info_storage": 2000,
   "maximum_result_storage": 2000,
   "maximum_result_time_storage": 20,
+  "maximum_retry_number": 20,
   "proxy_host": "127.0.0.1",
   "proxy_ip": 7999,
   "server_host": "127.0.0.1",
   "server_ip": 8000,
-  "webui_ip": 9000,
+  "webui_host": "127.0.0.1",
+  "webui_ip": 8100,
   "get_host": "127.0.0.1",
-  "get_ip": 10000,
-  "max_port_attempts": 1000,
+  "get_ip": 8200,
+  "control_host": "127.0.0.1",
+  "control_ip": 8201,
+  "max_port_attempts": 100,
   "exception_thrown": false,
-  "network_storage_results": true
+  "network_storage_results": false
 }

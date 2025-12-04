@@ -7,7 +7,8 @@ to a remote server using custom protocol over TCP sockets.
 """
 
 import asyncio
-import pickle
+
+import dill
 
 from task_scheduling.common import config
 
@@ -29,7 +30,7 @@ def store_task_result(task_id: str, serialized_result: bytes):
 
         reader, writer = await asyncio.open_connection(config["get_host"], config["get_ip"])
 
-        request_data = pickle.dumps(request)
+        request_data = dill.dumps(request)
         writer.write(len(request_data).to_bytes(4, 'big'))
         writer.write(request_data)
         await writer.drain()

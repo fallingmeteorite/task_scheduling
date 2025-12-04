@@ -6,10 +6,8 @@ This module provides centralized logging configuration using loguru for
 consistent log formatting and level management across the application.
 """
 
-# -*- coding: utf-8 -*-
-# Author: fallingmeteorite
-import sys
 import os
+import sys
 
 from loguru import logger
 

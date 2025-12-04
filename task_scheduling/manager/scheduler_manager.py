@@ -5,15 +5,14 @@
 This module provides a comprehensive task scheduling system with support for
 different task types, priority management, timeout handling, and thread-safe operations.
 """
+import gc
 import queue
+import signal
 import threading
 import time
-import signal
-import gc
-
 from typing import Callable, List, Optional, Union
+
 from task_scheduling.common import logger
-from task_scheduling.mark import task_function_type
 from task_scheduling.manager import task_status_manager
 
 
@@ -78,11 +77,9 @@ class TaskScheduler:
                 return False
 
             if function_type is None:
-                function_type = task_function_type.read_from_dict(task_name)
-                if function_type is None:
-                    logger.warning(
-                        f"Task name '{task_name}' has no function type, tasks cannot be added!")
-                    return False
+                logger.warning(
+                    f"Task name '{task_name}' has no function type, tasks cannot be added!")
+                return False
 
             self.core_task_queue.put((delay,
                                       daily_time,

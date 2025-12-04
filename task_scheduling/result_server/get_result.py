@@ -7,7 +7,8 @@ from a remote server using custom protocol over TCP sockets.
 """
 
 import asyncio
-import pickle
+
+import dill
 
 from task_scheduling.common import config
 
@@ -28,7 +29,7 @@ async def get_task_result(task_id: str):
 
     reader, writer = await asyncio.open_connection(config["get_host"], config["get_ip"])
 
-    request_data = pickle.dumps(request)
+    request_data = dill.dumps(request)
     writer.write(len(request_data).to_bytes(4, 'big'))
     writer.write(request_data)
     await writer.drain()
@@ -37,9 +38,9 @@ async def get_task_result(task_id: str):
     length_data = await reader.read(4)
     data_length = int.from_bytes(length_data, 'big')
     data = await reader.read(data_length)
-    response = pickle.loads(data)
+    response = dill.loads(data)
 
     writer.close()
     await writer.wait_closed()
 
-    return pickle.loads(response.get('serialized_result'))
+    return dill.loads(response.get('serialized_result'))

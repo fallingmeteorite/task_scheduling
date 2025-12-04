@@ -35,6 +35,6 @@ def wait_branch_thread_ended_check(func: Callable) -> bool:
         True if the function has the wait_branch_thread_ended decorator, otherwise False.
     """
     return (
-        hasattr(func, '_decorated_by')
-        and getattr(func, '_decorated_by') == 'wait_branch_thread_ended'
+            hasattr(func, '_decorated_by')
+            and getattr(func, '_decorated_by') == 'wait_branch_thread_ended'
     )

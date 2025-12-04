@@ -7,14 +7,14 @@ Task server main entry point, integrating server startup, connection acceptance,
 """
 
 import socket
-import signal
 import threading
-import pickle
 import time
-
 from typing import Any, Optional, Dict
+
+import dill
+
 from task_scheduling.common import logger, config
-from task_scheduling.server.utils import TaskServerCore
+from task_scheduling.main_server.utils import TaskServerCore
 
 
 class TaskServer:
@@ -39,21 +39,6 @@ class TaskServer:
         # Initialize core components
         self.core = TaskServerCore()
 
-        # Setup signal handlers
-        signal.signal(signal.SIGINT, self._signal_handler)
-        signal.signal(signal.SIGTERM, self._signal_handler)
-
-    def _signal_handler(self, signum: int, frame: Any) -> None:
-        """
-        Handle interrupt signals for graceful shutdown.
-
-        Args:
-            signum: Signal number
-            frame: Current stack frame
-        """
-        logger.warning("Received interrupt signal, shutting down...")
-        self.stop()
-
     @staticmethod
     def receive_message(client_socket: socket.socket, timeout: float = 5.0) -> Optional[Dict]:
         """Receive message - fixed version"""
@@ -73,9 +58,9 @@ class TaskServer:
 
                     # Try to parse pickle data
                     try:
-                        message = pickle.loads(data)
+                        message = dill.loads(data)
                         return message
-                    except (pickle.UnpicklingError, EOFError):
+                    except (dill.UnpicklingError, EOFError):
                         # Data incomplete, continue receiving
                         continue
 
@@ -85,23 +70,23 @@ class TaskServer:
 
             # If no complete data after timeout, try to parse existing data
             if data:
-                return pickle.loads(data)
+                return dill.loads(data)
 
             return None
 
-        except Exception as e:
-            logger.error(f"Error receiving message: {e}")
+        except Exception as error:
+            logger.error(f"Error receiving message: {error}")
             return None
 
     @staticmethod
     def send_message(client_socket: socket.socket, message: Dict) -> bool:
         """Send message"""
         try:
-            data = pickle.dumps(message)
+            data = dill.dumps(message)
             client_socket.sendall(data)  # Use sendall to ensure all data is sent
             return True
-        except Exception as e:
-            logger.error(f"Error sending message: {e}")
+        except Exception as error:
+            logger.error(f"Error sending message: {error}")
             return False
 
     def create_health_message(self, health_score: int) -> Dict:
@@ -132,12 +117,12 @@ class TaskServer:
                     logger.info(f"Port {self.port} is occupied, using port {current_port} instead")
                 return current_port
 
-            except OSError as e:
-                if e.errno in [48, 98]:
+            except OSError as error:
+                if error.errno in [48, 98]:
                     current_port += 1
                     attempts += 1
                 else:
-                    raise e
+                    raise error
 
         raise Exception(f"No available port found after {self.max_port_attempts} attempts")
 
@@ -235,17 +220,17 @@ class TaskServer:
                     'server_port': self.port,
                     'host': self.host
                 }
-                self.broker_socket.send(pickle.dumps(register_message))
+                self.broker_socket.send(dill.dumps(register_message))
                 logger.info(f"Registered with broker server at {self.broker_host}:{self.broker_port}")
 
-            except Exception as e:
-                logger.error(f"Failed to connect to broker: {e}")
+            except Exception as error:
+                logger.error(f"Failed to connect to broker: {error}")
 
             # Start accepting connections
             self._accept_connections()
 
-        except Exception as e:
-            logger.error(f"Failed to start server: {e}")
+        except Exception as error:
+            logger.error(f"Failed to start server: {error}")
         finally:
             self.stop()
 
@@ -266,13 +251,13 @@ class TaskServer:
 
             except socket.timeout:
                 continue
-            except OSError as e:
+            except OSError as error:
                 if self.running and not self.shutdown_event.is_set():
-                    logger.error(f"Error accepting connection: {e}")
+                    logger.error(f"Error accepting connection: {error}")
                 break
-            except Exception as e:
+            except Exception as error:
                 if self.running and not self.shutdown_event.is_set():
-                    logger.error(f"Unknown error accepting connection: {e}")
+                    logger.error(f"Unknown error accepting connection: {error}")
 
     def stop(self) -> None:
         """
@@ -294,7 +279,3 @@ class TaskServer:
         self.core.shutdown()
 
         logger.warning("Task server stopped")
-
-
-# Create global server instance
-task_server = TaskServer()

@@ -5,11 +5,10 @@
 This module provides a mechanism for gracefully terminating threads by raising
 a custom StopException within the target thread's execution context.
 """
-import sys
-import threading
 import ctypes
 import platform
-
+import sys
+import threading
 from contextlib import contextmanager
 from typing import Dict
 

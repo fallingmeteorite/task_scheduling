@@ -16,9 +16,8 @@ The manager is designed to work with threading tasks and provides:
 Key Components:
     ThreadTaskManager: Main class for managing thread tasks with control capabilities
 """
-import threading
 import platform
-
+import threading
 from typing import Dict, Any
 
 

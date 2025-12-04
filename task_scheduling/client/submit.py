@@ -21,10 +21,10 @@ Global Variables:
 import inspect
 import time
 import uuid
-
 from typing import Dict, Any, Callable, Optional, Union
-from task_scheduling.common import logger
+
 from task_scheduling.client.utils import send_request
+from task_scheduling.common import logger
 from task_scheduling.utils import wait_branch_thread_ended_check
 
 
@@ -174,17 +174,8 @@ def submit_task(
     task_id = str(uuid.uuid4())
 
     try:
-        # Validate that a callable function is provided
-        if not func or not callable(func):
-            logger.error(f"Invalid function provided for task '{task_name}'")
-            return None
-
         # Extract function information using serializer
         function_code, function_name = extract_function_info(func)
-
-        if not function_code:
-            logger.error(f"Empty function code extracted for task '{task_name}'")
-            return None
 
         # Create comprehensive task data package
         task_data = create_task_data(

@@ -6,10 +6,10 @@ This script starts the proxy server for the task scheduling system
 and handles graceful shutdown on keyboard interrupt.
 """
 
-from task_scheduling.proxy_server import proxy_server
-
+from task_scheduling.proxy_server import ProxyServer
 
 if __name__ == "__main__":
+    proxy_server = ProxyServer()
     try:
         proxy_server.start()
     except KeyboardInterrupt:

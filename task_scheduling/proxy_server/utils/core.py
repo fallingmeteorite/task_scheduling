@@ -19,11 +19,12 @@ Global Variables:
     None
 """
 
-import time
 import socket
-import pickle
-
+import time
 from typing import Dict, Optional
+
+import dill
+
 from task_scheduling.common import logger
 
 
@@ -61,7 +62,7 @@ class NetworkManager:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                 sock.settimeout(10.0)
                 sock.connect((server_info['host'], server_info['port']))
-                sock.send(pickle.dumps(message))
+                sock.send(dill.dumps(message))
             return True
         except Exception as error:
             logger.error(f"Failed to send message to server {server_info}: {error}")
@@ -92,8 +93,8 @@ class NetworkManager:
                     break
                 data += chunk
                 try:
-                    return pickle.loads(data)
-                except (pickle.UnpicklingError, EOFError):
+                    return dill.loads(data)
+                except (dill.UnpicklingError, EOFError):
                     continue
         except Exception as error:
             logger.error(f"Failed to receive message from socket: {error}")
@@ -122,7 +123,7 @@ class NetworkManager:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                 sock.settimeout(5.0)
                 sock.connect((host, port))
-                sock.send(pickle.dumps(health_msg))
+                sock.send(dill.dumps(health_msg))
 
                 response = NetworkManager.receive_message(sock)
                 return response if response and response.get('type') == 'health_response' else None

@@ -5,12 +5,11 @@ Proxy Server Module - Integrated Version
 Simplified version with reduced log output
 """
 
-import time
 import socket
 import threading
-import signal
-
+import time
 from typing import Dict, Any, Optional, List
+
 from task_scheduling.common import logger, config
 from task_scheduling.proxy_server.utils import NetworkManager
 
@@ -44,10 +43,6 @@ class ProxyServer:
             'server_register': self._handle_server_register,
             'server_heartbeat': self._handle_heartbeat,
         }
-
-        # Signal handling
-        signal.signal(signal.SIGINT, self._signal_handler)
-        signal.signal(signal.SIGTERM, self._signal_handler)
 
     # Task management methods
     def submit_task(self, task_data: Dict) -> str:
@@ -129,7 +124,7 @@ class ProxyServer:
         """Mark server as inactive so it won't receive new tasks"""
         if server_port in self.servers:
             self.servers[server_port]['active'] = False
-            logger.info(f"Server marked inactive: {server_port}")
+            logger.warning(f"Server marked inactive: {server_port}")
 
     def select_best_server(self) -> Optional[Dict]:
         """Select best available server using round-robin algorithm"""
@@ -139,7 +134,7 @@ class ProxyServer:
         ]
 
         if not active_servers:
-            logger.info("No active servers available")
+            logger.warning("No active servers available")
             return None
 
         server_port, server_info = active_servers[self._rr_index % len(active_servers)]
@@ -162,20 +157,20 @@ class ProxyServer:
 
                     if health_score > 50:
                         active_count += 1
-                        logger.info(f"Server {server_port} health check passed: score={health_score}")
+                        logger.debug(f"Server {server_port} health check passed: score={health_score}")
                     else:
-                        logger.info(f"Server {server_port} health check failed: score={health_score}")
+                        logger.error(f"Server {server_port} health check failed: score={health_score}")
                 else:
                     server_info['health_score'] = 0
                     server_info['active'] = False
-                    logger.info(f"Server {server_port} health check failed: no response")
+                    logger.error(f"Server {server_port} health check failed: no response")
 
-            except Exception as e:
+            except Exception as error:
                 server_info['health_score'] = 0
                 server_info['active'] = False
-                logger.info(f"Server {server_port} health check error: {e}")
+                logger.error(f"Server {server_port} health check error: {error}")
 
-        logger.info(f"Health check completed: {active_count}/{len(self.servers)} servers active")
+        logger.debug(f"Health check completed: {active_count}/{len(self.servers)} servers active")
         return active_count
 
     def get_server_stats(self) -> Dict:
@@ -186,11 +181,6 @@ class ProxyServer:
             'active_servers': len(active_servers),
             'servers': list(self.servers.keys())
         }
-
-    # Signal handling
-    def _signal_handler(self, signum, frame):
-        """Handle shutdown signals (Ctrl+C, termination signals)"""
-        self.stop()
 
     # Server startup and operation
     def start(self):
@@ -221,8 +211,8 @@ class ProxyServer:
             # Main connection loop - accepts incoming connections
             self._connection_loop()
 
-        except Exception as e:
-            logger.error(f"Server startup failed: {e}")
+        except Exception as error:
+            logger.error(f"Server startup failed: {error}")
             self.stop()
 
     def _connection_loop(self):
@@ -284,7 +274,7 @@ class ProxyServer:
                         if not success:
                             self.requeue_task(task)
                             self.mark_server_inactive(server['port'])
-                            logger.info(f"Failed to send task to server {server['port']}, marked inactive")
+                            logger.error(f"Failed to send task to server {server['port']}, marked inactive")
                     else:
                         self.requeue_task(task)
                         if not self.shutdown_event.is_set():
@@ -339,13 +329,13 @@ class ProxyServer:
             })
 
             if success:
-                logger.info(f"Server {host}:{server_port} passed initial health check")
+                logger.debug(f"Server {host}:{server_port} passed initial health check")
             else:
-                logger.info(f"Server {host}:{server_port} failed initial health check")
+                logger.error(f"Server {host}:{server_port} failed initial health check")
 
             return success
-        except Exception as e:
-            logger.info(f"Server {host}:{server_port} health check error: {e}")
+        except Exception as error:
+            logger.error(f"Server {host}:{server_port} health check error: {error}")
             return False
 
     # Message handler functions
@@ -356,7 +346,7 @@ class ProxyServer:
 
         task_data = message.get('task_data', {})
         if not self.validate_task_data(task_data):
-            logger.info(f"Invalid task data received from {addr}")
+            logger.error(f"Invalid task data received from {addr}")
             return
 
         task_id = self.submit_task(task_data)
@@ -375,17 +365,17 @@ class ProxyServer:
             if server_port in self.servers:
                 # Update heartbeat for existing server
                 self.update_heartbeat(server_port)
-                logger.info(f"Server {host}:{server_port} heartbeat updated")
+                logger.debug(f"Server {host}:{server_port} heartbeat updated")
             else:
                 # Perform health check for new server registration
-                logger.info(f"New server registration attempt: {host}:{server_port}")
+                logger.debug(f"New server registration attempt: {host}:{server_port}")
 
                 if self._check_server_health(server_port, host):
                     # Health check passed, register the server
                     self.register_server(server_port, host, addr)
                 else:
                     # Health check failed
-                    logger.info(f"Server {host}:{server_port} registration rejected - health check failed")
+                    logger.error(f"Server {host}:{server_port} registration rejected - health check failed")
 
     def _handle_heartbeat(self, message: Dict, addr: tuple):
         """Handle heartbeat messages from servers - keeps server status up to date"""
@@ -402,7 +392,7 @@ class ProxyServer:
         if not self.running:
             return
 
-        logger.info("Starting server shutdown...")
+        logger.warning("Starting server shutdown...")
         self.running = False
         self.shutdown_event.set()
 
@@ -410,7 +400,3 @@ class ProxyServer:
             self.server_socket.close()
 
         logger.info("Server stopped")
-
-
-# Global instance
-proxy_server = ProxyServer()

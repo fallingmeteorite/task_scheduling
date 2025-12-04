@@ -7,7 +7,7 @@ import sys
 
 # Prevent errors during multi-process initialization
 try:
-    from task_scheduling.common.log_config import configure_logger, logger, set_log_level
+    from task_scheduling.common.logger import configure_logger, logger, set_log_level
     from task_scheduling.common.config import config, ensure_config_loaded, update_config, set_config_directory
 except KeyboardInterrupt:
     sys.exit(0)
