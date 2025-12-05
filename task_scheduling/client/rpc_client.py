@@ -4,9 +4,8 @@
 Simple RPC Client with Direct Function Calls and Proper Serialization
 """
 
-import functools
 import socket
-from typing import Any
+from typing import Any, Dict
 
 from task_scheduling.client.utils import NetworkHandler
 from task_scheduling.common import logger, config
@@ -20,18 +19,8 @@ class RPCClient:
         with RPCClient('localhost', 8888) as client:
             info = client.get_tasks_info()
             client.add_ban_task_name('bad_task')
+            client.pause_api('video', 'task_123')
     """
-
-    # List of available RPC functions
-    AVAILABLE_FUNCTIONS = [
-        'add_ban_task_name',
-        'remove_ban_task_name',
-        'cancel_the_queue_task_by_name',
-        'get_tasks_info',
-        'get_task_status',
-        'get_task_count',
-        'get_all_task_count',
-    ]
 
     def __init__(self):
         """
@@ -44,24 +33,119 @@ class RPCClient:
         self._socket: socket.socket
         self._connected = False
 
-        # Dynamically create all available functions
-        self._create_dynamic_functions()
+    def add_ban_task_name(self, task_name: str) -> bool:
+        """
+        Add a task name to the ban list.
 
-    def _create_dynamic_functions(self):
-        """Create dynamic methods for all available RPC functions."""
-        for func_name in self.AVAILABLE_FUNCTIONS:
-            # Create the function
-            def make_function(name):
-                @functools.wraps(self._rpc_call)
-                def rpc_function(*args, **kwargs):
-                    return self._rpc_call(name, *args, **kwargs)
+        Args:
+            task_name: Name of task to ban
 
-                rpc_function.__name__ = name
-                rpc_function.__doc__ = f"Call remote function: {name}"
-                return rpc_function
+        Returns:
+            bool: True if successful
+        """
+        return self._rpc_call('add_ban_task_name', task_name)
 
-            # Add the function as a method
-            setattr(self, func_name, make_function(func_name))
+    def remove_ban_task_name(self, task_name: str) -> bool:
+        """
+        Remove a task name from the ban list.
+
+        Args:
+            task_name: Name of task to unban
+
+        Returns:
+            bool: True if successful
+        """
+        return self._rpc_call('remove_ban_task_name', task_name)
+
+    def cancel_the_queue_task_by_name(self, task_name: str) -> bool:
+        """
+        Cancel queued task by name.
+
+        Args:
+            task_name: Name of task to cancel
+
+        Returns:
+            bool: True if successful
+        """
+        return self._rpc_call('cancel_the_queue_task_by_name', task_name)
+
+    def get_tasks_info(self) -> Dict[str, Any]:
+        """
+        Get information about all tasks.
+
+        Returns:
+            Dict[str, Any]: Task information
+        """
+        return self._rpc_call('get_tasks_info')
+
+    def get_task_status(self, task_name: str) -> Dict[str, Any]:
+        """
+        Get status of specific task.
+
+        Args:
+            task_name: Name of task
+
+        Returns:
+            Dict[str, Any]: Task status information
+        """
+        return self._rpc_call('get_task_status', task_name)
+
+    def get_task_count(self) -> Dict[str, int]:
+        """
+        Get task counts by status.
+
+        Returns:
+            Dict[str, int]: Task counts
+        """
+        return self._rpc_call('get_task_count')
+
+    def get_all_task_count(self) -> Dict[str, Any]:
+        """
+        Get all task count information.
+
+        Returns:
+            Dict[str, Any]: Complete task count information
+        """
+        return self._rpc_call('get_all_task_count')
+
+    def pause_api(self, task_type: str, task_id: str) -> bool:
+        """
+        Pause a running task.
+
+        Args:
+            task_type: Type of the task (e.g., 'video', 'image', etc.)
+            task_id: ID of the task to pause
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        return self._rpc_call('pause_api', task_type, task_id)
+
+    def resume_api(self, task_type: str, task_id: str) -> bool:
+        """
+        Resume a paused task.
+
+        Args:
+            task_type: Type of the task (e.g., 'video', 'image', etc.)
+            task_id: ID of the task to resume
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        return self._rpc_call('resume_api', task_type, task_id)
+
+    def kill_api(self, task_type: str, task_id: str) -> bool:
+        """
+        Kill (terminate) a task.
+
+        Args:
+            task_type: Type of the task (e.g., 'video', 'image', etc.)
+            task_id: ID of the task to kill
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        return self._rpc_call('kill_api', task_type, task_id)
 
     def _rpc_call(self, func_name: str, *args, **kwargs) -> Any:
         """

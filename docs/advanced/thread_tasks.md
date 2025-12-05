@@ -37,7 +37,7 @@
 ```python
 import threading
 import time
-from task_scheduling.utils import wait_branch_thread_ended, branch_thread_control
+from task_scheduling.construct import wait_branch_thread_ended, branch_thread_control
 
 
 @wait_branch_thread_ended
@@ -75,4 +75,38 @@ if __name__ == "__main__":
             time.sleep(1)
     except KeyboardInterrupt:
         task_scheduler.shutdown_scheduler()
+```
+
+```python
+def main_task(share_info, sharedtaskdict, task_signal_transmission, input_info):
+    task_name = "other_task"
+    timeout_processing = True
+    import time
+    import threading
+    from task_scheduling.construct import wait_branch_thread_ended, branch_thread_control
+
+    @wait_branch_thread_ended
+    def main():
+        @branch_thread_control(share_info, sharedtaskdict, timeout_processing, task_name)
+        def other_task(input_info):
+            while True:
+                time.sleep(1)
+                print(input_info)
+
+        threading.Thread(target=other_task, args=(input_info,), daemon=True).start()
+
+        # Use this statement to terminate the branch thread
+        # time.sleep(4)
+        # task_signal_transmission[sharedtaskdict.read(task_name)] = ["kill"]
+
+    main()
+
+
+if __name__ == "__main__":
+    from task_scheduling.client import submit_task
+    from task_scheduling.variable import *
+
+    task_id1 = submit_task(
+        None, None, FUNCTION_TYPE_CPU, True, "linear_task",
+        main_task, priority_low, "test")
 ```

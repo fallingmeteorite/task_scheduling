@@ -22,7 +22,7 @@ class ProxyServer:
         self.server_socket = None
         self.health_thread = None
         self.host = config["proxy_host"]
-        self.port = config["proxy_ip"]
+        self.port = config["proxy_port"]
         self.running = False
         self.shutdown_event = threading.Event()
 
@@ -31,7 +31,6 @@ class ProxyServer:
 
         # Task management
         self.task_queue: List[Dict[str, Any]] = []
-        self.task_history: Dict[str, Dict] = {}
 
         # Server management
         self.servers: Dict[int, Dict[str, Any]] = {}
@@ -51,14 +50,7 @@ class ProxyServer:
         if not task_id:
             return ""
 
-        task_data.update({
-            'submit_time': time.time(),
-            'queue_time': time.time(),
-            'status': 'queued'
-        })
-
         self.task_queue.append(task_data)
-        self.task_history[task_id] = task_data
         return task_id
 
     def validate_task_data(self, task_data: Dict) -> bool:
@@ -75,31 +67,9 @@ class ProxyServer:
         retry_count = task_data.get('retry_count', 0) + 1
         task_data.update({
             'retry_count': retry_count,
-            'last_retry': time.time(),
-            'status': 'retrying'
+            'last_retry': time.time()
         })
         self.task_queue.insert(0, task_data)
-
-    def complete_task(self, task_id: str, result: Any = None) -> None:
-        """Mark a task as completed"""
-        if task_id in self.task_history:
-            self.task_history[task_id].update({
-                'status': 'completed',
-                'complete_time': time.time(),
-                'result': result
-            })
-
-    def get_task_by_id(self, task_id: str) -> Optional[Dict]:
-        """Get task by ID from history"""
-        return self.task_history.get(task_id)
-
-    def get_task_stats(self) -> Dict:
-        """Get task statistics"""
-        return {
-            'queued': len(self.task_queue),
-            'total_history': len(self.task_history),
-            'completed': len([t for t in self.task_history.values() if t.get('status') == 'completed'])
-        }
 
     # Server management methods
     def register_server(self, server_port: int, host: str, addr: tuple) -> None:

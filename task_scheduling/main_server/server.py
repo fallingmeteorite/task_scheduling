@@ -27,9 +27,9 @@ class TaskServer:
         Initialize task server.
         """
         self.host = config["server_host"]
-        self.port = config["server_ip"]
+        self.port = config["server_port"]
         self.broker_host = config["proxy_host"]
-        self.broker_port = config["proxy_ip"]
+        self.broker_port = config["proxy_port"]
         self.max_port_attempts = config["max_port_attempts"]
         self.running = True
         self.server_socket: Optional[socket.socket] = None

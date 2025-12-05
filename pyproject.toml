@@ -1,13 +1,13 @@
 [project]
 name = "task_scheduling"
-version = "6.0.4"
+version = "6.1.0"
 description = "It is mainly used for task scheduling"
 
 authors = [
     { name = "fallingmeteorite", email = "2327667836@qq.com" }
 ]
 
-dependencies = ["loguru"]
+dependencies = ["loguru", "dill"]
 
 requires-python = ">=3.7"
 

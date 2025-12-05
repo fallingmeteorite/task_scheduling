@@ -38,7 +38,7 @@ def send_request(request_data: Dict[str, Any]) -> None:
         client_socket.settimeout(10)  # Set connection timeout only
 
         # Establish connection to proxy server
-        client_socket.connect((config["proxy_host"], config["proxy_ip"]))
+        client_socket.connect((config["proxy_host"], config["proxy_port"]))
 
         # Serialize request data and send
         request_bytes = dill.dumps(request_data)

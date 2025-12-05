@@ -30,14 +30,17 @@
 
 **IP配置**
 
-- `proxy_ip: 127.0.0.1` - 代理服务器host
-- `proxy_host: 7999` - 代理服务器ip
-- `server_ip: 8000` - 主服务器ip
+- `proxy_port: 127.0.0.1` - 代理服务器host
+- `proxy_host: 7999` - 代理服务器端口
 - `server_host: 127.0.0.1` - 主服务器host
-- `webui_ip: 9000` - 网页控制端服务器ip
-- `get_ip: 10000` - 结果储存服务器ip
+- `server_port: 8000` - 主服务器端口
+- `webui_host: 127.0.0.1` - 网页控制端服务器host
+- `webui_port: 8100` - 网页控制端服务器端口
 - `get_host: 127.0.0.1` - 结果储存服务器host
-- `max_port_attempts: 999` - 主服务器和网页控制端服务器最大存在数量
+- `get_port: 8200` - 结果储存服务器端口
+- `control_host: 127.0.0.1` - 控制服务器host
+- `control_port: 8201` - 控制服务器端口
+- `max_port_attempts: 100` - 主服务器和网页控制端服务器最大存在数量
 
 **其他配置**
 

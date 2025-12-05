@@ -19,7 +19,6 @@ Global Variables:
     _serializer: Global TaskSerializer instance for task data preparation
 """
 import inspect
-import time
 import uuid
 from typing import Dict, Any, Callable, Optional, Union
 
@@ -103,7 +102,6 @@ def create_task_data(
         'function_name': function_name,
         'args': args,
         'kwargs': kwargs,
-        'submit_time': time.time(),  # Timestamp when task was created
     }
     return task_data
 

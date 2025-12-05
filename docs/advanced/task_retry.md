@@ -15,7 +15,7 @@ Union[float, int]) -> Any
 
 ```python
 import time
-from task_scheduling.utils import retry_on_error
+from task_scheduling.construct import retry_on_error
 
 
 @retry_on_error(exceptions=TypeError, max_attempts=3, delay=1.0)
@@ -44,4 +44,28 @@ if __name__ == "__main__":
             time.sleep(1)
     except KeyboardInterrupt:
         task_scheduler.shutdown_scheduler()
+```
+
+```python
+def linear_task(input_info):
+    import time
+    from task_scheduling.construct import retry_on_error
+    @retry_on_error(exceptions=Exception, max_attempts=3, delay=1.0)
+    def main():
+        while True:
+            print(input_info)
+            time.sleep(input_info)
+
+    main()
+
+
+if __name__ == "__main__":
+    from task_scheduling.client import submit_task
+    from task_scheduling.variable import *
+
+    submit_task(
+        None, None, FUNCTION_TYPE_CPU, True, "task1",
+        linear_task, priority_low, "test"
+    )
+
 ```

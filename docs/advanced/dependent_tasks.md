@@ -62,7 +62,7 @@ def dependent_task(input_info, return_value=None):
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
-    from task_scheduling.followup_creation import task_dependency_local
+    from task_scheduling.construct import task_dependency_local
     from task_scheduling.server_webui import start_task_status_ui
     from task_scheduling.variable import *
 
@@ -87,7 +87,7 @@ task_dependency_network(main_task_id: str, dependent_task: Callable, *args) -> N
 
 - 警告:
 
-如果主任务要传回参数,必须为元组格式,不接受其他格式的参数.
+如果主任务要传回参数,必须为元组格式,不接受其他格式的参数.该功能要`network_storage_results`为`true`
 
 - 功能说明:
 
@@ -142,13 +142,11 @@ def dependent_task(input_info, return_value=None):
 
 if __name__ == "__main__":
     from task_scheduling.client import submit_task
-    from task_scheduling.followup_creation import task_dependency_network
-    from task_scheduling.server_webui import start_task_status_ui
-    from task_scheduling.get_service import result_server
+    from task_scheduling.construct import task_dependency_network
+    from task_scheduling.result_server import result_server
     from task_scheduling.variable import *
     import time
 
-    start_task_status_ui()
     result_server.start_server()
 
     task_id1 = submit_task(None, None, FUNCTION_TYPE_IO, True, "mian_task", mian_task, priority_low, "test1")

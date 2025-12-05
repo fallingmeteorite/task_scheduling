@@ -23,7 +23,7 @@ class ResultServer:
         """Initialize the result server with configuration."""
         self._running = None
         self.host = config["get_host"]
-        self.port = config["get_ip"]
+        self.port = config["get_port"]
         # Store task results and creation time (task_id: (result, create_time))
         self.tasks: Dict[str, Tuple[Any, float]] = {}
         self.lock = asyncio.Lock()

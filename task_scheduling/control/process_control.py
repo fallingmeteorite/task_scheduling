@@ -150,7 +150,7 @@ class ProcessTaskManager:
                 # Create a copy of items to avoid modification during iteration
                 task_items = self._task_queue.copy()
 
-                for task_id, actions in task_items:
+                for task_id, actions in task_items.items():
                     if not self.exists(task_id):
 
                         # Initialize or increase the failure count

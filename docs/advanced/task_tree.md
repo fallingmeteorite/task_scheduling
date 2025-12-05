@@ -59,3 +59,31 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         task_scheduler.shutdown_scheduler()
 ```
+
+```python
+def liner_task(input_info):
+    import time
+    while True:
+        time.sleep(1)
+        print(input_info)
+
+
+if __name__ == "__main__":
+    from task_scheduling.client import submit_task
+    from task_scheduling.construct import task_group
+    from task_scheduling.variable import *
+
+    task_group_name = "main_task"
+
+    task_dict = {
+        "task1": (liner_task, True, 1111),
+        "task2": (liner_task, True, 2222),
+        "task3": (liner_task, True, 3333),
+    }
+
+    task_id1 = submit_task(
+        None, None, FUNCTION_TYPE_CPU, True, task_group_name,
+        task_group, priority_low, task_dict)
+
+    print(task_id1)
+```

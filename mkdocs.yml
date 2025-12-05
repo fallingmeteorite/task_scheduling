@@ -61,22 +61,38 @@ markdown_extensions:
 
       # 导航结构优化
 nav:
-  - 首页: index.md
-  - 基础功能:
-      - 创建任务: basic/create_tasks.md
-      - 任务控制: basic/task_control.md
-      - 状态查询: basic/status_query.md
-      - 结果获取: basic/result_retrieval.md
-      - 任务禁用: basic/task_disabling.md
-      - 网页控制: basic/web_control.md
-      - 配置文件: basic/configuration.md
-      - 关闭清理: basic/shutdown.md
+  - 快速使用: index.md
+
+  - 配置选项: configuration.md
+
+  - 本地功能函数:
+      - 任务提交: local/create_tasks.md
+      - 任务控制: local/task_control.md
+      - 状态查询: local/status_query.md
+      - 结果获取: local/result_retrieval.md
+      - 任务禁用: local/task_disabling.md
+
+  - 网络功能函数:
+      - 任务提交: network/create_tasks.md
+      - 任务控制: network/task_control.md
+      - 状态查询: network/status_query.md
+      - 结果获取: network/result_retrieval.md
+      - 任务禁用: network/task_disabling.md
+
+  - 调度器关闭: shutdown.md
+
+  - 网页控制: web_control.md
+
+  - 工具:
+      - 随机名字: utils/random.md
+      - 非阻塞睡眠: utils/sleep.md
+
   - 高级功能:
-      - 线程级任务: advanced/thread_tasks.md
-      - 任务树模式: advanced/task_tree.md
+      - 线程任务管理: advanced/thread_tasks.md
       - 依赖型任务: advanced/dependent_tasks.md
+      - 任务树模式: advanced/task_tree.md
       - 任务重试: advanced/task_retry.md
-      - 分布式服务: advanced/distributed_service.md
+
   - 忠告: advice.md
 
 # 额外配置

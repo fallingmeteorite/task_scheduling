@@ -7,7 +7,10 @@ str, func: Callable, *args, **kwargs) -> str or None
 
 `Windows`,`Linux`,`Mac`在多进程中都统一使用`spawn`
 
-IO异步任务中将不会阻拦同名任务执行,将提交后交给事件循环管理,其他任务中的同名任务都会排队执行
+IO异步任务中将不会阻拦同名任务执行,将提交后交给事件循环管理,其他任务中的同名任务都会排队执行(
+可以在工具一栏找到随机名字来绕过该限制,前提是该任务执行的不是读写等,不能多线程操作的行为)
+
+使用本地功能时候建议将配置文件中的`network_storage_results`改为`false`
 
 - 参数说明:
 
@@ -66,11 +69,11 @@ if __name__ == "__main__":
         None, None, FUNCTION_TYPE_IO, True, "async_task",
         async_task, priority_low, "Hello Async"
     )
-    while True:
-        try:
+    try:
+        while True:
             time.sleep(0.1)
-        except KeyboardInterrupt:
-            task_scheduler.shutdown_scheduler()
+    except KeyboardInterrupt:
+        task_scheduler.shutdown_scheduler()
 ```
 
 ## 命令任务提交

@@ -464,17 +464,12 @@ class TaskControlHandler(BaseHTTPRequestHandler):
 class TaskStatusServer:
     """Server for displaying task status information."""
 
-    def __init__(self, host=''):
+    def __init__(self):
         """
         Initialize the task status server.
-
-        Args:
-            host (str): Host to bind to. Default '' means all interfaces.
-                        Use '127.0.0.1' for localhost only.
-                        Use '0.0.0.0' for all interfaces.
         """
-        self.host = host
-        self.port = config["webui_ip"]  # 注意：config["webui_ip"] 可能实际上是端口号
+        self.host = config["webui_host"]
+        self.port = config["webui_port"]
         self.max_port_attempts = config["max_port_attempts"]
         self.actual_port = None  # Store the actual port used
         self.server = None
@@ -524,7 +519,7 @@ def start_task_status_ui(host='', port=7999, max_port_attempts=100):
     Returns:
         TaskStatusServer: The server instance with actual port information
     """
-    server = TaskStatusServer(host=config["webui_host"])
+    server = TaskStatusServer()
     server.port = port  # Port in override configuration
     server.max_port_attempts = max_port_attempts
     server.start()

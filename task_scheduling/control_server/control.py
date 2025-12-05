@@ -13,6 +13,7 @@ from typing import Any, List, Optional, Callable
 from task_scheduling.common import logger, config
 from task_scheduling.control_server.utils import NetworkHandler
 from task_scheduling.manager import task_scheduler, task_status_manager
+from task_scheduling.scheduler import pause_api, resume_api, kill_api
 from task_scheduling.server_webui import get_tasks_info
 
 
@@ -28,7 +29,7 @@ class RPCServer:
         Initialize RPC server.
         """
         self.host = config["control_host"]
-        self.port = config["control_ip"]
+        self.port = config["control_port"]
         self.running = False
         self.server_socket: Optional[socket.socket] = None
         self.client_threads: List[threading.Thread] = []
@@ -44,6 +45,9 @@ class RPCServer:
             "get_task_status": task_status_manager.get_task_status,
             "get_task_count": task_status_manager.get_task_count,
             "get_all_task_count": task_status_manager.get_all_task_count,
+            "pause_api": pause_api,
+            "resume_api": resume_api,
+            "kill_api": kill_api,
         }
 
     def start(self) -> None:
