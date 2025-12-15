@@ -53,7 +53,7 @@ update_config(key: str, value: Any) -> Any
 
 - 警告:
 
-请放在`if __name__ == "__main__":`前面,部分参数没法在启动后修改并生效
+请放在`if __name__ == "__main__":`前面,部分参数没法在调度器启动后修改并生效,或者在导入其他部分之前使用
 
 - 参数说明:
 
@@ -97,6 +97,26 @@ from task_scheduling.common import set_config_directory
 
 # 更新配置
 set_config_directory("文件位置")
+
+if __name__ == "__main__":
+    # 你的运行代码
+    ...
+```
+
+## 日志等级设置
+
+set_log_level(level: str):
+
+- 参数说明:
+
+**level**: 日志等级比如`INFO`/`DEBUG`高于的等级将会输出
+
+- 使用示例:
+
+```python
+from task_scheduling.common import set_log_level
+
+set_log_level("DEBUG")
 
 if __name__ == "__main__":
     # 你的运行代码
