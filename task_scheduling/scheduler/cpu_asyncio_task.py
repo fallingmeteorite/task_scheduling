@@ -12,7 +12,7 @@ import threading
 import time
 import signal
 import platform
-import pickle
+import dill
 
 from concurrent.futures import ProcessPoolExecutor, Future, BrokenExecutor
 from functools import partial
@@ -398,17 +398,17 @@ class CpuAsyncioTask:
                         ("completed", task_id, None, None, None, None, None))
                     if result is not None:
                         if config["network_storage_results"]:
-                            store_task_result(task_id, pickle.dumps(result))
+                            store_task_result(task_id, dill.dumps(result))
                         else:
                             self._task_results[task_id] = [result, time.time()]
                     else:
                         if config["network_storage_results"]:
-                            store_task_result(task_id, pickle.dumps(result))
+                            store_task_result(task_id, dill.dumps(result))
                         else:
                             self._task_results[task_id] = ["completed action", time.time()]
                 else:
                     if config["network_storage_results"]:
-                        store_task_result(task_id, pickle.dumps(result))
+                        store_task_result(task_id, dill.dumps(result))
                     else:
                         self._task_results[task_id] = [result, time.time()]
 

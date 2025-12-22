@@ -5,7 +5,7 @@
 This module provides a task scheduler for timer-based tasks with support for
 delayed execution and daily recurring tasks using priority queues.
 """
-import pickle
+import dill
 import platform
 import queue
 import threading
@@ -355,17 +355,17 @@ class TimerTask:
                 if result not in ["timeout action", "cancelled action", "failed action"]:
                     if result is not None:
                         if config["network_storage_results"]:
-                            store_task_result(task_id, pickle.dumps(result))
+                            store_task_result(task_id, dill.dumps(result))
                         else:
                             self._task_results[task_id] = [result, time.time()]
                     else:
                         if config["network_storage_results"]:
-                            store_task_result(task_id, pickle.dumps(result))
+                            store_task_result(task_id, dill.dumps(result))
                         else:
                             self._task_results[task_id] = ["completed action", time.time()]
                 else:
                     if config["network_storage_results"]:
-                        store_task_result(task_id, pickle.dumps(result))
+                        store_task_result(task_id, dill.dumps(result))
                     else:
                         self._task_results[task_id] = [result, time.time()]
 

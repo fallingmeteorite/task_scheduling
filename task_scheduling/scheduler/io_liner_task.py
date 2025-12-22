@@ -6,7 +6,7 @@ This module provides a task scheduler for IO-bound linear tasks using
 thread pool execution with priority-based scheduling and timeout handling.
 """
 import math
-import pickle
+import dill
 import platform
 import queue
 import threading
@@ -338,20 +338,20 @@ class IoLinerTask:
                 if result not in ["timeout action", "cancelled action", "failed action"]:
                     if result is not None:
                         if config["network_storage_results"]:
-                            store_task_result(task_id, pickle.dumps(result))
+                            store_task_result(task_id, dill.dumps(result))
                         else:
                             if config["network_storage_results"]:
-                                store_task_result(task_id, pickle.dumps(result))
+                                store_task_result(task_id, dill.dumps(result))
                             else:
                                 self._task_results[task_id] = [result, time.time()]
                     else:
                         if config["network_storage_results"]:
-                            store_task_result(task_id, pickle.dumps(result))
+                            store_task_result(task_id, dill.dumps(result))
                         else:
                             self._task_results[task_id] = ["completed action", time.time()]
                 else:
                     if config["network_storage_results"]:
-                        store_task_result(task_id, pickle.dumps(result))
+                        store_task_result(task_id, dill.dumps(result))
                     else:
                         self._task_results[task_id] = [result, time.time()]
 
