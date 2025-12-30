@@ -15,9 +15,9 @@ IO异步任务中将不会阻拦同名任务执行,将提交后交给事件循�
 
 - 参数说明:
 
-**delay**: 延迟执行时间(秒),用于定时任务(不使用填写None)
+**delay**: 延迟执行时间(秒),用于定时任务(不使用填写None,和下面参数二选一)
 
-**daily_time**: 每日执行时间,格式"HH:MM",用于定时任务(不使用填写None),使用24小时制
+**daily_time**: 每日执行时间,格式"HH:MM",用于定时任务,使用24小时制(不使用填写None,和上面参数二选一)
 
 **function_type**: 函数类型 (`FUNCTION_TYPE_IO`, `FUNCTION_TYPE_CPU`, `FUNCTION_TYPE_TIMER`)
 
