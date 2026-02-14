@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# Author: fallingmeteorite
 """
 Remote Procedure Call (RPC) Server
 
@@ -8,10 +9,10 @@ Uses NetworkHandler for network communication.
 
 import socket
 import threading
-from typing import Any, List, Optional, Callable
+from typing import Any, List, Optional, Callable, Tuple
 
 from task_scheduling.common import logger, config
-from task_scheduling.control_server.utils import NetworkHandler
+from task_scheduling.rpc_server.utils import NetworkHandler
 from task_scheduling.manager import task_scheduler, task_status_manager
 from task_scheduling.scheduler import pause_api, resume_api, kill_api
 from task_scheduling.server_webui import get_tasks_info
@@ -22,21 +23,25 @@ class RPCServer:
     RPC Server for task scheduling operations.
 
     Exposes task scheduling functions via network interface for remote control.
+    Automatically increments port if the specified port is in use.
     """
 
     def __init__(self) -> None:
         """
         Initialize RPC server.
         """
-        self.host = config["control_host"]
-        self.port = config["control_port"]
+        self.base_host = config["control_host"]
+        self.base_port = config["control_port"]
+        self.host = self.base_host
+        self.port = self.base_port
         self.running = False
         self.server_socket: Optional[socket.socket] = None
         self.client_threads: List[threading.Thread] = []
         self._lock = threading.Lock()
         self.network_handler = NetworkHandler()
+        self.max_port_attempts = config["max_port_attempts"]  # Maximum number of ports to try
 
-        # 函数映射表，减少if-else嵌套
+        # Function mapping table to reduce if-else nesting
         self._function_map: dict[str, Callable] = {
             "add_ban_task_name": task_scheduler.add_ban_task_name,
             "remove_ban_task_name": task_scheduler.remove_ban_task_name,
@@ -50,22 +55,77 @@ class RPCServer:
             "kill_api": kill_api,
         }
 
-    def start(self) -> None:
-        """Start the RPC server."""
-        self.running = True
+    def _find_available_port(self) -> Tuple[bool, int, Optional[str]]:
+        """
+        Find an available port starting from base_port.
 
-        # Create server socket using network handler
+        Returns:
+            Tuple[bool, int, Optional[str]]: (success, port, error_message)
+        """
+        for attempt in range(self.max_port_attempts):
+            current_port = self.base_port + attempt
+
+            # Create a test socket to check if port is available
+            test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            test_socket.settimeout(1)
+
+            try:
+                test_socket.bind((self.base_host, current_port))
+                test_socket.close()
+
+                # Port is available
+                if attempt > 0:
+                    logger.info(f"Base port {self.base_port} in use, using port {current_port} instead")
+
+                return True, current_port, None
+
+            except OSError:
+                test_socket.close()
+
+                if attempt == self.max_port_attempts - 1:
+                    error_msg = f"Failed to find available port after {self.max_port_attempts} attempts"
+                    return False, self.base_port, error_msg
+
+                # Continue to next port
+                continue
+
+            except Exception as error:
+                test_socket.close()
+                return False, self.base_port, f"Error checking port: {error}"
+
+        return False, self.base_port, "Unknown error finding available port"
+
+    def start(self) -> bool:
+        """
+        Start the RPC server with automatic port increment if needed.
+
+        Returns:
+            bool: True if server started successfully, False otherwise
+        """
+        # Find available port
+        success, self.port, error_msg = self._find_available_port()
+        if not success:
+            logger.error(error_msg)
+            return False
+
+        # Create server socket with the available port
         self.server_socket = self.network_handler.create_server_socket(self.host, self.port)
         if not self.server_socket:
             logger.error(f"Failed to create server socket on {self.host}:{self.port}")
-            return
+            return False
 
+        self.running = True
         logger.info(f"Task RPC Server started on {self.host}:{self.port}")
+
+        # Update config with actual port being used
+        config["control_port"] = self.port
 
         try:
             self._accept_connections()
+            return True
         except Exception as error:
             logger.error(f"Server error: {error}")
+            return False
         finally:
             self.stop()
 
@@ -148,10 +208,10 @@ class RPCServer:
                 'result': result,
                 'function': function_name
             }
-        except Exception as e:
+        except Exception as error:
             return {
                 'success': False,
-                'error': str(e),
+                'error': str(error),
                 'function': function_name or 'unknown'
             }
 
@@ -189,3 +249,12 @@ class RPCServer:
             self.server_socket.close()
 
         logger.info("Server shutdown complete")
+
+    def get_actual_address(self) -> Tuple[str, int]:
+        """
+        Get the actual host and port the server is running on.
+
+        Returns:
+            Tuple[str, int]: (host, port)
+        """
+        return self.host, self.port

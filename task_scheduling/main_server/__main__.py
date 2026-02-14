@@ -8,7 +8,7 @@ handling initialization and graceful shutdown.
 
 import threading
 
-from task_scheduling.control_server import RPCServer
+from task_scheduling.rpc_server import RPCServer
 from task_scheduling.main_server import TaskServer
 
 if __name__ == "__main__":

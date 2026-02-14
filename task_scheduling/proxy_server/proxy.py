@@ -152,6 +152,47 @@ class ProxyServer:
             'servers': list(self.servers.keys())
         }
 
+    def _notify_servers_shutdown(self):
+        """Notify all registered servers that the proxy server is shutting down"""
+        if not self.servers:
+            return
+
+        logger.info(f"Notifying {len(self.servers)} servers about proxy shutdown...")
+
+        shutdown_message = {
+            'type': 'proxy_shutdown',
+            'timestamp': time.time(),
+            'message': 'Proxy server is shutting down, please reconnect to new proxy'
+        }
+
+        # Create notification threads for each server
+        notification_threads = []
+        for server_port, server_info in list(self.servers.items()):
+            thread = threading.Thread(
+                target=self._notify_single_server,
+                args=(server_info, shutdown_message.copy()),
+                daemon=True
+            )
+            thread.start()
+            notification_threads.append(thread)
+
+        # Wait for all notification threads to complete (wait up to 3 seconds)
+        for thread in notification_threads:
+            thread.join(timeout=1.0)
+
+        logger.info("Shutdown notifications completed")
+
+    def _notify_single_server(self, server_info: Dict, message: Dict):
+        """Send shutdown notification to a single server"""
+        try:
+            success = self.network.send_to_server(server_info, message)
+            if success:
+                logger.debug(f"Shutdown notification sent to server {server_info['port']}")
+            else:
+                logger.debug(f"Failed to send shutdown notification to server {server_info['port']}")
+        except Exception as e:
+            logger.debug(f"Error notifying server {server_info['port']}: {e}")
+
     # Server startup and operation
     def start(self):
         """Start the proxy server and all its components"""
@@ -363,6 +404,10 @@ class ProxyServer:
             return
 
         logger.warning("Starting server shutdown...")
+
+        # First notify all registered servers
+        self._notify_servers_shutdown()
+
         self.running = False
         self.shutdown_event.set()
 

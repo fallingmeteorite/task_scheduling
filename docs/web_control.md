@@ -13,8 +13,11 @@ start_task_status_ui()
 
 - 功能说明
 
-- `Stop Adding Task` 停止任务添加到调度器
-- `Task Overview` 调度器各类任务状态统计
+- `Stop Adding Task` 停止任务添加到调度器,点击一次停止,在点击一次允许任务添加到调度器
+- `Task Overview` 调度器各状态的任务统计,点击可在右边直接显示对应状态的任务
+- `Task List` 任务列表,点击显示单个任务的详细信息并可以暂停,终止正在运行的任务
+
 
 - 效果图
   ![img](./../img/01.png)
+  ![img](./../img/02.png)

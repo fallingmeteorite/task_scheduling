@@ -521,6 +521,9 @@ class IoAsyncioTask:
         # Perform cancellation outside the lock to avoid deadlocks
         try:
             if not future.running():
+                # First ensure that the task is not paused.
+                if platform.system() == "Windows":
+                    _task_manager.resume_task(task_id)
                 future.cancel()
             else:
                 # First ensure that the task is not paused.
@@ -531,8 +534,8 @@ class IoAsyncioTask:
             task_status_manager.add_task_status(task_id, None, "cancelled", None, time.time(), None, None,
                                                 "io_asyncio_task")
             return True
-        except Exception as e:
-            logger.error(f"task | {task_id} | error during force stop: {e}")
+        except Exception as error:
+            logger.error(f"task | {task_id} | error during force stop: {error}")
             return False
 
     def pause_task(self,
@@ -561,8 +564,8 @@ class IoAsyncioTask:
             task_status_manager.add_task_status(task_id, None, "paused", None, None, None, None, "io_asyncio_task")
             logger.info(f"task | {task_id} | paused")
             return True
-        except Exception as e:
-            logger.error(f"task | {task_id} | error during pause: {e}")
+        except Exception as error:
+            logger.error(f"task | {task_id} | error during pause: {error}")
             return False
 
     def resume_task(self,
@@ -591,8 +594,8 @@ class IoAsyncioTask:
             task_status_manager.add_task_status(task_id, None, "running", None, None, None, None, "io_asyncio_task")
             logger.info(f"task | {task_id} | resumed")
             return True
-        except Exception as e:
-            logger.error(f"task | {task_id} | error during resume: {e}")
+        except Exception as error:
+            logger.error(f"task | {task_id} | error during resume: {error}")
             return False
 
     # Obtain the information returned by the corresponding task

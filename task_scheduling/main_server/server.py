@@ -35,9 +35,15 @@ class TaskServer:
         self.server_socket: Optional[socket.socket] = None
         self.broker_socket: Optional[socket.socket] = None
         self.shutdown_event = threading.Event()
+        self.broker_connected = False  # Add broker connection status flag
 
         # Initialize core components
         self.core = TaskServerCore()
+
+        # Add message handler dictionary
+        self.message_handlers = {
+            'proxy_shutdown': self._handle_proxy_shutdown,
+        }
 
     @staticmethod
     def receive_message(client_socket: socket.socket, timeout: float = 5.0) -> Optional[Dict]:
@@ -126,6 +132,150 @@ class TaskServer:
 
         raise Exception(f"No available port found after {self.max_port_attempts} attempts")
 
+    def _is_broker_connection_alive(self) -> bool:
+        """
+        Check if broker connection is still alive.
+        """
+        if not self.broker_socket:
+            return False
+
+        try:
+            # Use non-blocking method to check socket status
+            self.broker_socket.setblocking(False)
+
+            # Try to send empty data to check connection
+            try:
+                self.broker_socket.send(b'')
+            except socket.error as e:
+                # If error is EAGAIN or EWOULDBLOCK, socket is still writable
+                if e.errno in [11, 35]:  # EAGAIN or EWOULDBLOCK
+                    pass
+                else:
+                    return False
+            finally:
+                self.broker_socket.setblocking(True)
+
+            # Also try to get socket error status
+            try:
+                # Check if socket has pending errors
+                self.broker_socket.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
+            except:
+                return False
+
+            return True
+
+        except Exception as error:
+            logger.debug(f"Connection check failed: {error}")
+            return False
+
+    def _close_broker_socket(self) -> None:
+        """
+        Safely close broker socket.
+        """
+        if self.broker_socket:
+            try:
+                self.broker_socket.close()
+            except:
+                pass
+            finally:
+                self.broker_socket = None
+
+    def _register_with_broker(self) -> bool:
+        """
+        Register with broker server with retry mechanism.
+        Returns True if registration successful, False otherwise.
+        """
+        try:
+            # Close any existing connection first
+            self._close_broker_socket()
+
+            # Create new socket connection
+            broker_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            broker_socket.settimeout(2.0)  # Set short timeout
+
+            try:
+                broker_socket.connect((self.broker_host, self.broker_port))
+
+                register_message = {
+                    'type': 'server_register',
+                    'server_port': self.port,
+                    'host': self.host
+                }
+
+                # Send registration message
+                broker_socket.send(dill.dumps(register_message))
+
+                self.broker_socket = broker_socket
+                self.broker_connected = True
+                logger.info(f"Successfully registered with broker server at {self.broker_host}:{self.broker_port}")
+                return True
+
+            except Exception as e:
+                broker_socket.close()
+                raise e
+
+        except Exception as error:
+            self.broker_connected = False
+            logger.warning(f"Failed to connect to broker: {error}")
+            return False
+
+    def _handle_proxy_shutdown(self, message: Dict):
+        """Handle proxy server shutdown notification"""
+        logger.warning("Received proxy shutdown notification")
+        logger.warning("Proxy server is shutting down, will attempt to reconnect...")
+
+        # Mark broker connection as disconnected
+        self.broker_connected = False
+
+        # Close current broker socket
+        self._close_broker_socket()
+
+        logger.warning(f"Proxy shutdown!")
+
+    def _broker_registration_loop(self) -> None:
+        """
+        Continuous broker registration loop with 0.1 second interval.
+        Handles reconnection when broker restarts.
+        """
+        logger.info("Starting broker registration loop...")
+        connection_check_interval = 1.0  # Check interval after successful connection
+        last_check_time = 0
+
+        while self.running and not self.shutdown_event.is_set():
+            try:
+                current_time = time.time()
+
+                # If marked as connected, periodically check if connection is actually valid
+                if self.broker_connected:
+                    # Check connection status at intervals
+                    if current_time - last_check_time >= connection_check_interval:
+                        if not self._is_broker_connection_alive():
+                            logger.warning("Broker connection lost, attempting to reconnect...")
+                            self.broker_connected = False
+                            self._close_broker_socket()
+                        last_check_time = current_time
+                    else:
+                        time.sleep(0.1)  # Brief sleep to avoid CPU idle spinning
+                        continue
+
+                # If not connected, try to register
+                if not self.broker_connected:
+                    if self._register_with_broker():
+                        logger.info("Broker connection established")
+                        last_check_time = time.time()  # Reset check time
+                    else:
+                        # Registration failed, wait 0.1 seconds and retry
+                        time.sleep(0.1)
+                else:
+                    # Connection normal, brief sleep
+                    time.sleep(0.1)
+
+            except Exception as error:
+                logger.error(f"Error in broker registration loop: {error}")
+                self.broker_connected = False
+                self._close_broker_socket()
+                time.sleep(0.1)  # Wait 0.1 seconds after error before retry
+
     def _handle_health_check(self, client_socket: socket.socket) -> None:
         """
         Handle health check requests from broker server - fixed version.
@@ -161,6 +311,11 @@ class TaskServer:
                     self._handle_health_check(client_socket)
                 elif message_type == 'execute_task':
                     self._handle_task_message(client_socket, addr, message)
+                elif message_type in self.message_handlers:
+                    # Handle other types of messages (such as proxy shutdown notification)
+                    handler = self.message_handlers[message_type]
+                    handler(message)
+                    client_socket.close()
                 else:
                     logger.warning(f"Unknown message type from {addr}: {message_type}")
                     client_socket.close()
@@ -183,8 +338,6 @@ class TaskServer:
 
             # Execute task
             self.core.execute_received_task(task_data)
-
-            logger.info(f"Task {task_name} completed")
 
         except Exception as error:
             logger.error(f"Error handling task message: {error}")
@@ -209,22 +362,9 @@ class TaskServer:
 
             logger.info(f"Task server started on {self.host}:{self.port}")
 
-            # Register with broker
-            try:
-                self.broker_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self.broker_socket.settimeout(5.0)
-                self.broker_socket.connect((self.broker_host, self.broker_port))
-
-                register_message = {
-                    'type': 'server_register',
-                    'server_port': self.port,
-                    'host': self.host
-                }
-                self.broker_socket.send(dill.dumps(register_message))
-                logger.info(f"Registered with broker server at {self.broker_host}:{self.broker_port}")
-
-            except Exception as error:
-                logger.error(f"Failed to connect to broker: {error}")
+            # Start broker registration thread
+            registration_thread = threading.Thread(target=self._broker_registration_loop, daemon=True)
+            registration_thread.start()
 
             # Start accepting connections
             self._accept_connections()
@@ -273,8 +413,7 @@ class TaskServer:
         if self.server_socket:
             self.server_socket.close()
 
-        if self.broker_socket:
-            self.broker_socket.close()
+        self._close_broker_socket()  # Use encapsulated method to close broker socket
 
         self.core.shutdown()
 

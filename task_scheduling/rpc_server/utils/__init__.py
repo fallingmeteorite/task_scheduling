@@ -7,7 +7,7 @@ import sys
 
 # Prevent errors during multi-process initialization
 try:
-    from task_scheduling.control_server.utils.core import NetworkHandler
+    from task_scheduling.rpc_server.utils.core import NetworkHandler
 except KeyboardInterrupt:
     sys.exit(0)
 

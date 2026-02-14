@@ -7,7 +7,7 @@ import sys
 
 # Prevent errors during multi-process initialization
 try:
-    from task_scheduling.server_webui.control_ui import start_task_status_ui, get_tasks_info
+    from task_scheduling.server_webui.ui import start_task_status_ui, get_tasks_info
 except KeyboardInterrupt:
     sys.exit(0)
 

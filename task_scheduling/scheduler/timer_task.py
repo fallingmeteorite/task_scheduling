@@ -475,8 +475,8 @@ class TimerTask:
 
             task_status_manager.add_task_status(task_id, None, "cancelled", None, time.time(), None, None, "timer_task")
             return True
-        except Exception as e:
-            logger.error(f"task | {task_id} | error during force stop: {e}")
+        except Exception as error:
+            logger.error(f"task | {task_id} | error during force stop: {error}")
             return False
 
     def pause_task(self,
@@ -505,8 +505,8 @@ class TimerTask:
             task_status_manager.add_task_status(task_id, None, "paused", None, None, None, None, "timer_task")
             logger.info(f"task | {task_id} | paused")
             return True
-        except Exception as e:
-            logger.error(f"task | {task_id} | error during pause: {e}")
+        except Exception as error:
+            logger.error(f"task | {task_id} | error during pause: {error}")
             return False
 
     def resume_task(self,
@@ -535,8 +535,8 @@ class TimerTask:
             task_status_manager.add_task_status(task_id, None, "running", None, None, None, None, "io_liner_task")
             logger.info(f"task | {task_id} | resumed")
             return True
-        except Exception as e:
-            logger.error(f"task | {task_id} | error during resume: {e}")
+        except Exception as error:
+            logger.error(f"task | {task_id} | error during resume: {error}")
             return False
 
     # Obtain the information returned by the corresponding task

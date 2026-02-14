@@ -522,8 +522,8 @@ class CpuLinerTask:
                         shared_status_info_liner.task_signal_transmission[task_id] = ["kill"]
                     else:
                         logger.warning(f"task | {task_id} | no PID found for task")
-            except Exception as e:
-                logger.error(f"task | {task_id} | error sending termination signal: {e}")
+            except Exception as error:
+                logger.error(f"task | {task_id} | error sending termination signal: {error}")
                 return False
 
         shared_status_info_liner.task_status_queue.put(("cancelled", task_id, None, None, time.time(), None, None))
@@ -561,8 +561,8 @@ class CpuLinerTask:
             shared_status_info_liner.task_status_queue.put(("paused", task_id, None, None, None, None, None))
             logger.info(f"task | {task_id} | paused")
             return True
-        except Exception as e:
-            logger.error(f"task | {task_id} | error during pause: {e}")
+        except Exception as error:
+            logger.error(f"task | {task_id} | error during pause: {error}")
             return False
 
     def resume_task(self,
@@ -596,8 +596,8 @@ class CpuLinerTask:
             shared_status_info_liner.task_status_queue.put(("running", task_id, None, None, None, None, None))
             logger.info(f"task | {task_id} | resumed")
             return True
-        except Exception as e:
-            logger.error(f"task | {task_id} | error during resume: {e}")
+        except Exception as error:
+            logger.error(f"task | {task_id} | error during resume: {error}")
             return False
 
     def get_task_result(self,
