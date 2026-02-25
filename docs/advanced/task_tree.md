@@ -35,7 +35,7 @@ def liner_task(input_info):
 if __name__ == "__main__":
     from task_scheduling.task_creation import task_creation
     from task_scheduling.manager import task_scheduler
-    from task_scheduling.quick_creation import task_group
+    from task_scheduling.construct import task_group
     from task_scheduling.server_webui import start_task_status_ui
     from task_scheduling.variable import *
 
