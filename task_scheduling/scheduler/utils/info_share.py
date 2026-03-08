@@ -6,7 +6,7 @@ This module provides a thread-safe way to share task status and signal informati
 across multiple processes using multiprocessing.Manager.
 """
 import multiprocessing
-
+import queue
 from multiprocessing import Manager
 
 
@@ -33,19 +33,19 @@ class SharedStatusInfo:
             self._task_signal_transmission = self._manager.dict()
 
     @property
-    def task_pid(self) -> str:
+    def task_pid(self) -> dict:
         """Return the task pid"""
         self._initialize()
         return self._task_pid
 
     @property
-    def task_status_queue(self) -> None:
+    def task_status_queue(self) -> queue.Queue:
         """Get the task status queue with lazy initialization"""
         self._initialize()
         return self._task_status_queue
 
     @property
-    def task_signal_transmission(self) -> None:
+    def task_signal_transmission(self) -> dict:
         """Get the task signal transmission dictionary with lazy initialization"""
         self._initialize()
         return self._task_signal_transmission

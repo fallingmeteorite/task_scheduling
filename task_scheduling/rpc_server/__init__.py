@@ -7,7 +7,7 @@ import sys
 
 # Prevent errors during multi-process initialization
 try:
-    from task_scheduling.rpc_server.rpc import RPCServer
+    from task_scheduling.rpc_server.rpc_server import RPCServer
 except KeyboardInterrupt:
     sys.exit(0)
 

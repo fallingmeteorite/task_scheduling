@@ -26,8 +26,8 @@ from task_scheduling.result_server import store_task_result
 # Create Manager instance
 _task_counter = TaskCounter("io_liner_task")
 _task_manager = ThreadTaskManager()
-_threadsuspender = ThreadSuspender()
-_threadterminator = ThreadTerminator()
+_thread_suspender = ThreadSuspender()
+_thread_terminator = ThreadTerminator()
 
 
 def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict]) -> Any:
@@ -51,8 +51,8 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict]) -> An
     timeout_processing, task_name, task_id, func, priority, args, kwargs = task
     logger.debug(f"Start running task, task ID: {task_id}")
     try:
-        with _threadterminator.terminate_control() as terminate_ctx:
-            with _threadsuspender.suspend_context() as pause_ctx:
+        with _thread_terminator.terminate_control() as terminate_ctx:
+            with _thread_suspender.suspend_context() as pause_ctx:
 
                 _task_manager.add(None, terminate_ctx, pause_ctx, task_id)
 

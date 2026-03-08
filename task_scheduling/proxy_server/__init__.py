@@ -8,7 +8,7 @@ import sys
 
 # Prevent errors during multi-process initialization
 try:
-    from task_scheduling.proxy_server.proxy import ProxyServer
+    from task_scheduling.proxy_server.proxy_server import ProxyServer
 except KeyboardInterrupt:
     sys.exit(0)
 

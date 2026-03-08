@@ -16,7 +16,6 @@ import dill
 
 from concurrent.futures import ProcessPoolExecutor, Future, BrokenExecutor
 from functools import partial
-from multiprocessing.managers import DictProxy
 from typing import Callable, Dict, Tuple, Optional, Any, List
 from task_scheduling.common import logger, config
 from task_scheduling.control import ProcessTaskManager
@@ -28,15 +27,15 @@ from task_scheduling.scheduler.utils import exit_cleanup, TaskCounter, SharedSta
     retry_on_error_decorator_check, DillProcessPoolExecutor
 
 _task_counter = TaskCounter("cpu_liner_task")
-_threadsuspender = ThreadSuspender()
-_threadterminator = ThreadTerminator()
+_thread_suspender = ThreadSuspender()
+_thread_terminator = ThreadTerminator()
 shared_status_info_liner = SharedStatusInfo()
 
 
 def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict],
                   task_status_queue: queue.Queue,
-                  task_signal_transmission: DictProxy,
-                  task_pid: DictProxy) -> Any:
+                  task_signal_transmission: dict,
+                  task_pid: dict) -> Any:
     """
     Execute a task and handle its status.
 
@@ -66,8 +65,8 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict],
 
     task_manager = ProcessTaskManager(task_signal_transmission)
     try:
-        with _threadterminator.terminate_control() as terminate_ctx:
-            with _threadsuspender.suspend_context() as pause_ctx:
+        with _thread_terminator.terminate_control() as terminate_ctx:
+            with _thread_suspender.suspend_context() as pause_ctx:
                 task_manager.add(terminate_ctx, pause_ctx, task_id)
 
                 task_status_queue.put(("running", task_id, None, time.time(), None, None, None))
@@ -77,8 +76,8 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict],
                         # Whether to pass in the task manager to facilitate other thread management
                         # Check whether the function needs to use hyperthreading
                         if get_param_count(func, *args, **kwargs):
-                            share_info = (task_name, task_manager, _threadterminator, StopException, ThreadingTimeout,
-                                          TimeoutException, _threadsuspender, task_status_queue)
+                            share_info = (task_name, task_manager, _thread_terminator, StopException, ThreadingTimeout,
+                                          TimeoutException, _thread_suspender, task_status_queue)
                             if retry_on_error_decorator_check(func):
                                 result = func(task_id, share_info, _sharedtaskdict, task_signal_transmission, *args,
                                               **kwargs)
@@ -94,8 +93,8 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict],
                     # Whether to pass in the task manager to facilitate other thread management
                     # Check whether the function needs to use hyperthreading
                     if get_param_count(func, *args, **kwargs):
-                        share_info = (task_name, task_manager, _threadterminator, StopException, ThreadingTimeout,
-                                      TimeoutException, _threadsuspender, task_status_queue)
+                        share_info = (task_name, task_manager, _thread_terminator, StopException, ThreadingTimeout,
+                                      TimeoutException, _thread_suspender, task_status_queue)
                         if retry_on_error_decorator_check(func):
                             result = func(task_id, share_info, _sharedtaskdict, task_signal_transmission, *args,
                                           **kwargs)
@@ -348,8 +347,9 @@ class CpuLinerTask:
         """
         Scheduler function, fetch tasks from the task queue and submit them to the process pool for execution.
         """
-        with DillProcessPoolExecutor(max_workers=int(config["cpu_liner_task"] + math.ceil(config["cpu_liner_task"] / 2)),
-                                 initializer=exit_cleanup) as executor:
+        with DillProcessPoolExecutor(
+                max_workers=int(config["cpu_liner_task"] + math.ceil(config["cpu_liner_task"] / 2)),
+                initializer=exit_cleanup) as executor:
 
             self._executor = executor
             while not self._scheduler_stop_event.is_set():

@@ -16,7 +16,6 @@ import dill
 
 from concurrent.futures import ProcessPoolExecutor, Future, BrokenExecutor
 from functools import partial
-from multiprocessing.managers import DictProxy
 from typing import Callable, Dict, Tuple, Optional, Any, List
 from task_scheduling.common import logger, config
 from task_scheduling.manager import task_status_manager
@@ -26,8 +25,8 @@ from task_scheduling.result_server import store_task_result
 from task_scheduling.scheduler.utils import exit_cleanup, SharedStatusInfo, retry_on_error_decorator_check, \
     DillProcessPoolExecutor
 
-_threadsuspender = ThreadSuspender()
-_threadterminator = ThreadTerminator()
+_thread_suspender = ThreadSuspender()
+_thread_terminator = ThreadTerminator()
 shared_status_info_asyncio = SharedStatusInfo()
 
 
@@ -52,8 +51,8 @@ async def _execute_task_async(task: Tuple[bool, str, str, Callable, Tuple, Dict]
     timeout_processing, task_name, task_id, func, args, kwargs = task
     logger.debug(f"Start running task, task ID: {task_id}")
 
-    with _threadterminator.terminate_control() as terminate_ctx:
-        with _threadsuspender.suspend_context() as pause_ctx:
+    with _thread_terminator.terminate_control() as terminate_ctx:
+        with _thread_suspender.suspend_context() as pause_ctx:
             task_manager.add(terminate_ctx, pause_ctx, task_id)
 
             task_status_queue.put(("running", task_id, None, time.time(), None, None, None))
@@ -76,8 +75,8 @@ async def _execute_task_async(task: Tuple[bool, str, str, Callable, Tuple, Dict]
 
 def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
                   task_status_queue: queue.Queue,
-                  task_signal_transmission: DictProxy,
-                  task_pid: DictProxy) -> Any:
+                  task_signal_transmission: dict,
+                  task_pid: dict) -> Any:
     """
     Execute a task using an asyncio event loop.
 

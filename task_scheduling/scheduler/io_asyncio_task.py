@@ -24,7 +24,7 @@ from task_scheduling.result_server import store_task_result
 
 # Create Manager instance
 _task_manager = ThreadTaskManager()
-_threadsuspender = ThreadSuspender()
+_thread_suspender = ThreadSuspender()
 
 
 # A function that executes a task
@@ -49,7 +49,7 @@ async def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> A
     logger.debug(f"Start running task, task ID: {task_id}")
     result = None
     try:
-        with _threadsuspender.suspend_context() as pause_ctx:
+        with _thread_suspender.suspend_context() as pause_ctx:
             _task_manager.add(None, None, pause_ctx, task_id)
             # Modify the task status
             task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None, None, None)

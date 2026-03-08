@@ -3,11 +3,10 @@
 """Timer-based task execution module.
 
 This module provides a task scheduler for timer-based tasks with support for
-delayed execution and daily recurring tasks using priority queues.
+delayed execution and daily recurring tasks using time bucket optimization.
 """
 import dill
 import platform
-import queue
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, Future
@@ -20,13 +19,14 @@ from task_scheduling.control import ThreadTaskManager
 from task_scheduling.handling import ThreadTerminator, StopException, ThreadingTimeout, TimeoutException, \
     ThreadSuspender
 from task_scheduling.manager import task_status_manager
-from task_scheduling.scheduler.utils import retry_on_error_decorator_check
+from task_scheduling.scheduler.utils import retry_on_error_decorator_check, TimeBucketQueue
 from task_scheduling.result_server import store_task_result
 
 # Create Manager instance
 _task_manager = ThreadTaskManager()
-_threadterminator = ThreadTerminator()
-_threadsuspender = ThreadSuspender()
+_thread_terminator = ThreadTerminator()
+_thread_suspender = ThreadSuspender()
+_time_bucket_queue = TimeBucketQueue()
 
 
 def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
@@ -49,8 +49,8 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
     logger.debug(f"Start running task, task ID: {task_id}")
 
     try:
-        with _threadterminator.terminate_control() as terminate_ctx:
-            with _threadsuspender.suspend_context() as pause_ctx:
+        with _thread_terminator.terminate_control() as terminate_ctx:
+            with _thread_suspender.suspend_context() as pause_ctx:
                 _task_manager.add(None, terminate_ctx, pause_ctx, task_id)
                 task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None,
                                                     None, None)
@@ -98,6 +98,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
 class TimerTask:
     """
     Timer task manager class, responsible for scheduling, executing, and monitoring timer-based tasks.
+    Uses time bucket optimization for efficient handling of concurrent tasks.
     """
     __slots__ = [
         '_task_queue', '_running_tasks',
@@ -110,9 +111,9 @@ class TimerTask:
 
     def __init__(self) -> None:
         """
-        Initialize the TimerTask manager.
+        Initialize the TimerTask manager with time bucket optimization.
         """
-        self._task_queue = queue.PriorityQueue()  # Task queue with priority based on execution time
+        # Use TimeBucketQueue instead of PriorityQueue for better batch processing
         self._running_tasks = {}  # Running tasks
 
         self._lock = threading.Lock()  # Lock to protect access to shared resources
@@ -129,6 +130,7 @@ class TimerTask:
 
         self._task_results: Dict[str, List[Any]] = {}  # Store task return results
 
+        # Single thread pool for all tasks
         self._executor: Optional[ThreadPoolExecutor] = None
 
     # Add the task to the scheduler
@@ -142,7 +144,7 @@ class TimerTask:
                  *args,
                  **kwargs) -> Any:
         """
-        Add a task to the task queue.
+        Add a task to the task queue with time bucketing.
 
         Args:
             delay: Delay in seconds before the task should be executed (only once).
@@ -177,11 +179,19 @@ class TimerTask:
                     logger.error(f"task | {task_id} | no scheduling parameters provided")
                     return False
 
-                # Reduce the granularity of the lock
+                # Store daily_time in kwargs for rescheduling
+                if daily_time:
+                    kwargs['daily_time'] = daily_time
+
+                # Add task to time bucket queue
                 task_status_manager.add_task_status(task_id, None, "waiting", None, None, None,
                                                     None, "timer_task")
 
-                self._task_queue.put((execution_time, timeout_processing, task_name, task_id, func, args, kwargs))
+                # Create task tuple
+                task = (timeout_processing, task_name, task_id, func, args, kwargs)
+
+                # Add to time bucket queue
+                _time_bucket_queue.put(execution_time, task)
 
                 if not self._scheduler_started:
                     self._start_scheduler()
@@ -193,6 +203,7 @@ class TimerTask:
 
                 return True
         except Exception as error:
+            logger.error(f"Failed to add task {task_id}: {error}")
             return error
 
     # Start the scheduler
@@ -225,7 +236,7 @@ class TimerTask:
             # Check if all tasks are completed - use atomic check with lock
             if system_operations:
                 with self._lock:
-                    if not self._task_queue.empty() or len(self._running_tasks) != 0:
+                    if not _time_bucket_queue.empty() or len(self._running_tasks) != 0:
                         logger.warning(f"task was detected to be running, and the task stopped terminating")
                         return None
 
@@ -234,17 +245,17 @@ class TimerTask:
 
             # Ensure the executor is properly shut down
             if self._executor:
-                # Use wait=True for safe shutdown in No GIL environment
                 self._executor.shutdown(wait=False, cancel_futures=True)
 
-            # Clear the task queue - use atomic operation with lock
-            self._clear_task_queue()
+            # Clear the task queue
+            _time_bucket_queue.clear()
 
             # Wait for the scheduler thread to finish
             self._join_scheduler_thread()
 
             self._wait_tasks_end()
-            # Reset state variables - use atomic operations with locks
+
+            # Reset state variables
             with self._lock:
                 self._scheduler_started = False
                 self._running_tasks.clear()
@@ -271,46 +282,73 @@ class TimerTask:
                 break
             time.sleep(0.01)
 
-    # Scheduler function
+    # Scheduler function with time bucket optimization
     def _scheduler(self) -> None:
         """
-        Scheduler function, fetch tasks from the task queue and submit them to the thread pool for execution.
+        Enhanced scheduler function that processes tasks in batches using time buckets.
         """
+        # Single thread pool for all tasks
         with ThreadPoolExecutor(max_workers=int(config["timer_task"])) as executor:
             self._executor = executor
+
             while not self._scheduler_stop_event.is_set():
                 with self._condition:
-                    # Use loop and timeout to prevent spurious wakeup
-                    while (self._task_queue.empty() and
+                    # Wait for tasks with timeout
+                    while (_time_bucket_queue.empty() and
                            not self._scheduler_stop_event.is_set()):
-                        self._condition.wait(timeout=1.0)  # Add timeout to prevent permanent waiting
+                        self._condition.wait(timeout=1.0)
 
                     if self._scheduler_stop_event.is_set():
                         break
 
-                    # Check queue state again due to possible spurious wakeup or timeouts
-                    if self._task_queue.empty():
+                    # Get the next execution time
+                    next_time = _time_bucket_queue.peek_next_time()
+                    if next_time is None:
                         continue
 
-                    # Get the next task atomically
-                    execution_time, timeout_processing, task_name, task_id, func, args, kwargs = self._task_queue.get()
+                    current_time = time.time()
 
-                    # If task is not ready yet, put it back and wait
-                    if execution_time > time.time():
-                        self._task_queue.put(
-                            (execution_time, timeout_processing, task_name, task_id, func, args, kwargs))
-                        wait_time = max(0.1, min(execution_time - time.time(), 60.0))  # Reasonable wait limits
+                    # If the next task isn't ready yet, wait
+                    if next_time > current_time:
+                        wait_time = max(0.1, min(next_time - current_time, 60.0))
                         self._condition.wait(wait_time)
                         continue
 
-                # Submit task for execution with lock protection
-                with self._lock:
-                    future = executor.submit(_execute_task,
-                                             (timeout_processing, task_name, task_id, func, args, kwargs))
-                    self._running_tasks[task_id] = [future, task_name]
+                    # Get ALL ready buckets (all tasks that should execute now)
+                    ready_buckets = _time_bucket_queue.get_ready_buckets(current_time)
 
-                    future.add_done_callback(
-                        partial(self._task_done, task_id, timeout_processing, task_name, func, args, kwargs))
+                # Process all ready buckets outside the condition lock
+                for execution_time, tasks in ready_buckets:
+                    self._process_task_batch(execution_time, tasks)
+
+    def _process_task_batch(self, execution_time: float, tasks: List[Tuple]) -> None:
+        """
+        Process a batch of tasks scheduled for the same time.
+
+        Args:
+            execution_time: The scheduled execution time
+            tasks: List of tasks to execute
+        """
+        task_count = len(tasks)
+        logger.debug(f"Processing batch of {task_count} tasks scheduled for {execution_time}")
+
+        # Submit all tasks in the batch
+        futures = []
+        for task in tasks:
+            timeout_processing, task_name, task_id, func, args, kwargs = task
+
+            # Submit task for execution
+            future = self._executor.submit(_execute_task,
+                                           (timeout_processing, task_name, task_id, func, args, kwargs))
+
+            futures.append(future)
+
+            # Add to running tasks and set up callback
+            with self._lock:
+                self._running_tasks[task_id] = [future, task_name]
+                future.add_done_callback(
+                    partial(self._task_done, task_id, timeout_processing,
+                            task_name, func, args, kwargs))
 
     # A function that executes a task
     def _task_done(self,
@@ -387,8 +425,15 @@ class TimerTask:
                     if scheduled_time < now:
                         scheduled_time += timedelta(days=1)
                     execution_time = scheduled_time.timestamp()
-                    # Put the task back to queue for next execution
-                    self._task_queue.put((execution_time, timeout_processing, task_name, task_id, func, args, kwargs))
+
+                    # Create new task tuple and add to queue
+                    task = (timeout_processing, task_name, task_id, func, args, kwargs)
+                    _time_bucket_queue.put(execution_time, task)
+
+                    # Notify scheduler of new task
+                    with self._condition:
+                        self._condition.notify()
+
                 except ValueError:
                     # If daily_time is not a valid time string, do not reschedule
                     logger.error(
@@ -396,7 +441,7 @@ class TimerTask:
 
             # Check if all tasks are completed - use atomic check with lock
             with self._lock:
-                if self._task_queue.empty() and len(self._running_tasks) == 0:
+                if _time_bucket_queue.empty() and len(self._running_tasks) == 0:
                     self._reset_idle_timer()
 
     # The task scheduler closes the countdown
@@ -425,16 +470,6 @@ class TimerTask:
             if self._idle_timer is not None:
                 self._idle_timer.cancel()
                 self._idle_timer = None
-
-    def _clear_task_queue(self) -> None:
-        """
-        Clear the task queue.
-        """
-        try:
-            while True:
-                self._task_queue.get_nowait()
-        except queue.Empty:
-            pass
 
     def _join_scheduler_thread(self) -> None:
         """
