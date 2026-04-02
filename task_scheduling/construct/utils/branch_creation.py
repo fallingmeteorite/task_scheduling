@@ -34,6 +34,10 @@ def branch_thread_control(share_info, _sharedtaskdict, timeout_processing, task_
     Returns:
         A decorator function that wraps the target function with thread control
     """
+    import platform
+    if not platform.system() == "Windows":
+        raise Exception("Only Windows is supported")
+
     from task_scheduling.common import logger, config
     from functools import wraps
     import time

@@ -1,6 +1,6 @@
 [project]
 name = "task_scheduling"
-version = "6.3.0"
+version = "6.4.0"
 description = "It is mainly used for task scheduling"
 
 authors = [
@@ -22,7 +22,8 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
-    "Operating System :: OS Independent",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
 ]
 
 [project.urls]

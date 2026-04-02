@@ -203,37 +203,40 @@ class CpuAsyncioTask:
         Returns:
             Whether the task was successfully added.
         """
-        with self._scheduler_lock:
-            shared_status_info_asyncio.task_status_queue.put(("queuing", task_id, None, None, None, None, None))
-
-            # Use atomic operations for queue size check and running tasks check
+        try:
+            # 1. Capacity check (lock only for shared state)
             with self._lock:
                 queue_size = self._task_queue.qsize()
                 running_task_names = {details[1] for details in self._running_tasks.values()}
-
-                if queue_size >= config["cpu_asyncio_task"]:
+                if queue_size >= config["cpu_asyncio_task"] or len(self._running_tasks) >= config["cpu_asyncio_task"]:
                     return False
-
                 if task_name in running_task_names:
                     return False
 
-            if self._scheduler_stop_event.is_set() and not self._scheduler_started:
-                self._join_scheduler_thread()
-
-            # Reduce the granularity of the lock
+            # 2. Status updates (queue is thread-safe)
+            shared_status_info_asyncio.task_status_queue.put(("queuing", task_id, None, None, None, None, None))
             shared_status_info_asyncio.task_status_queue.put(("waiting", task_id, None, None, None, None, None))
 
+            # 3. Put task into queue (thread-safe)
             self._task_queue.put((timeout_processing, task_name, task_id, func, args, kwargs))
 
-            if not self._scheduler_started:
-                self._start_scheduler()
+            # 4. Start scheduler if needed (only protect start flag)
+            with self._scheduler_lock:
+                if self._scheduler_stop_event.is_set() and not self._scheduler_started:
+                    self._join_scheduler_thread()
+                if not self._scheduler_started:
+                    self._start_scheduler()
 
+            # 5. Notify scheduler (condition lock held only for notify)
             with self._condition:
                 self._condition.notify()
 
+            # 6. Cancel idle timer (has its own lock)
             self._cancel_idle_timer()
 
             return True
+        except Exception as error:
+            return error
 
     def _start_scheduler(self) -> None:
         """
@@ -253,40 +256,37 @@ class CpuAsyncioTask:
         Args:
             system_operations: Boolean indicating if this stop is due to system operations.
         """
-        # Turn off the scheduler
+        # Set stop event and notify all waiting threads
         self._scheduler_stop_event.set()
 
-        # Notify all waiting threads first
         with self._condition:
             self._condition.notify_all()
 
         with self._scheduler_lock:
-            # Check if there are any running tasks - use atomic operations
+            # Check if there are any running tasks (only when system_operations)
             if system_operations:
                 with self._lock:
                     queue_empty = self._task_queue.empty()
                     running_tasks_empty = len(self._running_tasks) == 0
-
                     if not queue_empty or not running_tasks_empty:
                         logger.warning(f"Cpu liner task | detected running tasks | stopping operation terminated")
                         return
 
-            # First cancel the task pause - use atomic operations
+            # Resume all paused tasks (lock only for accessing _running_tasks)
             with self._lock:
                 for task_id, _ in self._running_tasks.items():
-                    if platform.system() in ("Linux", "Darwin"):
+                    if platform.system() in "Linux":
                         os.kill(shared_status_info_asyncio.task_pid.get(task_id), signal.SIGCONT)
                     shared_status_info_asyncio.task_signal_transmission[task_id] = ["resume", "kill"]
 
-            # Ensure the executor is properly shut down
+            # Shutdown executor (no lock needed)
             if self._executor:
-                # Use wait=True for safe shutdown in No GIL environment
                 self._executor.shutdown(wait=False, cancel_futures=True)
 
             # Clear the task queue
             self._clear_task_queue()
 
-            # Wait for the scheduler thread to finish
+            # Wait for scheduler thread to finish (no lock needed)
             self._join_scheduler_thread()
 
             # Wait for status thread to finish
@@ -294,9 +294,10 @@ class CpuAsyncioTask:
                 self._status_thread.join(timeout=1.0)
             self._status_thread = threading.Thread(target=self._handle_task_status_updates, daemon=True)
 
+            # Wait for running tasks to finish
             self._wait_tasks_end()
 
-            # Reset state variables - use atomic operations with locks
+            # Reset state (lock only for resetting shared variables)
             with self._lock:
                 self._scheduler_started = False
                 self._running_tasks.clear()
@@ -304,7 +305,7 @@ class CpuAsyncioTask:
 
             self._scheduler_thread = None
 
-            # Cancel idle timer safely
+            # Cancel idle timer (has its own lock)
             with self._idle_timer_lock:
                 if self._idle_timer is not None:
                     self._idle_timer.cancel()
@@ -330,35 +331,38 @@ class CpuAsyncioTask:
                                      initializer=exit_cleanup) as executor:
             self._executor = executor
             while not self._scheduler_stop_event.is_set():
+                task = None
+                # Wait for task with condition, but release lock before submitting
                 with self._condition:
-                    # Use loop and timeout to prevent spurious wakeup
                     while (self._task_queue.empty() and
                            not self._scheduler_stop_event.is_set()):
-                        self._condition.wait(timeout=1.0)  # Add timeout to prevent permanent waiting
+                        self._condition.wait(timeout=1.0)
 
                     if self._scheduler_stop_event.is_set():
                         break
 
-                    # Check queue state again due to possible spurious wakeup
                     if self._task_queue.empty():
                         continue
 
+                    # Atomically get a task from the queue (inside lock)
                     task = self._task_queue.get()
+
+                if task is None:
+                    continue
 
                 timeout_processing, task_name, task_id, func, args, kwargs = task
 
-                # Use lock protection for shared state updates
+                # Submit to executor (no lock held)
                 try:
                     future = executor.submit(_execute_task, task, shared_status_info_asyncio.task_status_queue,
                                              shared_status_info_asyncio.task_signal_transmission,
                                              shared_status_info_asyncio.task_pid)
-                except Exception:
-                    pass
+                    with self._lock:
+                        self._running_tasks[task_id] = [future, task_name]
 
-                with self._lock:
-                    self._running_tasks[task_id] = [future, task_name]
-
-                future.add_done_callback(partial(self._task_done, task_id))
+                    future.add_done_callback(partial(self._task_done, task_id))
+                except Exception as error:
+                    shared_status_info_asyncio.task_status_queue.put(("failed", task_id, None, None, None, error, None))
 
     def _task_done(self,
                    task_id: str,
@@ -384,40 +388,43 @@ class CpuAsyncioTask:
             if config["exception_thrown"]:
                 raise
 
-            # if not "Cannot close a running event loop" in str(e):
             logger.error(f"task | {task_id} | execution failed: {error}")
             shared_status_info_asyncio.task_status_queue.put(("failed", task_id, None, None, None, error, None))
             result = "failed action"
 
         finally:
-            # The results returned by the storage task - use lock protection
+            # Prepare result for storage (without lock)
+            network_storage = config["network_storage_results"]
+            serialized_result = None
+            if network_storage:
+                serialized_result = dill.dumps(result)
+
+            # Lock-protected section: update local results and running tasks
             with self._lock:
                 if result not in ["timeout action", "cancelled action", "failed action"]:
                     shared_status_info_asyncio.task_status_queue.put(
                         ("completed", task_id, None, None, None, None, None))
                     if result is not None:
-                        if config["network_storage_results"]:
-                            store_task_result(task_id, dill.dumps(result))
-                        else:
+                        if not network_storage:
                             self._task_results[task_id] = [result, time.time()]
                     else:
-                        if config["network_storage_results"]:
-                            store_task_result(task_id, dill.dumps(result))
-                        else:
+                        if not network_storage:
                             self._task_results[task_id] = ["completed action", time.time()]
                 else:
-                    if config["network_storage_results"]:
-                        store_task_result(task_id, dill.dumps(result))
-                    else:
+                    if not network_storage:
                         self._task_results[task_id] = [result, time.time()]
 
-                # Make sure the Future object is deleted
+                # Remove from running tasks
                 if task_id in self._running_tasks:
                     del self._running_tasks[task_id]
 
                 # Check if all tasks are completed
                 if self._task_queue.empty() and len(self._running_tasks) == 0:
                     self._reset_idle_timer()
+
+            # Perform network storage outside lock (I/O operation)
+            if network_storage:
+                store_task_result(task_id, serialized_result)
 
     def _reset_idle_timer(self) -> None:
         """
@@ -473,7 +480,6 @@ class CpuAsyncioTask:
         Returns:
             Whether the task was successfully force stopped.
         """
-        # Use lock protection for running tasks dictionary access
         with self._lock:
             task_info = self._running_tasks.get(task_id)
             if not task_info:
@@ -486,17 +492,17 @@ class CpuAsyncioTask:
                 future.cancel()
                 return True
 
-            # Send termination signal to running task
-            if platform.system() == "Windows":
-                shared_status_info_asyncio.task_signal_transmission[task_id] = ["resume", "kill"]
-            elif platform.system() in ("Linux", "Darwin"):
-                pid = shared_status_info_asyncio.task_pid.get(task_id)
-                if pid:
-                    os.kill(pid, signal.SIGCONT)
-                    shared_status_info_asyncio.task_signal_transmission[task_id] = ["kill"]
-                else:
-                    logger.warning(f"task | {task_id} | no PID found for task")
-            return True
+        # Send termination signal to running task (outside lock)
+        if platform.system() == "Windows":
+            shared_status_info_asyncio.task_signal_transmission[task_id] = ["resume", "kill"]
+        elif platform.system() in "Linux":
+            pid = shared_status_info_asyncio.task_pid.get(task_id)
+            if pid:
+                os.kill(pid, signal.SIGCONT)
+                shared_status_info_asyncio.task_signal_transmission[task_id] = ["kill"]
+            else:
+                logger.warning(f"task | {task_id} | no PID found for task")
+        return True
 
     def pause_task(self,
                    task_id: str) -> bool:
@@ -509,7 +515,6 @@ class CpuAsyncioTask:
         Returns:
             Whether the task was successfully paused.
         """
-        # Use lock protection for running tasks dictionary access
         with self._lock:
             if task_id not in self._running_tasks:
                 logger.warning(f"task | {task_id} | does not exist or is already completed")
@@ -517,7 +522,7 @@ class CpuAsyncioTask:
 
         if platform.system() == "Windows":
             shared_status_info_asyncio.task_signal_transmission[task_id] = ["pause"]
-        elif platform.system() in ("Linux", "Darwin"):
+        elif platform.system() in "Linux":
             pid = shared_status_info_asyncio.task_pid.get(task_id)
             if pid:
                 os.kill(pid, signal.SIGSTOP)
@@ -540,7 +545,6 @@ class CpuAsyncioTask:
         Returns:
             Whether the task was successfully resumed.
         """
-        # Use lock protection for running tasks dictionary access
         with self._lock:
             if task_id not in self._running_tasks:
                 logger.warning(f"task | {task_id} | does not exist or is already completed")
@@ -548,7 +552,7 @@ class CpuAsyncioTask:
 
         if platform.system() == "Windows":
             shared_status_info_asyncio.task_signal_transmission[task_id] = ["resume"]
-        elif platform.system() in ("Linux", "Darwin"):
+        elif platform.system() in "Linux":
             pid = shared_status_info_asyncio.task_pid.get(task_id)
             if pid:
                 os.kill(pid, signal.SIGCONT)
@@ -571,7 +575,6 @@ class CpuAsyncioTask:
         Returns:
             Task return result, or None if the task is not completed or does not exist.
         """
-        # Use lock protection for results dictionary access and modification
         with self._lock:
             if task_id in self._task_results:
                 result = self._task_results[task_id][0]

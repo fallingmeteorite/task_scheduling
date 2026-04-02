@@ -86,8 +86,10 @@ nav:
   - 工具:
       - 随机名字: utils/random.md
       - 非阻塞睡眠: utils/sleep.md
+      - 任务暂停恢复: utils/pause.md
 
   - 高级功能:
+      - 任务优先级调度: advanced/priority.md
       - 线程任务管理: advanced/thread_tasks.md
       - 依赖型任务: advanced/dependent_tasks.md
       - 任务树模式: advanced/task_tree.md

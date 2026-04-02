@@ -2,6 +2,8 @@
 
 一个强大的 Python 任务调度库，提供灵活的任务管理和调度功能。
 
+只支持`Windows`,`Linux`
+
 ## 特性
 
 - 🚀 简单易用的任务创建和管理
@@ -55,6 +57,14 @@ if __name__ == "__main__":
         except KeyboardInterrupt:
             task_scheduler.shutdown_scheduler()
 ```
+
+### 感谢
+
+https://github.com/glenfant/stopit
+
+感谢这个库给予我了一个很巧妙地思维去处理任务控制相关的逻辑
+
+为了便于后续修改我将它放在库内部,而不是通过 pip 安装的,所以这里明确说明并感谢
 
 ### 许可证
 

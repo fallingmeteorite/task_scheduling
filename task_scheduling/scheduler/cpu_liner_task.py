@@ -5,7 +5,6 @@
 This module provides a task scheduler for CPU-bound linear tasks using
 process pool execution with priority-based scheduling and timeout handling.
 """
-import math
 import queue
 import os
 import threading
@@ -217,41 +216,44 @@ class CpuLinerTask:
             Whether the task was successfully added.
         """
         try:
+            need_add_high = False
+            # 1. Capacity check (lock only for shared state)
+            with self._lock:
+                if _task_counter.is_high_priority(priority):
+                    if _task_counter.is_high_priority_full(config["cpu_liner_task"]):
+                        return False
+                    # Prevent circular locking
+                    need_add_high = True
+                else:
+                    queue_size = self._task_queue.qsize()
+                    running_task_names = {details[1] for details in self._running_tasks.values()}
+                    if queue_size >= config["cpu_liner_task"] or len(self._running_tasks) >= config["cpu_liner_task"]:
+                        return False
+                    if task_name in running_task_names:
+                        return False
+
+            if need_add_high:
+                _task_counter.add_high_priority_task(task_id, self._running_tasks)
+
+            # 2. Status updates (queue is thread-safe)
+            shared_status_info_liner.task_status_queue.put(("waiting", task_id, None, None, None, None, None))
+
+            # 3. Put task into queue (thread-safe)
+            self._task_queue.put((timeout_processing, task_name, task_id, func, priority, args, kwargs))
+
+            # 4. Start scheduler if needed (only protect start flag)
             with self._scheduler_lock:
-                shared_status_info_liner.task_status_queue.put(("queuing", task_id, None, None, None, None, None))
-
-                # Use atomic operations for queue size check and running tasks check
-                with self._lock:
-                    if not _task_counter.is_high_priority(priority):
-                        queue_size = self._task_queue.qsize()
-                        running_task_names = {details[1] for details in self._running_tasks.values()}
-
-                        if queue_size >= config["cpu_liner_task"]:
-                            return False
-
-                        if task_name in running_task_names:
-                            return False
-                    else:
-                        if not _task_counter.add_count(math.ceil(config["cpu_liner_task"])):
-                            return False
-
-                if self._scheduler_stop_event.is_set() and not self._scheduler_started:
-                    self._join_scheduler_thread()
-
-                # Reduce the granularity of the lock
-                shared_status_info_liner.task_status_queue.put(("waiting", task_id, None, None, None, None, None))
-
-                self._task_queue.put((timeout_processing, task_name, task_id, func, priority, args, kwargs))
-
                 if not self._scheduler_started:
                     self._start_scheduler()
 
-                with self._condition:
-                    self._condition.notify()
+            # 5. Notify scheduler (condition lock held only for notify)
+            with self._condition:
+                self._condition.notify()
 
-                self._cancel_idle_timer()
+            # 6. Cancel idle timer (has its own lock)
+            self._cancel_idle_timer()
 
-                return True
+            return True
         except Exception as error:
             return error
 
@@ -273,50 +275,48 @@ class CpuLinerTask:
         Args:
             system_operations: Boolean indicating if this stop is due to system operations.
         """
-        # Turn off the scheduler
+        # Set stop event and notify all waiting threads
         self._scheduler_stop_event.set()
 
-        # Notify all waiting threads first
         with self._condition:
             self._condition.notify_all()
 
         with self._scheduler_lock:
-            # Check if there are any running tasks - use atomic operations
+            # Check if there are any running tasks (only when system_operations)
             if system_operations:
                 with self._lock:
                     queue_empty = self._task_queue.empty()
                     running_tasks_empty = len(self._running_tasks) == 0
-
                     if not queue_empty or not running_tasks_empty:
                         logger.warning(f"Cpu liner task | detected running tasks | stopping operation terminated")
                         return None
 
-            # First cancel the task pause - use atomic operations
+            # Resume all paused tasks (lock only for accessing _running_tasks)
             with self._lock:
                 for task_id, _ in self._running_tasks.items():
-                    if platform.system() in ("Linux", "Darwin"):
+                    if platform.system() in "Linux":
                         os.kill(shared_status_info_liner.task_pid.get(task_id), signal.SIGCONT)
                     shared_status_info_liner.task_signal_transmission[task_id] = ["resume", "kill"]
 
-            # Ensure the executor is properly shut down
+            # Shutdown executor (no lock needed)
             if self._executor:
-                # Use wait=True for safe shutdown in No GIL environment
                 self._executor.shutdown(wait=False, cancel_futures=True)
 
-            # Clear the task queue
+            # Clear task queue
             self._clear_task_queue()
 
-            # Wait for the scheduler thread to finish
+            # Wait for scheduler thread to finish
             self._join_scheduler_thread()
 
-            # Wait for status thread to finish
+            # Wait for status thread
             if self._status_thread.is_alive():
                 self._status_thread.join(timeout=1.0)
             self._status_thread = threading.Thread(target=self._handle_task_status_updates, daemon=True)
 
+            # Wait for running tasks to finish
             self._wait_tasks_end()
 
-            # Reset state variables - use atomic operations with locks
+            # Reset state (lock only for resetting shared variables)
             with self._lock:
                 self._scheduler_started = False
                 self._running_tasks.clear()
@@ -324,14 +324,13 @@ class CpuLinerTask:
 
             self._scheduler_thread = None
 
-            # Cancel idle timer safely
+            # Cancel idle timer (has its own lock)
             with self._idle_timer_lock:
                 if self._idle_timer is not None:
                     self._idle_timer.cancel()
                     self._idle_timer = None
 
-            logger.debug(
-                "Scheduler and event loop have stopped, all resources have been released and parameters reset")
+            logger.debug("Scheduler and event loop have stopped, all resources have been released and parameters reset")
         return None
 
     def _wait_tasks_end(self) -> None:
@@ -348,40 +347,45 @@ class CpuLinerTask:
         Scheduler function, fetch tasks from the task queue and submit them to the process pool for execution.
         """
         with DillProcessPoolExecutor(
-                max_workers=int(config["cpu_liner_task"] + math.ceil(config["cpu_liner_task"] / 2)),
+                max_workers=int(config["cpu_liner_task"] * 2),
                 initializer=exit_cleanup) as executor:
 
             self._executor = executor
             while not self._scheduler_stop_event.is_set():
+                task = None
+                # Wait for task with condition, but release lock before submitting
                 with self._condition:
-                    # Use loop and timeout to prevent spurious wakeup
                     while (self._task_queue.empty() and
                            not self._scheduler_stop_event.is_set()):
-                        self._condition.wait(timeout=1.0)  # Add timeout to prevent permanent waiting
+                        self._condition.wait(timeout=1.0)
 
                     if self._scheduler_stop_event.is_set():
                         break
 
-                    # Check queue state again due to possible spurious wakeup
                     if self._task_queue.empty():
                         continue
 
-                    task = self._task_queue.get()
+                    # Atomically get a task from the queue (inside lock)
+                    task = self._task_queue.queue[0]
+
+                # Now task is taken out of queue, lock released
+                if task is None:
+                    continue
 
                 timeout_processing, task_name, task_id, func, priority, args, kwargs = task
 
-                # Use lock protection for shared state updates
+                # Submit to executor (no lock held)
                 try:
                     future = executor.submit(_execute_task, task, shared_status_info_liner.task_status_queue,
                                              shared_status_info_liner.task_signal_transmission,
                                              shared_status_info_liner.task_pid)
-                except Exception:
-                    pass
+                    with self._lock:
+                        self._running_tasks[task_id] = [future, task_name, priority]
+                    self._task_queue.get()
 
-                with self._lock:
-                    self._running_tasks[task_id] = [future, task_name, priority]
-
-                future.add_done_callback(partial(self._task_done, task_id))
+                    future.add_done_callback(partial(self._task_done, task_id))
+                except Exception as error:
+                    shared_status_info_liner.task_status_queue.put(("failed", task_id, None, None, None, error, None))
 
     def _task_done(self,
                    task_id: str,
@@ -394,12 +398,11 @@ class CpuLinerTask:
             future: Future object corresponding to the task.
         """
         result = None
-
+        _task_counter.remove_high_priority_task(task_id)
         try:
             result = future.result()  # Get the task result, where the exception will be thrown
 
         except (KeyboardInterrupt, BrokenExecutor, BrokenPipeError):
-            # Prevent problems caused by exit errors
             logger.warning(f"task | {task_id} | cancelled, forced termination")
             shared_status_info_liner.task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
             result = "cancelled action"
@@ -413,33 +416,43 @@ class CpuLinerTask:
             result = "failed action"
 
         finally:
-            # The storage task returns a result - use lock protection
+            # Prepare result for storage (without lock)
+            store_in_network = config["network_storage_results"]
+            serialized_result = None
+            if store_in_network:
+                serialized_result = dill.dumps(result)
+
+            # Update status and store result with minimal lock
             with self._lock:
                 if result not in ["timeout action", "cancelled action", "failed action"]:
                     shared_status_info_liner.task_status_queue.put(("completed", task_id, None, None, None, None, None))
                     if result is not None:
-                        if config["network_storage_results"]:
-                            store_task_result(task_id, dill.dumps(result))
+                        if store_in_network:
+                            pass  # will store outside lock
                         else:
                             self._task_results[task_id] = [result, time.time()]
                     else:
-                        if config["network_storage_results"]:
-                            store_task_result(task_id, dill.dumps(result))
+                        if store_in_network:
+                            pass
                         else:
                             self._task_results[task_id] = ["completed action", time.time()]
                 else:
-                    if config["network_storage_results"]:
-                        store_task_result(task_id, dill.dumps(result))
+                    if store_in_network:
+                        pass
                     else:
                         self._task_results[task_id] = [result, time.time()]
 
-                # Make sure the Future object is deleted
+                # Remove from running tasks
                 if task_id in self._running_tasks:
                     del self._running_tasks[task_id]
 
                 # Check if all tasks are completed
                 if self._task_queue.empty() and len(self._running_tasks) == 0:
                     self._reset_idle_timer()
+
+            # Perform network storage outside lock (I/O operation)
+            if store_in_network:
+                store_task_result(task_id, serialized_result)
 
     def _reset_idle_timer(self) -> None:
         """
@@ -482,7 +495,7 @@ class CpuLinerTask:
         Wait for the scheduler thread to finish.
         """
         if self._scheduler_thread and self._scheduler_thread.is_alive():
-            self._scheduler_thread.join(timeout=1.0)  # Add timeout to prevent permanent waiting
+            self._scheduler_thread.join(timeout=1.0)
 
     def force_stop_task(self,
                         task_id: str) -> bool:
@@ -495,7 +508,6 @@ class CpuLinerTask:
         Returns:
             Whether the task was successfully force stopped.
         """
-        # Use lock protection for running tasks dictionary access
         with self._lock:
             task_info = self._running_tasks.get(task_id)
             if not task_info:
@@ -515,7 +527,7 @@ class CpuLinerTask:
                 if platform.system() == "Windows":
                     # First ensure that the task is not paused.
                     shared_status_info_liner.task_signal_transmission[task_id] = ["resume", "kill"]
-                elif platform.system() in ("Linux", "Darwin"):
+                elif platform.system() in "Linux":
                     pid = shared_status_info_liner.task_pid.get(task_id)
                     if pid:
                         os.kill(pid, signal.SIGCONT)
@@ -540,7 +552,6 @@ class CpuLinerTask:
         Returns:
             Whether the task was successfully paused.
         """
-        # Use lock protection for running tasks dictionary access
         with self._lock:
             if task_id not in self._running_tasks and not platform.system() == "Windows":
                 logger.warning(f"The pause signal must be issued in the main thread.")
@@ -548,9 +559,8 @@ class CpuLinerTask:
 
         try:
             if platform.system() == "Windows":
-                # Use lock protection for running tasks dictionary access
                 shared_status_info_liner.task_signal_transmission[task_id] = ["pause"]
-            elif platform.system() in ("Linux", "Darwin"):
+            elif platform.system() in "Linux":
                 pid = shared_status_info_liner.task_pid.get(task_id)
                 if pid:
                     os.kill(pid, signal.SIGSTOP)
@@ -576,7 +586,6 @@ class CpuLinerTask:
         Returns:
             Whether the task was successfully resumed.
         """
-        # Use lock protection for running tasks dictionary access
         with self._lock:
             if task_id not in self._running_tasks and not platform.system() == "Windows":
                 logger.warning(f"The resume signal must be issued in the main thread.")
@@ -585,7 +594,7 @@ class CpuLinerTask:
         try:
             if platform.system() == "Windows":
                 shared_status_info_liner.task_signal_transmission[task_id] = ["resume"]
-            elif platform.system() in ("Linux", "Darwin"):
+            elif platform.system() in "Linux":
                 pid = shared_status_info_liner.task_pid.get(task_id)
                 if pid:
                     os.kill(pid, signal.SIGCONT)
@@ -611,7 +620,6 @@ class CpuLinerTask:
         Returns:
             Task return result, or None if the task is not completed or does not exist.
         """
-        # Use lock protection for results dictionary access and modification
         with self._lock:
             if task_id in self._task_results:
                 result = self._task_results[task_id][0]

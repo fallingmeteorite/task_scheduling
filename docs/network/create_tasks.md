@@ -5,7 +5,7 @@ str, func: Callable, *args, **kwargs) -> str or None
 
 - 警告:
 
-`Windows`,`Linux`,`Mac`在多进程中都统一使用`spawn`
+`Windows`,`Linux`在多进程中都统一使用`spawn`
 
 IO异步任务中将不会阻拦同名任务执行,将提交后交给事件循环管理,其他任务中的同名任务都会排队执行(
 可以在工具一栏找到随机名字来绕过该限制,前提是该任务执行的不是读写等,不能多线程操作的行为)

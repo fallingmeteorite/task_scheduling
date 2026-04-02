@@ -154,7 +154,7 @@ class IoAsyncioTask:
                     self._task_counters[task_name] = 0  # Initialize the task counter
 
                 if self._task_counters[task_name] >= config["io_asyncio_task"] or len(self._task_counters) >= config[
-                    "maximum_event_loop"]:
+                    "maximum_event_loop"] or len(self._running_tasks) >= config["io_asyncio_task"]:
                     return False
 
                 # If the scheduler thread has not started, start it
@@ -165,19 +165,21 @@ class IoAsyncioTask:
                     self._scheduler_stop_events[task_name] = threading.Event()  # Create stop event for this task name
                     self._start_scheduler(task_name)
 
-                # Add Count Reference
+                # Increment counter under lock (fast operation)
                 with self._lock:
                     self._task_counters[task_name] += 1
-                task_status_manager.add_task_status(task_id, None, "waiting", None, None, None, None, "io_asyncio_task")
-                self._task_queues[task_name].put((timeout_processing, task_name, task_id, func, args, kwargs))
 
-                # Cancel the idle timer
-                self._cancel_idle_timer(task_name)
+            # Status update and queue put (thread-safe, no lock needed)
+            task_status_manager.add_task_status(task_id, None, "waiting", None, None, None, None, "io_asyncio_task")
+            self._task_queues[task_name].put((timeout_processing, task_name, task_id, func, args, kwargs))
 
-                with self._lock:
-                    self._lock.notify()  # Notify the scheduler thread that a new task is available
+            # Cancel idle timer (has its own lock)
+            self._cancel_idle_timer(task_name)
 
-                return True
+            with self._lock:
+                self._lock.notify()  # Notify the scheduler thread that a new task is available
+
+            return True
         except Exception as error:
             return error
 
@@ -230,13 +232,13 @@ class IoAsyncioTask:
                 self._scheduler_started = False
                 self._lock.notify_all()
 
-            # Clear the task queue
+            # Clear the task queue (no lock needed, operates on its own)
             self._clear_task_queue(task_name)
 
-            # Stop the event loop
+            # Stop the event loop (no lock needed)
             self._stop_event_loop(task_name)
 
-            # Wait for the scheduler thread to finish
+            # Wait for the scheduler thread to finish (no lock needed)
             self._join_scheduler_thread(task_name)
 
             # Reset parameters for scheduler restart - use atomic operations
@@ -304,7 +306,6 @@ class IoAsyncioTask:
             for task_name in list(self._scheduler_threads.keys()):
                 self._join_scheduler_thread(task_name)
 
-            # self._wait_tasks_end()
             # Reset all parameters - use atomic operations with lock
             with self._lock:
                 self._task_results.clear()
@@ -354,17 +355,17 @@ class IoAsyncioTask:
                         self._task_queues[task_name].empty()):
                     continue
 
-                task = self._task_queues[task_name].get()
+                task = self._task_queues[task_name].queue[0]
 
             # Execute the task after the lock is released
             timeout_processing, task_name, task_id, func, args, kwargs = task
             future = asyncio.run_coroutine_threadsafe(_execute_task(task), self._event_loops[task_name])
             _task_manager.add(future, None, None, task_id)
 
-            # Use lock protection for shared state updates
+            # Use lock protection for shared state updates (fast operation)
             with self._lock:
                 self._running_tasks[task_id] = [future, task_name]
-
+            self._task_queues[task_name].get()
             future.add_done_callback(partial(self._task_done, task_id, task_name))
 
     def _task_done(self,
@@ -380,11 +381,9 @@ class IoAsyncioTask:
             future: Future object corresponding to the task.
         """
         try:
-
             result = future.result()
         except CancelledError:
             result = "cancelled action"
-
         except Exception as error:
             if config["exception_thrown"]:
                 raise
@@ -393,23 +392,23 @@ class IoAsyncioTask:
             task_status_manager.add_task_status(task_id, None, "failed", None, None, error, None, None)
             result = "failed action"
 
-        # Save the result returned by the task - use lock protection
+        # Prepare data for network storage outside lock
+        network_storage = config["network_storage_results"]
+        serialized_result = None
+        if network_storage:
+            serialized_result = dill.dumps(result)
+
+        # Lock-protected section: update local results and counters
         with self._lock:
             if result not in ["timeout action", "cancelled action", "failed action"]:
                 if result is not None:
-                    if config["network_storage_results"]:
-                        store_task_result(task_id, dill.dumps(result))
-                    else:
+                    if not network_storage:
                         self._task_results[task_id] = [result, time.time()]
                 else:
-                    if config["network_storage_results"]:
-                        store_task_result(task_id, dill.dumps(result))
-                    else:
+                    if not network_storage:
                         self._task_results[task_id] = ["completed action", time.time()]
             else:
-                if config["network_storage_results"]:
-                    store_task_result(task_id, dill.dumps(result))
-                else:
+                if not network_storage:
                     self._task_results[task_id] = [result, time.time()]
 
             # Remove the task from running tasks dictionary
@@ -420,10 +419,6 @@ class IoAsyncioTask:
             if task_name in self._task_counters and self._task_counters[task_name] > 0:
                 self._task_counters[task_name] -= 1
 
-            # Update task status
-            if result not in ["timeout action", "cancelled action", "failed action"]:
-                task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None, None)
-
             # Check if all tasks are completed
             if (task_name in self._task_queues and
                     self._task_queues[task_name].empty() and
@@ -432,6 +427,14 @@ class IoAsyncioTask:
 
             # Notify the scheduler to continue scheduling new tasks
             self._lock.notify()
+
+        # Perform network storage outside lock (I/O operation)
+        if network_storage:
+            store_task_result(task_id, serialized_result)
+
+        # Update task status (no lock needed, as it's a separate thread-safe component)
+        if result not in ["timeout action", "cancelled action", "failed action"]:
+            task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None, None)
 
     # The task scheduler closes the countdown
     def _reset_idle_timer(self,

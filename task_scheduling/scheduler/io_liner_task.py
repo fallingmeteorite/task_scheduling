@@ -160,40 +160,46 @@ class IoLinerTask:
             Whether the task was successfully added.
         """
         try:
+            need_add_high = False
+            # Capacity check (lock only for shared state)
+            with self._lock:
+                if _task_counter.is_high_priority(priority):
+                    if _task_counter.is_high_priority_full(config["io_liner_task"]):
+                        return False
+                    # Prevent circular locking
+                    need_add_high = True
+                else:
+                    # Atomic Check Queue Size and Running Tasks
+                    queue_size = self._task_queue.qsize()
+                    running_task_names = {details[1] for details in self._running_tasks.values()}
+
+                    if queue_size >= config["io_liner_task"] or len(self._running_tasks) >= config[
+                        "io_liner_task"]:
+                        return False
+
+                    if task_name in running_task_names:
+                        return False
+
+            if need_add_high:
+                _task_counter.add_high_priority_task(task_id, self._running_tasks)
+
+            # Scheduler state handling (protected by scheduler_lock)
             with self._scheduler_lock:
-                # Use a lock to protect queue size checks and task execution checks
-                with self._lock:
-                    if not _task_counter.is_high_priority(priority):
-                        # Atomic Check Queue Size and Running Tasks
-                        queue_size = self._task_queue.qsize()
-                        running_task_names = {details[1] for details in self._running_tasks.values()}
-
-                        if queue_size >= config["io_liner_task"]:
-                            return False
-
-                        if task_name in running_task_names:
-                            return False
-                    else:
-                        if not _task_counter.add_count(math.ceil(config["io_liner_task"])):
-                            return False
-
                 if self._scheduler_stop_event.is_set() and not self._scheduler_started:
                     self._join_scheduler_thread()
 
-                # Reduce the granularity of the lock
                 task_status_manager.add_task_status(task_id, None, "waiting", None, None, None, None, "io_liner_task")
-
                 self._task_queue.put((timeout_processing, task_name, task_id, func, priority, args, kwargs))
 
                 if not self._scheduler_started:
                     self._start_scheduler()
 
-                with self._condition:
-                    self._condition.notify()
+            with self._condition:
+                self._condition.notify()
 
-                self._cancel_idle_timer()
+            self._cancel_idle_timer()
 
-                return True
+            return True
         except Exception as error:
             return error
 
@@ -224,7 +230,7 @@ class IoLinerTask:
             self._condition.notify_all()
 
         with self._scheduler_lock:
-            # Check if all tasks are completed
+            # Check if all tasks are completed (only when system_operations)
             if system_operations:
                 with self._lock:
                     if not self._task_queue.empty() or len(self._running_tasks) != 0:
@@ -239,14 +245,10 @@ class IoLinerTask:
                 # Use wait=True to ensure a safe shutdown
                 self._executor.shutdown(wait=False, cancel_futures=True)
 
-            # Clear the task queue - Needs to be protected by a lock
+            # Clear the task queue
             self._clear_task_queue()
 
-            # Wait for the scheduler thread to finish
-            self._join_scheduler_thread()
-
-            self._wait_tasks_end()
-            # Reset state variables - Needs to be protected by a lock
+            # Reset state variables
             with self._lock:
                 self._scheduler_started = False
                 self._running_tasks.clear()
@@ -262,6 +264,11 @@ class IoLinerTask:
 
             logger.debug(
                 "Scheduler and event loop have stopped, all resources have been released and parameters reset")
+
+        # Wait for scheduler thread and running tasks to finish (outside lock)
+        self._join_scheduler_thread()
+        self._wait_tasks_end()
+
         return None
 
     def _wait_tasks_end(self) -> None:
@@ -269,8 +276,9 @@ class IoLinerTask:
         Wait for all tasks to finish
         """
         while True:
-            if len(self._running_tasks) == 0:
-                break
+            with self._lock:
+                if len(self._running_tasks) == 0:
+                    break
             time.sleep(0.01)
 
     # Task scheduler
@@ -278,7 +286,7 @@ class IoLinerTask:
         """
         Scheduler function, fetch tasks from the task queue and submit them to the thread pool for execution.
         """
-        with ThreadPoolExecutor(max_workers=int(config["io_liner_task"] + math.ceil(config["io_liner_task"] / 2))
+        with ThreadPoolExecutor(max_workers=int(config["io_liner_task"] * 2)
                                 ) as executor:
             self._executor = executor
             while not self._scheduler_stop_event.is_set():
@@ -295,16 +303,17 @@ class IoLinerTask:
                     if self._task_queue.empty():
                         continue
 
-                    task = self._task_queue.get()
+                    task = self._task_queue.queue[0]
 
                 timeout_processing, task_name, task_id, func, priority, args, kwargs = task
 
-                # Use a lock to protect updates to the task dictionary during execution
+                # Submit task outside lock to reduce lock hold time
+                future = executor.submit(_execute_task, task)
                 with self._lock:
-                    future = executor.submit(_execute_task, task)
                     self._running_tasks[task_id] = [future, task_name, priority]
+                self._task_queue.get()
 
-                    future.add_done_callback(partial(self._task_done, task_id))
+                future.add_done_callback(partial(self._task_done, task_id))
 
     # A function that executes a task
     def _task_done(self,
@@ -318,7 +327,7 @@ class IoLinerTask:
             future: Future object corresponding to the task.
         """
         result = None
-
+        _task_counter.remove_high_priority_task(task_id)
         try:
             result = future.result()  # Get task result, exceptions will be raised here
 
@@ -333,40 +342,40 @@ class IoLinerTask:
             result = "failed action"
 
         finally:
-            # Store task return results - Use a lock to protect the result dictionary
+            # Prepare data for network storage (outside lock)
+            network_storage = config["network_storage_results"]
+            store_data = None
+            if network_storage:
+                store_data = dill.dumps(result)
+
+            # Lock-protected section: update local results and running tasks
             with self._lock:
                 if result not in ["timeout action", "cancelled action", "failed action"]:
                     if result is not None:
-                        if config["network_storage_results"]:
-                            store_task_result(task_id, dill.dumps(result))
-                        else:
-                            if config["network_storage_results"]:
-                                store_task_result(task_id, dill.dumps(result))
-                            else:
-                                self._task_results[task_id] = [result, time.time()]
+                        if not network_storage:
+                            self._task_results[task_id] = [result, time.time()]
                     else:
-                        if config["network_storage_results"]:
-                            store_task_result(task_id, dill.dumps(result))
-                        else:
+                        if not network_storage:
                             self._task_results[task_id] = ["completed action", time.time()]
                 else:
-                    if config["network_storage_results"]:
-                        store_task_result(task_id, dill.dumps(result))
-                    else:
+                    if not network_storage:
                         self._task_results[task_id] = [result, time.time()]
 
-                # Remove from the running task dictionary - already under lock protection
+                # Remove from the running task dictionary
                 if task_id in self._running_tasks:
                     del self._running_tasks[task_id]
+
+                # Check if all tasks are completed
+                if self._task_queue.empty() and len(self._running_tasks) == 0:
+                    self._reset_idle_timer()
+
+            # Perform network storage outside lock (I/O operation)
+            if network_storage:
+                store_task_result(task_id, store_data)
 
             # Update task status
             if result not in ["timeout action", "cancelled action", "failed action"]:
                 task_status_manager.add_task_status(task_id, None, "completed", None, time.time(), None, None, None)
-
-            # Check if all tasks are completed - Atomicity check required
-            with self._lock:
-                if self._task_queue.empty() and len(self._running_tasks) == 0:
-                    self._reset_idle_timer()
 
     # The task scheduler closes the countdown
     def _reset_idle_timer(self) -> None:
