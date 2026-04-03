@@ -16,6 +16,7 @@ The manager is designed to work with threading tasks and provides:
 Key Components:
     ThreadTaskManager: Main class for managing thread tasks with control capabilities
 """
+import platform
 import threading
 from typing import Dict, Any
 
@@ -119,8 +120,10 @@ class ThreadTaskManager:
 
     def pause_task(self, task_id: str) -> None:
         """Pause specific task."""
-        self._execute_operation(task_id, 'pause', 'clear')
+        if platform.system() == "Windows":
+            self._execute_operation(task_id, 'pause', 'pause')
 
     def resume_task(self, task_id: str) -> None:
         """Resume specific task."""
-        self._execute_operation(task_id, 'pause', 'set')
+        if platform.system() == "Windows":
+            self._execute_operation(task_id, 'pause', 'resume')

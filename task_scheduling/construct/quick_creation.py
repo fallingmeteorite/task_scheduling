@@ -18,6 +18,10 @@ def task_group(share_info, sharedtaskdict, task_signal_transmission, task_dict):
         task_dict: Dictionary mapping task names to their arguments
                    Format: {task_name: (function, timeout_processing, *args)}
     """
+    import platform
+    if not platform.system() == "Windows":
+        raise Exception("Only Windows is supported")
+
     import threading
     from task_scheduling.construct.utils import wait_branch_thread_ended
     def decorator_func(func, share_info, sharedtaskdict, timeout_processing, task_name):

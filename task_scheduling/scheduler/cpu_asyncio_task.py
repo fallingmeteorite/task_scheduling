@@ -10,6 +10,8 @@ import queue
 import os
 import threading
 import time
+import signal
+import platform
 import dill
 
 from concurrent.futures import ProcessPoolExecutor, Future, BrokenExecutor
@@ -23,6 +25,8 @@ from task_scheduling.result_server import store_task_result
 from task_scheduling.scheduler.utils import exit_cleanup, SharedStatusInfo, retry_on_error_decorator_check, \
     DillProcessPoolExecutor
 
+_thread_suspender = ThreadSuspender()
+_thread_terminator = ThreadTerminator()
 shared_status_info_asyncio = SharedStatusInfo()
 
 
@@ -47,8 +51,8 @@ async def _execute_task_async(task: Tuple[bool, str, str, Callable, Tuple, Dict]
     timeout_processing, task_name, task_id, func, args, kwargs = task
     logger.debug(f"Start running task, task ID: {task_id}")
 
-    with ThreadTerminator().terminate_control() as terminate_ctx:
-        with ThreadSuspender() as pause_ctx:
+    with _thread_terminator.terminate_control() as terminate_ctx:
+        with _thread_suspender.suspend_context() as pause_ctx:
             task_manager.add(terminate_ctx, pause_ctx, task_id)
 
             task_status_queue.put(("running", task_id, None, time.time(), None, None, None))
@@ -271,6 +275,8 @@ class CpuAsyncioTask:
             # Resume all paused tasks (lock only for accessing _running_tasks)
             with self._lock:
                 for task_id, _ in self._running_tasks.items():
+                    if platform.system() in "Linux":
+                        os.kill(shared_status_info_asyncio.task_pid.get(task_id), signal.SIGCONT)
                     shared_status_info_asyncio.task_signal_transmission[task_id] = ["resume", "kill"]
 
             # Shutdown executor (no lock needed)
@@ -487,8 +493,15 @@ class CpuAsyncioTask:
                 return True
 
         # Send termination signal to running task (outside lock)
-        shared_status_info_asyncio.task_signal_transmission[task_id] = ["resume", "kill"]
-
+        if platform.system() == "Windows":
+            shared_status_info_asyncio.task_signal_transmission[task_id] = ["resume", "kill"]
+        elif platform.system() in "Linux":
+            pid = shared_status_info_asyncio.task_pid.get(task_id)
+            if pid:
+                os.kill(pid, signal.SIGCONT)
+                shared_status_info_asyncio.task_signal_transmission[task_id] = ["kill"]
+            else:
+                logger.warning(f"task | {task_id} | no PID found for task")
         return True
 
     def pause_task(self,
@@ -507,7 +520,15 @@ class CpuAsyncioTask:
                 logger.warning(f"task | {task_id} | does not exist or is already completed")
                 return False
 
-        shared_status_info_asyncio.task_signal_transmission[task_id] = ["pause"]
+        if platform.system() == "Windows":
+            shared_status_info_asyncio.task_signal_transmission[task_id] = ["pause"]
+        elif platform.system() in "Linux":
+            pid = shared_status_info_asyncio.task_pid.get(task_id)
+            if pid:
+                os.kill(pid, signal.SIGSTOP)
+            else:
+                logger.warning(f"task | {task_id} | no PID found for task")
+                return False
 
         shared_status_info_asyncio.task_status_queue.put(("paused", task_id, None, None, None, None, None))
         logger.info(f"task | {task_id} | paused")
@@ -529,7 +550,15 @@ class CpuAsyncioTask:
                 logger.warning(f"task | {task_id} | does not exist or is already completed")
                 return False
 
-        shared_status_info_asyncio.task_signal_transmission[task_id] = ["resume"]
+        if platform.system() == "Windows":
+            shared_status_info_asyncio.task_signal_transmission[task_id] = ["resume"]
+        elif platform.system() in "Linux":
+            pid = shared_status_info_asyncio.task_pid.get(task_id)
+            if pid:
+                os.kill(pid, signal.SIGCONT)
+            else:
+                logger.warning(f"task | {task_id} | no PID found for task")
+                return False
 
         shared_status_info_asyncio.task_status_queue.put(("running", task_id, None, None, None, None, None))
         logger.info(f"task | {task_id} | resumed")

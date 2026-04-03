@@ -6,6 +6,10 @@ Initialize available methods
 import sys
 
 try:
+    import platform
+    if not platform.system() in ("Windows", "Linux"):
+        raise Exception("Unsupported operating system")
+
     from task_scheduling.common import configure_logger, ensure_config_loaded
 
     # Initialize logger configuration at module load

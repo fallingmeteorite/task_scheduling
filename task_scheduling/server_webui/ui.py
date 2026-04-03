@@ -155,8 +155,7 @@ def get_tasks_info():
             'status': status.upper(),
             'type': task_info.get('task_type', 'Unknown'),
             'duration': _calculate_elapsed_time_seconds(task_info),
-            'start_time': task_info.get('start_time'),
-            'priority': task_info.get('priority', 'N/A')
+            'start_time': task_info.get('start_time')  # Add this line
         }
 
         # Add error message if exists

@@ -33,7 +33,7 @@ class TaskStatusManager:
                         start_time: Optional[float] = None,
                         end_time: Optional[float] = None, error_info: Optional[str] = None,
                         is_timeout_enabled: Optional[bool] = None,
-                        task_type: str = None, priority: str = None) -> None:
+                        task_type: str = None) -> None:
         """
         Add or update task status information in the dictionary.
 
@@ -46,7 +46,6 @@ class TaskStatusManager:
             error_info: Error information. If not provided, it is not updated.
             is_timeout_enabled: Boolean indicating if timeout processing is enabled. If not provided, it is not updated.
             task_type: Task type. If not provided, it is not updated.
-            priority: Task priority
         """
         with self._lock:
             if task_id not in self._task_status_dict:
@@ -58,8 +57,7 @@ class TaskStatusManager:
                         'end_time': None,
                         'error_info': None,
                         'is_timeout_enabled': None,
-                        'task_type': None,
-                        'priority': None
+                        'task_type': None
                     }
                 else:
                     return
@@ -80,8 +78,6 @@ class TaskStatusManager:
                 task_status['is_timeout_enabled'] = is_timeout_enabled
             if task_type is not None:
                 task_status['task_type'] = task_type
-            if priority is not None:
-                task_status['priority'] = priority
 
             self._task_status_dict[task_id] = task_status
 

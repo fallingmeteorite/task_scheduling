@@ -86,6 +86,7 @@ nav:
   - 工具:
       - 随机名字: utils/random.md
       - 非阻塞睡眠: utils/sleep.md
+      - 任务暂停恢复: utils/pause.md
 
   - 高级功能:
       - 任务优先级调度: advanced/priority.md

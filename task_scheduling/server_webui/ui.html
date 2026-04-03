@@ -9,7 +9,6 @@
         /* =============================================================
            Design Tokens – Full Transparency / Glass / Refined Texture
            (All Comments In English, Original Logic Fully Preserved)
-           [UI ENHANCEMENTS ONLY] – No functional changes.
         ============================================================= */
         :root {
             --primary-base: rgba(43, 47, 76, 0.9);
@@ -551,18 +550,6 @@
             text-transform: capitalize;
         }
 
-        .task-priority {
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 20px;
-            background: var(--bg-page);
-            color: var(--text-secondary);
-            font-size: 0.7rem;
-            font-weight: 500;
-            backdrop-filter: blur(4px);
-            border: 1px solid var(--border-subtle);
-        }
-
         .task-status {
             display: inline-flex; align-items: center;
             padding: 6px 12px;
@@ -593,7 +580,7 @@
         .empty-state-icon { font-size: 2.5rem; opacity: 0.5; }
         .empty-state-title { text-transform: capitalize; }
 
-        /* ----- Detail Modal – Fixed Close Button + Scrollable Content (UI fix only) ----- */
+        /* ----- Detail Modal – Smart Start Time Display ----- */
         .detail-overlay {
             position: fixed; top:0; left:0; width:100%; height:100%;
             background: rgba(0,0,0,0.2);
@@ -609,20 +596,18 @@
         .detail-panel {
             width: 520px;
             max-width: 90vw;
-            height: auto;
             max-height: 85vh;
             background: var(--bg-card);
             border-radius: 32px;
             box-shadow: 0 35px 70px -20px rgba(0,0,0,0.4);
+            padding: 28px 30px;
+            overflow-y: auto;
             border: 1px solid rgba(255,255,255,0.25);
             transform: scale(0.95);
             transition: transform 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.1), opacity 0.2s;
             opacity: 0;
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden; /* Important: prevent overall scroll, content scrolls inside */
         }
         .active .detail-panel {
             transform: scale(1);
@@ -630,16 +615,13 @@
         }
 
         .detail-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 24px 28px 16px 28px;
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 28px;
+            padding-bottom: 12px;
             border-bottom: 1px solid var(--border-subtle);
-            flex-shrink: 0; /* Fixed header, never scrolls */
-            background: inherit;
         }
         .detail-header h2 {
-            font-size: 1.6rem;
+            font-size: 1.7rem;
             font-weight: 600;
             background: linear-gradient(145deg, var(--primary-base), var(--primary-soft));
             -webkit-background-clip: text;
@@ -652,36 +634,14 @@
             color: var(--text-secondary);
             font-size: 2rem;
             line-height: 1;
-            width: 44px;
-            height: 44px;
+            width: 44px; height: 44px;
             border-radius: 30px;
             cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            display: flex; align-items: center; justify-content: center;
             transition: 0.15s;
             backdrop-filter: blur(6px);
         }
         .close-detail:hover { background: var(--primary-light); color: white; }
-
-        /* Scrollable content area */
-        .detail-scroll-area {
-            flex: 1;
-            overflow-y: auto;
-            padding: 8px 28px 28px 28px;
-            scrollbar-width: thin;
-        }
-        .detail-scroll-area::-webkit-scrollbar {
-            width: 5px;
-        }
-        .detail-scroll-area::-webkit-scrollbar-track {
-            background: var(--border-faint);
-            border-radius: 10px;
-        }
-        .detail-scroll-area::-webkit-scrollbar-thumb {
-            background: var(--primary-soft);
-            border-radius: 10px;
-        }
 
         .detail-property { margin-bottom: 22px; }
         .detail-label {
@@ -778,17 +738,15 @@
 <!-- Notifications -->
 <div class="notification-container" id="notificationContainer"></div>
 
-<!-- Detail Overlay – Smart Start Time Display (Fixed close button + scroll) -->
+<!-- Detail Overlay – Smart Start Time Display -->
 <div class="detail-overlay" id="detailOverlay">
-    <div class="detail-panel">
+    <div class="detail-panel" id="detailPanel">
         <div class="detail-header">
             <h2>Task Details</h2>
             <button class="close-detail" id="closeDetailBtn">&times;</button>
         </div>
-        <div class="detail-scroll-area">
-            <div id="detailContent">
-                <!-- Dynamic Content -->
-            </div>
+        <div id="detailContent">
+            <!-- Dynamic Content -->
         </div>
     </div>
 </div>
@@ -908,13 +866,12 @@
             <div class="task-table-container">
                 <table class="task-table">
                     <thead>
-                        <tr>
-                            <th>Task</th>
-                            <th>Type</th>
-                            <th>Priority</th>
-                            <th>Status</th>
-                            <th>Duration</th>
-                        </tr>
+                    <tr>
+                        <th>Task</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Duration</th>
+                    </tr>
                     </thead>
                     <tbody id="tasks"></tbody>
                 </table>
@@ -925,7 +882,7 @@
 </div>
 
 <script>
-    // ========== All Javascript Logic Preserved, Smart Start Time Display + Priority ==========
+    // ========== All Javascript Logic Preserved, Smart Start Time Display ==========
     (function() {
         // ---------- Notification System ----------
         class NotificationSystem {
@@ -1118,7 +1075,7 @@
             return filtered;
         }
 
-        // ---------- Detail Panel With Smart Start Time Display and Priority ----------
+        // ---------- Detail Panel With Smart Start Time Display ----------
         const overlay = document.getElementById('detailOverlay');
         const detailContent = document.getElementById('detailContent');
         const closeBtn = document.getElementById('closeDetailBtn');
@@ -1169,9 +1126,13 @@
 
             const errorBlock = task.error_info ? `<div class="detail-error"><strong>Error:</strong> ${task.error_info}</div>` : '';
 
-            // Smart start time display
+            // Smart start time display:
+            // - For queuing/waiting tasks: show "Not Started"
+            // - For other tasks with start_time: show formatted time
+            // - For other tasks without start_time: show "N/A"
             let startTimeDisplay = 'N/A';
             const statusLower = task.status.toLowerCase();
+
             if (statusLower === 'queuing' || statusLower === 'waiting') {
                 startTimeDisplay = 'Not Started';
             } else if (task.start_time) {
@@ -1179,7 +1140,6 @@
                 if (formatted) startTimeDisplay = formatted;
             }
 
-            const priorityValue = task.priority !== undefined && task.priority !== null ? task.priority : 'N/A';
             const startTimeHtml = `<div class="detail-property">
                 <div class="detail-label">Started</div>
                 <div class="detail-value">${startTimeDisplay}</div>
@@ -1189,7 +1149,6 @@
                 <div class="detail-property"><div class="detail-label">Task Id</div><div class="detail-value">${task.id}</div></div>
                 <div class="detail-property"><div class="detail-label">Name</div><div class="detail-value">${task.name || 'Unnamed'}</div></div>
                 <div class="detail-property"><div class="detail-label">Type</div><div class="detail-value">${capitalizeFirst(task.type) || 'N/A'}</div></div>
-                <div class="detail-property"><div class="detail-label">Priority</div><div class="detail-value">${priorityValue}</div></div>
                 <div class="detail-property"><div class="detail-label">Status</div><div class="detail-value"><span class="task-status status-${task.status.toLowerCase()}"><span class="status-indicator"></span>${capitalizeFirst(task.status)}</span></div></div>
                 ${startTimeHtml}
                 <div class="detail-property"><div class="detail-label">Duration</div><div class="detail-value">${formatDuration(task.duration)}</div></div>
@@ -1285,7 +1244,7 @@
             }
         }
 
-        // ---------- Main Table Rendering with Priority Column ----------
+        // ---------- Main Table Rendering ----------
         function updatePage(data, searchTerm = '', statusFilter = 'all') {
             if (data === "nan" || !data || typeof data !== 'object') {
                 showNoTasksState();
@@ -1318,7 +1277,6 @@
                 const filtered = filterTasks(data.tasks, searchTerm, statusFilter);
                 if (filtered.length > 0) {
                     tasksContainer.innerHTML = filtered.map(task => {
-                        const priorityDisplay = (task.priority !== undefined && task.priority !== null) ? task.priority : 'N/A';
                         return `
                         <tr class="task-row" data-task-id="${task.id}">
                             <td class="task-info">
@@ -1326,7 +1284,6 @@
                                 <div class="task-id">Id: ${highlightText(task.id, searchTerm)}</div>
                             </td>
                             <td><span class="task-type">${capitalizeFirst(task.type) || 'N/A'}</span></td>
-                            <td><span class="task-priority">${priorityDisplay}</span></td>
                             <td><span class="task-status status-${task.status.toLowerCase()}"><span class="status-indicator"></span>${capitalizeFirst(task.status)}</span></td>
                             <td>${formatDuration(task.duration)}</td>
                         </tr>
@@ -1363,7 +1320,7 @@
                     });
 
                 } else {
-                    tasksContainer.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">🔍</div><div class="empty-state-title">No tasks found</div></div></td></tr>`;
+                    tasksContainer.innerHTML = `<tr><td colspan="4"><div class="empty-state"><div class="empty-state-icon">🔍</div><div class="empty-state-title">No tasks found</div></div></td></tr>`;
                 }
             } else {
                 showNoTasksState();
@@ -1372,7 +1329,7 @@
         }
 
         function showNoTasksState() {
-            document.getElementById('tasks').innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">☁️</div><div class="empty-state-title">No tasks available</div></div></td></tr>`;
+            document.getElementById('tasks').innerHTML = `<tr><td colspan="4"><div class="empty-state"><div class="empty-state-icon">☁️</div><div class="empty-state-title">No tasks available</div></div></td></tr>`;
             ['total-count', 'running-count', 'failed-count', 'completed-count', 'queuing-count', 'waiting-count', 'paused-count', 'cancelled-count', 'timeout-count']
                 .forEach(id => document.getElementById(id).textContent = '0');
         }
@@ -1405,15 +1362,15 @@
                     failed_count: 1,
                     completed_count: 5,
                     tasks: [
-                        { id: "task-001-very-long-id-example", name: "Process Data", type: "data", status: "Running", duration: 125, start_time: Math.floor(Date.now()/1000) - 125, priority: "High" },
-                        { id: "task-002", name: "Generate Report", type: "report", status: "Completed", duration: 45, start_time: Math.floor(Date.now()/1000) - 500, priority: "Medium" },
-                        { id: "task-003", name: "Backup Database", type: "database", status: "Failed", duration: 300, error_info: "Connection timeout", start_time: Math.floor(Date.now()/1000) - 600, priority: "Low" },
-                        { id: "task-004", name: "Send Notifications", type: "email", status: "Waiting", duration: null, start_time: null, priority: "High" },
-                        { id: "task-005", name: "Data Analysis", type: "analysis", status: "Paused", duration: 180, start_time: Math.floor(Date.now()/1000) - 200, priority: "Medium" },
-                        { id: "task-006", name: "Cleanup Job", type: "maintenance", status: "Cancelled", duration: null, start_time: Math.floor(Date.now()/1000) - 1000, priority: "Low" },
-                        { id: "task-007", name: "Data Sync", type: "sync", status: "Queuing", duration: null, start_time: null, priority: "High" },
-                        { id: "task-008", name: "Image Processing", type: "media", status: "Waiting", duration: null, start_time: null, priority: "Normal" },
-                        { id: "task-009", name: "Long Running Task", type: "batch", status: "Timeout", duration: -1, error_info: "Task execution exceeded time limit", start_time: Math.floor(Date.now()/1000) - 7200, priority: "High" }
+                        { id: "task-001-very-long-id-example", name: "Process Data", type: "data", status: "Running", duration: 125, start_time: Math.floor(Date.now()/1000) - 125 },
+                        { id: "task-002", name: "Generate Report", type: "report", status: "Completed", duration: 45, start_time: Math.floor(Date.now()/1000) - 500 },
+                        { id: "task-003", name: "Backup Database", type: "database", status: "Failed", duration: 300, error_info: "Connection timeout", start_time: Math.floor(Date.now()/1000) - 600 },
+                        { id: "task-004", name: "Send Notifications", type: "email", status: "Waiting", duration: null, start_time: null },
+                        { id: "task-005", name: "Data Analysis", type: "analysis", status: "Paused", duration: 180, start_time: Math.floor(Date.now()/1000) - 200 },
+                        { id: "task-006", name: "Cleanup Job", type: "maintenance", status: "Cancelled", duration: null, start_time: Math.floor(Date.now()/1000) - 1000 },
+                        { id: "task-007", name: "Data Sync", type: "sync", status: "Queuing", duration: null, start_time: null },
+                        { id: "task-008", name: "Image Processing", type: "media", status: "Waiting", duration: null, start_time: null },
+                        { id: "task-009", name: "Long Running Task", type: "batch", status: "Timeout", duration: -1, error_info: "Task execution exceeded time limit", start_time: Math.floor(Date.now()/1000) - 7200 }
                     ]
                 };
                 currentData = mockData;

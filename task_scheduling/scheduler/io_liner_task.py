@@ -5,7 +5,9 @@
 This module provides a task scheduler for IO-bound linear tasks using
 thread pool execution with priority-based scheduling and timeout handling.
 """
+import math
 import dill
+import platform
 import queue
 import threading
 import time
@@ -24,6 +26,8 @@ from task_scheduling.result_server import store_task_result
 # Create Manager instance
 _task_counter = TaskCounter("io_liner_task")
 _task_manager = ThreadTaskManager()
+_thread_suspender = ThreadSuspender()
+_thread_terminator = ThreadTerminator()
 
 
 def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict]) -> Any:
@@ -47,8 +51,8 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict]) -> An
     timeout_processing, task_name, task_id, func, priority, args, kwargs = task
     logger.debug(f"Start running task, task ID: {task_id}")
     try:
-        with ThreadTerminator().terminate_control() as terminate_ctx:
-            with ThreadSuspender() as pause_ctx:
+        with _thread_terminator.terminate_control() as terminate_ctx:
+            with _thread_suspender.suspend_context() as pause_ctx:
 
                 _task_manager.add(None, terminate_ctx, pause_ctx, task_id)
 
@@ -159,21 +163,22 @@ class IoLinerTask:
             need_add_high = False
             # Capacity check (lock only for shared state)
             with self._lock:
-                # Atomic Check Queue Size and Running Tasks
-                queue_size = self._task_queue.qsize()
-                running_task_names = {details[1] for details in self._running_tasks.values()}
+                if _task_counter.is_high_priority(priority):
+                    if _task_counter.is_high_priority_full(config["io_liner_task"]):
+                        return False
+                    # Prevent circular locking
+                    need_add_high = True
+                else:
+                    # Atomic Check Queue Size and Running Tasks
+                    queue_size = self._task_queue.qsize()
+                    running_task_names = {details[1] for details in self._running_tasks.values()}
 
-                if queue_size >= config["io_liner_task"] or len(self._running_tasks) >= config[
-                    "io_liner_task"]:
-                    if _task_counter.is_high_priority(priority):
-                        if _task_counter.is_high_priority_full(config["io_liner_task"]):
-                            return False
-                        # Prevent circular locking
-                        need_add_high = True
-                    return False
+                    if queue_size >= config["io_liner_task"] or len(self._running_tasks) >= config[
+                        "io_liner_task"]:
+                        return False
 
-                if task_name in running_task_names:
-                    return False
+                    if task_name in running_task_names:
+                        return False
 
             if need_add_high:
                 _task_counter.add_high_priority_task(task_id, self._running_tasks)
@@ -442,7 +447,8 @@ class IoLinerTask:
                 future.cancel()
             else:
                 # First ensure that the task is not paused.
-                _task_manager.resume_task(task_id)
+                if platform.system() == "Windows":
+                    _task_manager.resume_task(task_id)
                 _task_manager.terminate_task(task_id)
 
             task_status_manager.add_task_status(task_id, None, "cancelled", None, time.time(), None, None,
@@ -469,6 +475,10 @@ class IoLinerTask:
                 logger.warning(f"task | {task_id} | does not exist or is already completed")
                 return False
 
+        if not platform.system() == "Windows":
+            logger.warning(f"Pause and resume functionality is not supported on Linux and Mac!")
+            return False
+
         try:
             _task_manager.pause_task(task_id)
             task_status_manager.add_task_status(task_id, None, "paused", None, None, None, None, "io_liner_task")
@@ -494,6 +504,10 @@ class IoLinerTask:
             if task_id not in self._running_tasks:
                 logger.warning(f"task | {task_id} | does not exist or is already completed")
                 return False
+
+        if not platform.system() == "Windows":
+            logger.warning(f"Pause and resume functionality is not supported on Linux and Mac!")
+            return False
 
         try:
             _task_manager.resume_task(task_id)

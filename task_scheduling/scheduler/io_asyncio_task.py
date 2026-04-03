@@ -7,6 +7,7 @@ asyncio event loops with per-task-name isolation and thread-safe operations.
 """
 import asyncio
 import dill
+import platform
 import queue
 import threading
 import time
@@ -23,6 +24,7 @@ from task_scheduling.result_server import store_task_result
 
 # Create Manager instance
 _task_manager = ThreadTaskManager()
+_thread_suspender = ThreadSuspender()
 
 
 # A function that executes a task
@@ -47,7 +49,7 @@ async def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> A
     logger.debug(f"Start running task, task ID: {task_id}")
     result = None
     try:
-        with ThreadSuspender() as pause_ctx:
+        with _thread_suspender.suspend_context() as pause_ctx:
             _task_manager.add(None, None, pause_ctx, task_id)
             # Modify the task status
             task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None, None, None)
@@ -523,11 +525,13 @@ class IoAsyncioTask:
         try:
             if not future.running():
                 # First ensure that the task is not paused.
-                _task_manager.resume_task(task_id)
+                if platform.system() == "Windows":
+                    _task_manager.resume_task(task_id)
                 future.cancel()
             else:
                 # First ensure that the task is not paused.
-                _task_manager.resume_task(task_id)
+                if platform.system() == "Windows":
+                    _task_manager.resume_task(task_id)
                 _task_manager.cancel_task(task_id)
 
             task_status_manager.add_task_status(task_id, None, "cancelled", None, time.time(), None, None,
@@ -554,6 +558,10 @@ class IoAsyncioTask:
                 logger.warning(f"task | {task_id} | does not exist or is already completed")
                 return False
 
+        if not platform.system() == "Windows":
+            logger.warning(f"Pause and resume functionality is not supported on Linux and Mac!")
+            return False
+
         try:
             _task_manager.pause_task(task_id)
             task_status_manager.add_task_status(task_id, None, "paused", None, None, None, None, "io_asyncio_task")
@@ -579,6 +587,10 @@ class IoAsyncioTask:
             if task_id not in self._running_tasks:
                 logger.warning(f"task | {task_id} | does not exist or is already completed")
                 return False
+
+        if not platform.system() == "Windows":
+            logger.warning(f"Pause and resume functionality is not supported on Linux and Mac!")
+            return False
 
         try:
             _task_manager.resume_task(task_id)

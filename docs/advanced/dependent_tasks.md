@@ -6,6 +6,8 @@ task_dependency_local(main_task_id: str, dependent_task: Callable, *args) -> Non
 
 如果主任务要传回参数,必须为元组格式,不接受其他格式的参数.
 
+不支持`Linux`!
+
 - 功能说明:
 
 使用`task_creation`创建完主任务后,使用`task_dependency_local`类设置依赖于主任务返回结果的运行函数。
