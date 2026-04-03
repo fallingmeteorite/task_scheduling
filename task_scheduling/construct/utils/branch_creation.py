@@ -34,17 +34,13 @@ def branch_thread_control(share_info, _sharedtaskdict, timeout_processing, task_
     Returns:
         A decorator function that wraps the target function with thread control
     """
-    import platform
-    if not platform.system() == "Windows":
-        raise Exception("Only Windows is supported")
-
     from task_scheduling.common import logger, config
     from functools import wraps
     import time
     import uuid
 
-    (task_group_name, task_manager, _threadterminator, StopException, ThreadingTimeout, TimeoutException,
-     _threadsuspender, task_status_queue) = share_info
+    (task_group_name, task_manager, ThreadTerminator, StopException, ThreadingTimeout, TimeoutException,
+     ThreadSuspender, task_status_queue) = share_info
 
     def decorator(func):
         """Decorator function that adds thread control to the target function.
@@ -71,10 +67,10 @@ def branch_thread_control(share_info, _sharedtaskdict, timeout_processing, task_
             task_id = str(uuid.uuid4())
             _sharedtaskdict.write(task_name, task_id)
             task_status_queue.put(
-                ("running", task_id, f"{task_group_name}|{task_name}", time.time(), None, None, timeout_processing))
+                ("running", task_id, f"{task_group_name}|{task_name}", time.time(), None, None, timeout_processing, "low"))
 
-            with _threadterminator.terminate_control() as terminate_ctx:
-                with _threadsuspender.suspend_context() as pause_ctx:
+            with ThreadTerminator().terminate_control() as terminate_ctx:
+                with ThreadSuspender() as pause_ctx:
                     try:
                         return_results = None
                         task_manager.add(terminate_ctx, pause_ctx, task_id)

@@ -6,7 +6,6 @@ This module provides a task scheduler for timer-based tasks with support for
 delayed execution and daily recurring tasks using time bucket queue.
 """
 import dill
-import platform
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, Future
@@ -26,8 +25,6 @@ from task_scheduling.scheduler.utils import TimeBucketQueue
 
 # Create Manager instance
 _task_manager = ThreadTaskManager()
-_threadterminator = ThreadTerminator()
-_threadsuspender = ThreadSuspender()
 
 
 def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
@@ -50,8 +47,8 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
     logger.debug(f"Start running task, task ID: {task_id}")
 
     try:
-        with _threadterminator.terminate_control() as terminate_ctx:
-            with _threadsuspender.suspend_context() as pause_ctx:
+        with ThreadTerminator().terminate_control() as terminate_ctx:
+            with ThreadSuspender() as pause_ctx:
                 _task_manager.add(None, terminate_ctx, pause_ctx, task_id)
                 task_status_manager.add_task_status(task_id, None, "running", time.time(), None, None,
                                                     None, None)
@@ -500,8 +497,7 @@ class TimerTask:
                 future.cancel()
             else:
                 # First ensure that the task is not paused.
-                if platform.system() == "Windows":
-                    _task_manager.resume_task(task_id)
+                _task_manager.resume_task(task_id)
                 _task_manager.terminate_task(task_id)
 
             task_status_manager.add_task_status(task_id, None, "cancelled", None, time.time(), None, None, "timer_task")
@@ -526,10 +522,6 @@ class TimerTask:
             if task_id not in self._running_tasks:
                 logger.warning(f"task | {task_id} | does not exist or is already completed")
                 return False
-
-        if not platform.system() == "Windows":
-            logger.warning(f"Pause and resume functionality is not supported on Linux and Mac!")
-            return False
 
         try:
             _task_manager.pause_task(task_id)
@@ -556,10 +548,6 @@ class TimerTask:
             if task_id not in self._running_tasks:
                 logger.warning(f"task | {task_id} | does not exist or is already completed")
                 return False
-
-        if not platform.system() == "Windows":
-            logger.warning(f"Pause and resume functionality is not supported on Linux and Mac!")
-            return False
 
         try:
             _task_manager.resume_task(task_id)

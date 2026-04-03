@@ -16,7 +16,6 @@ The manager is designed to work with multiprocessing tasks and provides:
 Key Components:
     ProcessTaskManager: Main class for managing process tasks with monitoring capabilities
 """
-import platform
 import threading
 import time
 from typing import Dict, Any, Union
@@ -135,13 +134,11 @@ class ProcessTaskManager:
 
     def pause_task(self, task_id: str) -> None:
         """Pause specific task."""
-        if platform.system() == "Windows":
-            self._execute_operation(task_id, 'pause', 'pause')
+        self._execute_operation(task_id, 'pause', 'clear')
 
     def resume_task(self, task_id: str) -> None:
         """Resume specific task."""
-        if platform.system() == "Windows":
-            self._execute_operation(task_id, 'pause', 'resume')
+        self._execute_operation(task_id, 'pause', 'set')
 
     def _monitor_loop(self) -> None:
         """Monitor the task queue for control commands and process them."""

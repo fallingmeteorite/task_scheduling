@@ -98,7 +98,7 @@ class TaskScheduler:
 
             self._task_event.set()  # Wake up the allocator thread
             task_status_manager.add_task_status(task_id, task_name, "queuing", None, None, None, timeout_processing,
-                                                None)
+                                                None, priority)
 
             if not self.allocator_started:
                 self.allocator_started = True
