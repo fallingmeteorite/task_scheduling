@@ -9,8 +9,6 @@ import queue
 import os
 import threading
 import time
-import platform
-import signal
 import dill
 
 from concurrent.futures import ProcessPoolExecutor, Future, BrokenExecutor
@@ -26,8 +24,6 @@ from task_scheduling.scheduler.utils import exit_cleanup, TaskCounter, SharedSta
     retry_on_error_decorator_check, DillProcessPoolExecutor
 
 _task_counter = TaskCounter("cpu_liner_task")
-_thread_suspender = ThreadSuspender()
-_thread_terminator = ThreadTerminator()
 shared_status_info_liner = SharedStatusInfo()
 
 
@@ -64,8 +60,8 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict],
 
     task_manager = ProcessTaskManager(task_signal_transmission)
     try:
-        with _thread_terminator.terminate_control() as terminate_ctx:
-            with _thread_suspender.suspend_context() as pause_ctx:
+        with ThreadTerminator().terminate_control() as terminate_ctx:
+            with ThreadSuspender() as pause_ctx:
                 task_manager.add(terminate_ctx, pause_ctx, task_id)
 
                 task_status_queue.put(("running", task_id, None, time.time(), None, None, None))
@@ -75,8 +71,8 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict],
                         # Whether to pass in the task manager to facilitate other thread management
                         # Check whether the function needs to use hyperthreading
                         if get_param_count(func, *args, **kwargs):
-                            share_info = (task_name, task_manager, _thread_terminator, StopException, ThreadingTimeout,
-                                          TimeoutException, _thread_suspender, task_status_queue)
+                            share_info = (task_name, task_manager, ThreadTerminator, StopException, ThreadingTimeout,
+                                          TimeoutException, ThreadSuspender, task_status_queue)
                             if retry_on_error_decorator_check(func):
                                 result = func(task_id, share_info, _sharedtaskdict, task_signal_transmission, *args,
                                               **kwargs)
@@ -92,8 +88,8 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict],
                     # Whether to pass in the task manager to facilitate other thread management
                     # Check whether the function needs to use hyperthreading
                     if get_param_count(func, *args, **kwargs):
-                        share_info = (task_name, task_manager, _thread_terminator, StopException, ThreadingTimeout,
-                                      TimeoutException, _thread_suspender, task_status_queue)
+                        share_info = (task_name, task_manager, ThreadTerminator, StopException, ThreadingTimeout,
+                                      TimeoutException, ThreadSuspender, task_status_queue)
                         if retry_on_error_decorator_check(func):
                             result = func(task_id, share_info, _sharedtaskdict, task_signal_transmission, *args,
                                           **kwargs)
@@ -186,9 +182,13 @@ class CpuLinerTask:
         while not self._scheduler_stop_event.is_set() or not shared_status_info_liner.task_status_queue.empty():
             try:
                 task = shared_status_info_liner.task_status_queue.get(timeout=0.1)
-                status, task_id, task_name, start_time, end_time, error, timeout_processing = task
+                if len(task) == 7:
+                    status, task_id, task_name, start_time, end_time, error, timeout_processing = task
+                    priority = None
+                else:
+                    status, task_id, task_name, start_time, end_time, error, timeout_processing, priority = task
                 task_status_manager.add_task_status(task_id, task_name, status, start_time, end_time, error,
-                                                    timeout_processing, "cpu_liner_task")
+                                                    timeout_processing, "cpu_liner_task", priority)
 
             except (queue.Empty, ValueError, EOFError, BrokenPipeError):
                 pass  # Ignore empty queue exceptions
@@ -219,18 +219,18 @@ class CpuLinerTask:
             need_add_high = False
             # 1. Capacity check (lock only for shared state)
             with self._lock:
-                if _task_counter.is_high_priority(priority):
-                    if _task_counter.is_high_priority_full(config["cpu_liner_task"]):
-                        return False
-                    # Prevent circular locking
-                    need_add_high = True
-                else:
-                    queue_size = self._task_queue.qsize()
-                    running_task_names = {details[1] for details in self._running_tasks.values()}
-                    if queue_size >= config["cpu_liner_task"] or len(self._running_tasks) >= config["cpu_liner_task"]:
-                        return False
-                    if task_name in running_task_names:
-                        return False
+
+                queue_size = self._task_queue.qsize()
+                running_task_names = {details[1] for details in self._running_tasks.values()}
+                if queue_size >= config["cpu_liner_task"] or len(self._running_tasks) >= config["cpu_liner_task"]:
+                    if not _task_counter.is_high_priority(priority):
+                        if _task_counter.is_high_priority_full(config["cpu_liner_task"]):
+                            return False
+                        need_add_high = True
+                    return False
+
+                if task_name in running_task_names:
+                    return False
 
             if need_add_high:
                 _task_counter.add_high_priority_task(task_id, self._running_tasks)
@@ -294,8 +294,6 @@ class CpuLinerTask:
             # Resume all paused tasks (lock only for accessing _running_tasks)
             with self._lock:
                 for task_id, _ in self._running_tasks.items():
-                    if platform.system() in "Linux":
-                        os.kill(shared_status_info_liner.task_pid.get(task_id), signal.SIGCONT)
                     shared_status_info_liner.task_signal_transmission[task_id] = ["resume", "kill"]
 
             # Shutdown executor (no lock needed)
@@ -524,16 +522,7 @@ class CpuLinerTask:
             future.cancel()
         else:
             try:
-                if platform.system() == "Windows":
-                    # First ensure that the task is not paused.
-                    shared_status_info_liner.task_signal_transmission[task_id] = ["resume", "kill"]
-                elif platform.system() in "Linux":
-                    pid = shared_status_info_liner.task_pid.get(task_id)
-                    if pid:
-                        os.kill(pid, signal.SIGCONT)
-                        shared_status_info_liner.task_signal_transmission[task_id] = ["kill"]
-                    else:
-                        logger.warning(f"task | {task_id} | no PID found for task")
+                shared_status_info_liner.task_signal_transmission[task_id] = ["resume", "kill"]
             except Exception as error:
                 logger.error(f"task | {task_id} | error sending termination signal: {error}")
                 return False
@@ -552,21 +541,9 @@ class CpuLinerTask:
         Returns:
             Whether the task was successfully paused.
         """
-        with self._lock:
-            if task_id not in self._running_tasks and not platform.system() == "Windows":
-                logger.warning(f"The pause signal must be issued in the main thread.")
-                return False
-
         try:
-            if platform.system() == "Windows":
-                shared_status_info_liner.task_signal_transmission[task_id] = ["pause"]
-            elif platform.system() in "Linux":
-                pid = shared_status_info_liner.task_pid.get(task_id)
-                if pid:
-                    os.kill(pid, signal.SIGSTOP)
-                else:
-                    logger.warning(f"task | {task_id} | no PID found for task")
-                    return False
+
+            shared_status_info_liner.task_signal_transmission[task_id] = ["pause"]
 
             shared_status_info_liner.task_status_queue.put(("paused", task_id, None, None, None, None, None))
             logger.info(f"task | {task_id} | paused")
@@ -586,21 +563,8 @@ class CpuLinerTask:
         Returns:
             Whether the task was successfully resumed.
         """
-        with self._lock:
-            if task_id not in self._running_tasks and not platform.system() == "Windows":
-                logger.warning(f"The resume signal must be issued in the main thread.")
-                return False
-
         try:
-            if platform.system() == "Windows":
-                shared_status_info_liner.task_signal_transmission[task_id] = ["resume"]
-            elif platform.system() in "Linux":
-                pid = shared_status_info_liner.task_pid.get(task_id)
-                if pid:
-                    os.kill(pid, signal.SIGCONT)
-                else:
-                    logger.warning(f"task | {task_id} | no PID found for task")
-                    return False
+            shared_status_info_liner.task_signal_transmission[task_id] = ["resume"]
 
             shared_status_info_liner.task_status_queue.put(("running", task_id, None, None, None, None, None))
             logger.info(f"task | {task_id} | resumed")

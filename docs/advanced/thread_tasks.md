@@ -4,8 +4,6 @@
 
 !!!该功能只支持CPU密集型线性任务!!!
 
-不支持`Linux`!
-
 - 功能说明:
 
 `main_task`中前三位接受参数必须为`share_info`, `_sharedtaskdict`, `task_signal_transmission`(
