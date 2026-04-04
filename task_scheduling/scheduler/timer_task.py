@@ -368,7 +368,7 @@ class TimerTask:
 
         except Exception as error:
             # Other exceptions are already handled in _execute_task
-            task_status_manager.add_task_status(task_id, None, "cancelled", None, None, error, None, None)
+            task_status_manager.add_task_status(task_id, None, "failed", None, None, error, None, None)
             result = "failed action"
 
         finally:
@@ -551,7 +551,7 @@ class TimerTask:
 
         try:
             _task_manager.resume_task(task_id)
-            task_status_manager.add_task_status(task_id, None, "running", None, None, None, None, "io_liner_task")
+            task_status_manager.add_task_status(task_id, None, "running", None, None, None, None, "timer_task")
             logger.info(f"task | {task_id} | resumed")
             return True
         except Exception as error:
