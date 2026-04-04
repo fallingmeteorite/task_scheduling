@@ -6,7 +6,7 @@ remove_ban_task_name(task_name: str) -> None
 
 - 警告:
 
-已经进入调度器的任务将不会被处理，只有在任务状态为`queued`才会被取消
+已经进入调度器的任务将不会被处理，只有在任务状态为`queuing`才会被取消
 
 - 参数说明:
 
@@ -56,7 +56,7 @@ cancel_the_queue_task_by_name(task_name: str) -> None
 
 - 警告:
 
-已经进入调度器的任务将不会被处理，只有在任务状态为`queued`才会被取消
+已经进入调度器的任务将不会被处理，只有在任务状态为`queuing`才会被取消
 
 - 参数说明:
 

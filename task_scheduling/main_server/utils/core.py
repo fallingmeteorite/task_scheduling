@@ -379,9 +379,9 @@ class TaskServerCore:
             # Get task scheduling parameters
             delay = task_data.get('delay')
             daily_time = task_data.get('daily_time')
-            function_type = task_data.get('function_type', 'normal')
+            function_type = task_data.get('function_type')
             timeout_processing = task_data.get('timeout_processing', False)
-            priority = task_data.get('priority', 'normal')
+            priority = task_data.get('priority')
 
             # Validate required parameters
             if not function_code or not function_name:

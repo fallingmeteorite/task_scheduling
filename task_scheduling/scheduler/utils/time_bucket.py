@@ -19,6 +19,8 @@ class TimeBucketQueue:
     enables batch processing of tasks scheduled for the same time.
     """
 
+    __slots__ = ('_time_heap', '_buckets', '_lock')
+
     def __init__(self):
         # Min-heap that only stores execution timestamps
         self._time_heap = []

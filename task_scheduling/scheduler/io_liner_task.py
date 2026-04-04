@@ -99,9 +99,9 @@ class IoLinerTask:
     Linear task manager class, responsible for managing the scheduling, execution, and monitoring of linear tasks.
     """
     __slots__ = [
-        '_task_queue', '_running_tasks',
+        '_task_queue', '_running_tasks', '_running_task_names',
         '_lock', '_condition', '_scheduler_lock',
-        '_scheduler_started', '_scheduler_stop_event', '_scheduler_thread',
+        '_scheduler_started', '_scheduler_stop_event', '_scheduler_thread', '_task_add_lock',
         '_idle_timer', '_idle_timeout', '_idle_timer_lock',
         '_task_results',
         '_executor'
@@ -114,10 +114,12 @@ class IoLinerTask:
 
         self._task_queue = queue.Queue()  # Task queue
         self._running_tasks = {}  # Running tasks
+        self._running_task_names = set()  # Running task names for O(1) duplicate checks
 
         self._lock = threading.Lock()  # Lock to protect access to shared resources
         self._scheduler_lock = threading.RLock()  # Reentrant lock for scheduler operations
         self._condition = threading.Condition(self._lock)  # Condition variable using existing lock
+        self._task_add_lock = False
 
         self._scheduler_started = False  # Whether the scheduler thread has started
         self._scheduler_stop_event = threading.Event()  # Scheduler thread stop event
@@ -156,14 +158,14 @@ class IoLinerTask:
             Whether the task was successfully added.
         """
         try:
+            while self._task_add_lock:
+                time.sleep(0.01)
+
             need_add_high = False
             # Capacity check (lock only for shared state)
             with self._lock:
-                # Atomic Check Queue Size and Running Tasks
-                queue_size = self._task_queue.qsize()
-                running_task_names = {details[1] for details in self._running_tasks.values()}
 
-                if queue_size >= config["io_liner_task"] or len(self._running_tasks) >= config[
+                if len(self._running_tasks) >= config[
                     "io_liner_task"]:
                     if _task_counter.is_high_priority(priority):
                         if _task_counter.is_high_priority_full(config["io_liner_task"]):
@@ -172,7 +174,7 @@ class IoLinerTask:
                         need_add_high = True
                     return False
 
-                if task_name in running_task_names:
+                if task_name in self._running_task_names:
                     return False
 
             if need_add_high:
@@ -185,6 +187,8 @@ class IoLinerTask:
 
                 task_status_manager.add_task_status(task_id, None, "waiting", None, None, None, None, "io_liner_task")
                 self._task_queue.put((timeout_processing, task_name, task_id, func, priority, args, kwargs))
+                with self._lock:
+                    self._task_add_lock = True
 
                 if not self._scheduler_started:
                     self._start_scheduler()
@@ -247,7 +251,9 @@ class IoLinerTask:
             with self._lock:
                 self._scheduler_started = False
                 self._running_tasks.clear()
+                self._running_task_names.clear()
                 self._task_results.clear()
+                self._task_add_lock = True
 
             self._scheduler_thread = None
 
@@ -298,7 +304,7 @@ class IoLinerTask:
                     if self._task_queue.empty():
                         continue
 
-                    task = self._task_queue.queue[0]
+                    task = self._task_queue.get()
 
                 timeout_processing, task_name, task_id, func, priority, args, kwargs = task
 
@@ -306,7 +312,8 @@ class IoLinerTask:
                 future = executor.submit(_execute_task, task)
                 with self._lock:
                     self._running_tasks[task_id] = [future, task_name, priority]
-                self._task_queue.get()
+                    self._running_task_names.add(task_name)
+                    self._task_add_lock = True
 
                 future.add_done_callback(partial(self._task_done, task_id))
 
@@ -333,7 +340,7 @@ class IoLinerTask:
 
         except Exception as error:
             # Other exceptions have already been handled in _execute_task.
-            task_status_manager.add_task_status(task_id, None, "cancelled", None, None, error, None, None)
+            task_status_manager.add_task_status(task_id, None, "failed", None, None, error, None, None)
             result = "failed action"
 
         finally:
@@ -358,7 +365,8 @@ class IoLinerTask:
 
                 # Remove from the running task dictionary
                 if task_id in self._running_tasks:
-                    del self._running_tasks[task_id]
+                    task_info = self._running_tasks.pop(task_id, None)
+                    self._running_task_names.discard(task_info[1])
 
                 # Check if all tasks are completed
                 if self._task_queue.empty() and len(self._running_tasks) == 0:

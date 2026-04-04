@@ -131,9 +131,9 @@ class CpuAsyncioTask:
     Linear task manager class, responsible for managing the scheduling, execution, and monitoring of linear tasks.
     """
     __slots__ = [
-        '_task_queue', '_running_tasks',
+        '_task_queue', '_running_tasks', '_running_task_names',
         '_lock', '_condition', '_scheduler_lock',
-        '_scheduler_started', '_scheduler_stop_event', '_scheduler_thread',
+        '_scheduler_started', '_scheduler_stop_event', '_scheduler_thread', '_task_add_lock',
         '_idle_timer', '_idle_timeout', '_idle_timer_lock',
         '_task_results',
         '_executor', '_status_thread'
@@ -145,10 +145,12 @@ class CpuAsyncioTask:
         """
         self._task_queue = queue.Queue()  # Task queue
         self._running_tasks = {}  # Running tasks
+        self._running_task_names = set()  # Running task names for O(1) duplicate checks
 
         self._lock = threading.Lock()  # Lock to protect access to shared resources
         self._scheduler_lock = threading.RLock()  # Reentrant lock for scheduler operations
         self._condition = threading.Condition(self._lock)  # Condition variable using existing lock for synchronization
+        self._task_add_lock = False
 
         self._scheduler_started = False  # Whether the scheduler thread has started
         self._scheduler_stop_event = threading.Event()  # Scheduler thread stop event
@@ -200,21 +202,23 @@ class CpuAsyncioTask:
             Whether the task was successfully added.
         """
         try:
+            while self._task_add_lock:
+                time.sleep(0.01)
+
             # 1. Capacity check (lock only for shared state)
             with self._lock:
-                queue_size = self._task_queue.qsize()
-                running_task_names = {details[1] for details in self._running_tasks.values()}
-                if queue_size >= config["cpu_asyncio_task"] or len(self._running_tasks) >= config["cpu_asyncio_task"]:
+                if len(self._running_tasks) >= config["cpu_asyncio_task"]:
                     return False
-                if task_name in running_task_names:
+                if task_name in self._running_task_names:
                     return False
 
             # 2. Status updates (queue is thread-safe)
-            shared_status_info_asyncio.task_status_queue.put(("queuing", task_id, None, None, None, None, None))
             shared_status_info_asyncio.task_status_queue.put(("waiting", task_id, None, None, None, None, None))
 
             # 3. Put task into queue (thread-safe)
             self._task_queue.put((timeout_processing, task_name, task_id, func, args, kwargs))
+            with self._lock:
+                self._task_add_lock = True
 
             # 4. Start scheduler if needed (only protect start flag)
             with self._scheduler_lock:
@@ -295,7 +299,9 @@ class CpuAsyncioTask:
             with self._lock:
                 self._scheduler_started = False
                 self._running_tasks.clear()
+                self._running_task_names.clear()
                 self._task_results.clear()
+                self._task_add_lock = False
 
             self._scheduler_thread = None
 
@@ -353,10 +359,14 @@ class CpuAsyncioTask:
                                              shared_status_info_asyncio.task_pid)
                     with self._lock:
                         self._running_tasks[task_id] = [future, task_name]
+                        self._running_task_names.add(task_name)
 
                     future.add_done_callback(partial(self._task_done, task_id))
                 except Exception as error:
                     shared_status_info_asyncio.task_status_queue.put(("failed", task_id, None, None, None, error, None))
+                finally:
+                    with self._lock:
+                        self._task_add_lock = False
 
     def _task_done(self,
                    task_id: str,
@@ -410,7 +420,8 @@ class CpuAsyncioTask:
 
                 # Remove from running tasks
                 if task_id in self._running_tasks:
-                    del self._running_tasks[task_id]
+                    task_info = self._running_tasks.pop(task_id, None)
+                    self._running_task_names.discard(task_info[1])
 
                 # Check if all tasks are completed
                 if self._task_queue.empty() and len(self._running_tasks) == 0:

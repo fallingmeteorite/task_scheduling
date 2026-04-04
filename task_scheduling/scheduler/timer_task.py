@@ -98,9 +98,9 @@ class TimerTask:
     Timer task manager class, responsible for scheduling, executing, and monitoring timer-based tasks.
     """
     __slots__ = [
-        '_task_queue', '_running_tasks',
+        '_task_queue', '_running_tasks', '_running_task_names',
         '_lock', '_condition', '_scheduler_lock',
-        '_scheduler_started', '_scheduler_stop_event', '_scheduler_thread',
+        '_scheduler_started', '_scheduler_stop_event', '_scheduler_thread', '_task_add_lock',
         '_idle_timer', '_idle_timeout', '_idle_timer_lock',
         '_task_results',
         '_executor'
@@ -113,10 +113,12 @@ class TimerTask:
         # Use TimeBucketQueue instead of PriorityQueue
         self._task_queue = TimeBucketQueue()
         self._running_tasks = {}  # Running tasks
+        self._running_task_names = set()  # Running task names for O(1) duplicate checks
 
         self._lock = threading.Lock()  # Lock to protect access to shared resources
         self._scheduler_lock = threading.RLock()  # Reentrant lock for scheduler operations
         self._condition = threading.Condition(self._lock)  # Condition variable using existing lock for synchronization
+        self._task_add_lock = False
 
         self._scheduler_started = False  # Whether the scheduler thread has started
         self._scheduler_stop_event = threading.Event()  # Scheduler thread stop event
@@ -157,10 +159,22 @@ class TimerTask:
             Whether the task was successfully added.
         """
         try:
+            while self._task_add_lock:
+                time.sleep(0.01)
+
             # Check scheduler state (protected by scheduler_lock)
             with self._scheduler_lock:
                 if self._scheduler_stop_event.is_set() and not self._scheduler_started:
                     self._join_scheduler_thread()
+
+            # Capacity check (lock only for shared state)
+            with self._lock:
+
+                if len(self._running_tasks) >= config["io_liner_task"]:
+                    return False
+
+                if task_name in self._running_task_names:
+                    return False
 
             # Calculate execution time (no lock needed)
             if delay is not None:
@@ -182,11 +196,10 @@ class TimerTask:
             task_status_manager.add_task_status(task_id, None, "waiting", None, None, None,
                                                 None, "timer_task")
 
-            # Build task tuple (without execution time)
-            task_tuple = (timeout_processing, task_name, task_id, func, args, kwargs)
-
             # Put into time bucket queue
-            self._task_queue.put(execution_time, task_tuple)
+            self._task_queue.put(execution_time, (timeout_processing, task_name, task_id, func, args, kwargs))
+            with self._lock:
+                self._task_add_lock = True
 
             # Start scheduler if needed (protected by scheduler_lock)
             with self._scheduler_lock:
@@ -258,7 +271,9 @@ class TimerTask:
         with self._lock:
             self._scheduler_started = False
             self._running_tasks.clear()
+            self._running_task_names.clear()
             self._task_results.clear()
+            self._task_add_lock = False
 
         self._scheduler_thread = None
 
@@ -318,7 +333,7 @@ class TimerTask:
                 ready_buckets = self._task_queue.get_ready_buckets(time.time())
 
                 # Process each bucket
-                for exec_time, tasks in ready_buckets:
+                for _, tasks in ready_buckets:
                     for task in tasks:
                         # task structure: (timeout_processing, task_name, task_id, func, args, kwargs)
                         timeout_processing, task_name, task_id, func, args, kwargs = task
@@ -329,6 +344,8 @@ class TimerTask:
                         # Update running tasks dictionary (needs lock protection)
                         with self._lock:
                             self._running_tasks[task_id] = [future, task_name]
+                            self._running_task_names.add(task_name)
+                            self._task_add_lock = False
 
                         # Add completion callback (pass full task parameters for rescheduling etc.)
                         future.add_done_callback(
@@ -368,7 +385,7 @@ class TimerTask:
 
         except Exception as error:
             # Other exceptions are already handled in _execute_task
-            task_status_manager.add_task_status(task_id, None, "cancelled", None, None, error, None, None)
+            task_status_manager.add_task_status(task_id, None, "failed", None, None, error, None, None)
             result = "failed action"
 
         finally:
@@ -393,7 +410,8 @@ class TimerTask:
 
                 # Remove from running tasks - already under lock protection
                 if task_id in self._running_tasks:
-                    del self._running_tasks[task_id]
+                    task_info = self._running_tasks.pop(task_id, None)
+                    self._running_task_names.discard(task_info[1])
 
             # Perform network storage outside lock (I/O operation)
             if network_storage:
@@ -500,7 +518,7 @@ class TimerTask:
                 _task_manager.resume_task(task_id)
                 _task_manager.terminate_task(task_id)
 
-            task_status_manager.add_task_status(task_id, None, "cancelled", None, time.time(), None, None, "timer_task")
+            task_status_manager.add_task_status(task_id, None, "running", None, time.time(), None, None, "timer_task")
             return True
         except Exception as error:
             logger.error(f"task | {task_id} | error during force stop: {error}")

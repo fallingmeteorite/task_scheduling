@@ -38,7 +38,6 @@ class TaskScheduler:
         self._lock = threading.RLock()  # Reentrant lock for thread safety
         self._shutdown_lock = threading.Lock()  # Lock for shutdown operation
         self._allow_task_addition: bool = True
-        self._task_counter: int = 0
 
     def add_task(self,
                  delay: Union[int, None],
@@ -92,9 +91,6 @@ class TaskScheduler:
                                       priority,
                                       args,
                                       kwargs))
-            self._task_counter += 1
-            if self._task_counter >= 40:
-                logger.warning(f"Garbage collection performed. A total of <{gc.collect()}> objects were recycled.")
 
             self._task_event.set()  # Wake up the allocator thread
             task_status_manager.add_task_status(task_id, task_name, "queuing", None, None, None, timeout_processing,

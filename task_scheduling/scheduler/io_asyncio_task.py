@@ -90,7 +90,7 @@ class IoAsyncioTask:
     __slots__ = [
         '_task_queues', '_running_tasks',
         '_lock', '_scheduler_lock',
-        '_scheduler_started', '_scheduler_stop_events', '_scheduler_threads',
+        '_scheduler_started', '_scheduler_stop_events', '_scheduler_threads', '_task_add_lock',
         '_event_loops',
         '_idle_timers', '_idle_timeout', '_idle_timer_lock',
         '_task_results', '_task_counters'
@@ -105,6 +105,7 @@ class IoAsyncioTask:
 
         self._lock = threading.Condition()  # Condition variable for thread synchronization
         self._scheduler_lock = threading.RLock()  # Reentrant lock for scheduler operations
+        self._task_add_lock = False
 
         self._scheduler_started = False  # Whether the scheduler thread has started
         self._scheduler_stop_events: Dict[str, threading.Event] = {}  # Scheduler thread stop events for each task name
@@ -142,6 +143,9 @@ class IoAsyncioTask:
             Whether the task was successfully added.
         """
         try:
+            while self._task_add_lock:
+                time.sleep(0.01)
+
             with self._scheduler_lock:
                 # Use atomic operations for queue creation and size check
                 if task_name not in self._task_queues:
@@ -151,7 +155,7 @@ class IoAsyncioTask:
                 if self._task_counters.get(task_name, None) is None:
                     self._task_counters[task_name] = 0  # Initialize the task counter
 
-                if self._task_counters[task_name] >= config["io_asyncio_task"] or len(self._task_counters) >= config[
+                if len(self._task_counters) >= config[
                     "maximum_event_loop"] or len(self._running_tasks) >= config["io_asyncio_task"]:
                     return False
 
@@ -170,6 +174,8 @@ class IoAsyncioTask:
             # Status update and queue put (thread-safe, no lock needed)
             task_status_manager.add_task_status(task_id, None, "waiting", None, None, None, None, "io_asyncio_task")
             self._task_queues[task_name].put((timeout_processing, task_name, task_id, func, args, kwargs))
+            with self._lock:
+                self._task_add_lock = True
 
             # Cancel idle timer (has its own lock)
             self._cancel_idle_timer(task_name)
@@ -314,6 +320,7 @@ class IoAsyncioTask:
                 self._task_counters.clear()
                 self._running_tasks.clear()
                 self._scheduler_stop_events.clear()
+                self._task_add_lock = True
 
             logger.debug(
                 "Scheduler and event loop have stopped, all resources have been released and parameters reset")
@@ -353,7 +360,7 @@ class IoAsyncioTask:
                         self._task_queues[task_name].empty()):
                     continue
 
-                task = self._task_queues[task_name].queue[0]
+                task = self._task_queues[task_name].get()
 
             # Execute the task after the lock is released
             timeout_processing, task_name, task_id, func, args, kwargs = task
@@ -363,8 +370,10 @@ class IoAsyncioTask:
             # Use lock protection for shared state updates (fast operation)
             with self._lock:
                 self._running_tasks[task_id] = [future, task_name]
-            self._task_queues[task_name].get()
             future.add_done_callback(partial(self._task_done, task_id, task_name))
+
+            with self._lock:
+                self._task_add_lock = True
 
     def _task_done(self,
                    task_id: str,
