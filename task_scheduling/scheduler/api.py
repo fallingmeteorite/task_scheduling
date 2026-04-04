@@ -6,6 +6,7 @@ This module provides a unified API for managing different types of tasks
 (IO-bound, CPU-bound, timer) with support for asynchronous and linear execution modes.
 """
 import time
+import threading
 from typing import Any, Union, Callable
 
 from task_scheduling.common import logger, config
@@ -23,6 +24,9 @@ _TASK_HANDLERS = {
     "cpu_asyncio_task": cpu_asyncio_task,
     "timer_task": timer_task,
 }
+
+_cleanup_thread = None
+_cleanup_thread_lock = threading.Lock()
 
 
 def _get_handler(task_type: str):
@@ -125,29 +129,59 @@ def get_result_api(task_type: str, task_id: str) -> Any:
     return handler.get_task_result(task_id)
 
 
+def _cleanup_task_results(handler: Any,
+                          current_time: Union[float, None] = None,
+                          max_result_count: Union[int, None] = None,
+                          max_result_age: Union[int, None] = None) -> None:
+    """
+    Remove expired task results in place for a single handler.
+
+    Args:
+        handler: Scheduler handler containing `_task_results` and `_lock`.
+        current_time: Timestamp used for age comparison.
+        max_result_count: Threshold that enables cleanup.
+        max_result_age: Maximum retained result age in seconds.
+    """
+    if current_time is None:
+        current_time = time.time()
+    if max_result_count is None:
+        max_result_count = config["maximum_result_storage"]
+    if max_result_age is None:
+        max_result_age = config["maximum_result_time_storage"]
+
+    with handler._lock:
+        if len(handler._task_results) < max_result_count:
+            return
+
+        expired_task_ids = [
+            task_id for task_id, value in handler._task_results.items()
+            if int(current_time - value[1]) >= max_result_age
+        ]
+        for task_id in expired_task_ids:
+            handler._task_results.pop(task_id, None)
+
+
+def ensure_cleanup_results_thread_started() -> None:
+    """
+    Start the cleanup thread once for the current process.
+    """
+    global _cleanup_thread
+
+    with _cleanup_thread_lock:
+        if _cleanup_thread is not None and _cleanup_thread.is_alive():
+            return
+
+        _cleanup_thread = threading.Thread(target=cleanup_results_api, daemon=True)
+        _cleanup_thread.start()
+
+
 def cleanup_results_api() -> None:
     """
     Clear useless return results.
     """
-    max_result_count = config["maximum_result_storage"]
     while True:
         for handler in _TASK_HANDLERS.values():
-            del_task_results = []
-            # Check if the cleaning limit has been reached
-            if len(handler._task_results) >= max_result_count:
-                # Lock
-                with handler._lock:
-                    cache_task_results = handler._task_results.copy()
-                # Delete results that have been inactive for too long
-                for key, value in cache_task_results.items():
-                    if int(time.time() - value[1]) >= config["maximum_result_time_storage"]:
-                        del_task_results.append(key)
-                # Delete the data for 'drinking' in the dictionary
-                for task_id in del_task_results:
-                    del cache_task_results[task_id]
-                # Lock
-                with handler._lock:
-                    handler._task_results = cache_task_results
+            _cleanup_task_results(handler)
         try:
             time.sleep(2.0)
         except KeyboardInterrupt:

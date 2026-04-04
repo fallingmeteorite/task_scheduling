@@ -26,7 +26,7 @@ class TaskScheduler:
                  'allocator_running', 'allocator_started', 'allocator_thread',
                  '_task_event', '_lock', '_shutdown_lock',
                  '_allow_task_addition',
-                 '_task_counter']
+                 '_task_counter', '_gc_interval']
 
     def __init__(self) -> None:
         self.ban_task_names: List[str] = []
@@ -39,6 +39,7 @@ class TaskScheduler:
         self._shutdown_lock = threading.Lock()  # Lock for shutdown operation
         self._allow_task_addition: bool = True
         self._task_counter: int = 0
+        self._gc_interval: int = 40
 
     def add_task(self,
                  delay: Union[int, None],
@@ -93,8 +94,9 @@ class TaskScheduler:
                                       args,
                                       kwargs))
             self._task_counter += 1
-            if self._task_counter >= 40:
+            if self._task_counter >= self._gc_interval:
                 logger.warning(f"Garbage collection performed. A total of <{gc.collect()}> objects were recycled.")
+                self._task_counter = 0
 
             self._task_event.set()  # Wake up the allocator thread
             task_status_manager.add_task_status(task_id, task_name, "queuing", None, None, None, timeout_processing,
@@ -110,75 +112,79 @@ class TaskScheduler:
 
     def _allocator(self) -> None:
         # Avoid import issues
-        from task_scheduling.scheduler import add_api, cleanup_results_api
+        from task_scheduling.scheduler.api import add_api, ensure_cleanup_results_thread_started
 
-        threading.Thread(target=cleanup_results_api, daemon=True).start()
+        ensure_cleanup_results_thread_started()
 
         while self.allocator_running:
             if not self._allow_task_addition:
-                time.sleep(0.1)
+                self._task_event.clear()
+                if self.allocator_running and not self._allow_task_addition:
+                    self._task_event.wait(timeout=0.1)
                 continue
 
-            if not self.core_task_queue.empty():
+            try:
                 (delay, daily_time, async_function, function_type, timeout_processing, task_name, task_id, func,
-                 priority,
-                 args, kwargs) = self.core_task_queue.get()
-                state = False
+                 priority, args, kwargs) = self.core_task_queue.get_nowait()
+            except queue.Empty:
+                self._task_event.clear()
+                if self.allocator_running and self.core_task_queue.empty():
+                    self._task_event.wait()
+                continue
 
-                if async_function:
+            state = False
 
-                    if function_type == "io":
-                        state = add_api("io_asyncio_task", None, None, timeout_processing, task_name, task_id, func,
-                                        priority, *args, **kwargs)
-                    if function_type == "cpu":
-                        state = add_api("cpu_asyncio_task", None, None, timeout_processing, task_name, task_id, func,
-                                        priority, *args, **kwargs)
+            if async_function:
+
+                if function_type == "io":
+                    state = add_api("io_asyncio_task", None, None, timeout_processing, task_name, task_id, func,
+                                    priority, *args, **kwargs)
+                if function_type == "cpu":
+                    state = add_api("cpu_asyncio_task", None, None, timeout_processing, task_name, task_id, func,
+                                    priority, *args, **kwargs)
+
+            if not async_function:
+
+                if function_type == "io":
+                    state = add_api("io_liner_task", None, None, timeout_processing, task_name, task_id, func,
+                                    priority, *args, **kwargs)
+                if function_type == "cpu":
+                    state = add_api("cpu_liner_task", None, None, timeout_processing, task_name, task_id, func,
+                                    priority, *args, **kwargs)
+
+            if function_type == "timer":
 
                 if not async_function:
+                    state = add_api("timer_task", delay, daily_time, timeout_processing, task_name, task_id, func,
+                                    priority, *args, **kwargs)
+                else:
+                    logger.warning("The timer function cannot be asynchronous code!")
+                    state = "The timer function cannot be asynchronous code!"
 
-                    if function_type == "io":
-                        state = add_api("io_liner_task", None, None, timeout_processing, task_name, task_id, func,
-                                        priority, *args, **kwargs)
-                    if function_type == "cpu":
-                        state = add_api("cpu_liner_task", None, None, timeout_processing, task_name, task_id, func,
-                                        priority, *args, **kwargs)
+            if state == False:
+                self.core_task_queue.put((delay,
+                                          daily_time,
+                                          async_function,
+                                          function_type,
+                                          timeout_processing,
+                                          task_name,
+                                          task_id,
+                                          func,
+                                          priority,
+                                          args,
+                                          kwargs))
+                time.sleep(0.01)
 
-                if function_type == "timer":
-
-                    if not async_function:
-                        state = add_api("timer_task", delay, daily_time, timeout_processing, task_name, task_id, func,
-                                        priority, *args, **kwargs)
-                    else:
-                        logger.warning("The timer function cannot be asynchronous code!")
-                        state = "The timer function cannot be asynchronous code!"
-
-                if state == False:
-                    self.core_task_queue.put((delay,
-                                              daily_time,
-                                              async_function,
-                                              function_type,
-                                              timeout_processing,
-                                              task_name,
-                                              task_id,
-                                              func,
-                                              priority,
-                                              args,
-                                              kwargs))
-
-                if not state == False and not state == True:
-                    task_status_manager.add_task_status(task_id, None, "failed", None, None, state,
-                                                        timeout_processing, None)
-
-            else:
-                self._task_event.clear()
-                if self.core_task_queue.empty():
-                    self._task_event.wait()  # Wait for the event to trigger
+            if not state == False and not state == True:
+                task_status_manager.add_task_status(task_id, None, "failed", None, None, state,
+                                                    timeout_processing, None)
 
     def _stop_task_addition(self) -> None:
         """
         Stop task addition by banning all task names
         """
         self._allow_task_addition = False
+        self._task_event.set()
         logger.warning(f"Task addition was disabled by user!")
 
     def _resume_task_addition(self) -> None:
@@ -186,6 +192,7 @@ class TaskScheduler:
         Resume task addition by removing all bans
         """
         self._allow_task_addition = True
+        self._task_event.set()
         logger.warning(f"Task addition was enabled by user!")
 
     def cancel_the_queue_task_by_name(self, task_name: str) -> None:

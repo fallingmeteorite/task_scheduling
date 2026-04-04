@@ -342,8 +342,9 @@ class IoAsyncioTask:
         while not self._scheduler_stop_events[task_name].is_set():
             with self._lock:
                 # Use loop and timeout to prevent spurious wakeup
-                while task_name not in self._task_queues or self._task_queues[task_name].empty():
-                    self._lock.wait(timeout=1.0)  # Add timeout to prevent permanent waiting
+                while (not self._scheduler_stop_events[task_name].is_set() and
+                       (task_name not in self._task_queues or self._task_queues[task_name].empty())):
+                    self._lock.wait()
 
                 if self._scheduler_stop_events[task_name].is_set():
                     break
@@ -353,7 +354,10 @@ class IoAsyncioTask:
                         self._task_queues[task_name].empty()):
                     continue
 
-                task = self._task_queues[task_name].queue[0]
+                try:
+                    task = self._task_queues[task_name].get_nowait()
+                except queue.Empty:
+                    continue
 
             # Execute the task after the lock is released
             timeout_processing, task_name, task_id, func, args, kwargs = task
@@ -363,7 +367,6 @@ class IoAsyncioTask:
             # Use lock protection for shared state updates (fast operation)
             with self._lock:
                 self._running_tasks[task_id] = [future, task_name]
-            self._task_queues[task_name].get()
             future.add_done_callback(partial(self._task_done, task_id, task_name))
 
     def _task_done(self,
