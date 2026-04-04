@@ -28,7 +28,7 @@ class RPCClient:
         """
         self._socket = None
         self.host = config["control_host"]
-        self.port = config["control_ip"]
+        self.port = config["control_port"]
         self._network = NetworkHandler()
         self._socket: socket.socket
         self._connected = False

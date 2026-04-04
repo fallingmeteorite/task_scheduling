@@ -81,9 +81,9 @@ def create_task_data(
         function_name: Name of the function to execute
         delay: Optional delay in seconds before execution
         daily_time: Optional daily scheduled time string (HH:MM format)
-        function_type: Type classification of function (default: "normal")
+        function_type: Type classification of function ("io", "cpu", or "timer")
         timeout_processing: Flag indicating if timeout processing is enabled
-        priority: Task priority level (default: "normal")
+        priority: Task priority level ("low" or "high")
         *args: Positional arguments to pass to the function
         **kwargs: Keyword arguments to pass to the function
 
@@ -145,11 +145,11 @@ def submit_task(
     Args:
         delay: Delay execution time in seconds (None for immediate execution)
         daily_time: Daily scheduled time in "HH:MM" format for recurring tasks
-        function_type: Type of function ("normal", "periodic", "scheduled")
+        function_type: Type of function ("io", "cpu", "timer")
         timeout_processing: Whether to enable timeout processing for long-running tasks
         task_name: Descriptive name for the task for monitoring purposes
         func: Callable function to execute (must be provided for execution)
-        priority: Task priority level ("low", "normal", "high", "critical")
+        priority: Task priority level ("low", "high")
         *args: Positional arguments to pass to the function
         **kwargs: Keyword arguments to pass to the function
 

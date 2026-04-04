@@ -11,6 +11,9 @@ import inspect
 from typing import Callable
 
 
+SUPPORTED_FUNCTION_TYPES = ("io", "cpu", "timer")
+
+
 def is_async_function(func: Callable) -> bool:
     """
     Determine if a function is an asynchronous function.
@@ -22,6 +25,19 @@ def is_async_function(func: Callable) -> bool:
         True if the function is asynchronous, otherwise False.
     """
     return inspect.iscoroutinefunction(func)
+
+
+def is_valid_function_type(function_type: str) -> bool:
+    """
+    Check whether the provided function type is supported by the scheduler.
+
+    Args:
+        function_type: Function type string to validate.
+
+    Returns:
+        True if the function type is one of the supported scheduler types.
+    """
+    return function_type in SUPPORTED_FUNCTION_TYPES
 
 
 def wait_branch_thread_ended_check(func: Callable) -> bool:

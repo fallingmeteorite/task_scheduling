@@ -11,7 +11,7 @@ from typing import Callable, Union
 
 from task_scheduling.common import logger
 from task_scheduling.manager import task_scheduler
-from task_scheduling.utils import is_async_function, wait_branch_thread_ended_check
+from task_scheduling.utils import is_async_function, is_valid_function_type, wait_branch_thread_ended_check
 
 
 def task_creation(delay: Union[int, None], daily_time: Union[str, None], function_type: str, timeout_processing: bool,
@@ -34,6 +34,10 @@ def task_creation(delay: Union[int, None], daily_time: Union[str, None], functio
     :param kwargs: Keyword arguments for the task function.
     :return: A unique task ID.
     """
+    if not is_valid_function_type(function_type):
+        logger.error("Unsupported function type. Please use FUNCTION_TYPE_IO, FUNCTION_TYPE_CPU, or FUNCTION_TYPE_TIMER.")
+        return False
+
     # Generate a unique task ID
     task_id = str(uuid.uuid4())
     async_function = is_async_function(func)
