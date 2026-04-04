@@ -65,27 +65,23 @@ nav:
 
   - 配置选项: configuration.md
 
-  - 本地功能函数:
+  - 本地功能:
       - 任务提交: local/create_tasks.md
       - 任务控制: local/task_control.md
       - 状态查询: local/status_query.md
       - 结果获取: local/result_retrieval.md
       - 任务禁用: local/task_disabling.md
 
-  - 网络功能函数:
+  - 网络功能:
       - 任务提交: network/create_tasks.md
       - 任务控制: network/task_control.md
       - 状态查询: network/status_query.md
       - 结果获取: network/result_retrieval.md
       - 任务禁用: network/task_disabling.md
 
-  - 调度器关闭: shutdown.md
-
   - 网页控制: web_control.md
 
-  - 工具:
-      - 随机名字: utils/random.md
-      - 非阻塞睡眠: utils/sleep.md
+  - 调度器关闭: shutdown.md
 
   - 高级功能:
       - 任务优先级调度: advanced/priority.md
@@ -93,6 +89,10 @@ nav:
       - 依赖型任务: advanced/dependent_tasks.md
       - 任务树模式: advanced/task_tree.md
       - 任务重试: advanced/task_retry.md
+
+  - 工具:
+      - 随机名字: utils/random.md
+      - 非阻塞睡眠: utils/sleep.md
 
   - 忠告: advice.md
 
