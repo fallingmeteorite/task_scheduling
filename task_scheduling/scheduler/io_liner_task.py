@@ -165,18 +165,21 @@ class IoLinerTask:
 
                 if queue_size >= config["io_liner_task"] or len(self._running_tasks) >= config[
                     "io_liner_task"]:
-                    if _task_counter.is_high_priority(priority):
-                        if _task_counter.is_high_priority_full(config["io_liner_task"]):
-                            return False
-                        # Prevent circular locking
-                        need_add_high = True
-                    return False
+                    if not _task_counter.is_high_priority(priority):
+                        return False
+
+                    if _task_counter.is_high_priority_full(config["io_liner_task"]):
+                        return False
+
+                    # Pause a low-priority task outside the scheduler lock to avoid re-entrancy issues.
+                    need_add_high = True
 
                 if task_name in running_task_names:
                     return False
 
             if need_add_high:
-                _task_counter.add_high_priority_task(task_id, self._running_tasks)
+                if not _task_counter.add_high_priority_task(task_id, self._running_tasks):
+                    return False
 
             # Scheduler state handling (protected by scheduler_lock)
             with self._scheduler_lock:
@@ -333,7 +336,7 @@ class IoLinerTask:
 
         except Exception as error:
             # Other exceptions have already been handled in _execute_task.
-            task_status_manager.add_task_status(task_id, None, "cancelled", None, None, error, None, None)
+            task_status_manager.add_task_status(task_id, None, "failed", None, None, error, None, None)
             result = "failed action"
 
         finally:

@@ -224,16 +224,19 @@ class CpuLinerTask:
                 running_task_names = {details[1] for details in self._running_tasks.values()}
                 if queue_size >= config["cpu_liner_task"] or len(self._running_tasks) >= config["cpu_liner_task"]:
                     if not _task_counter.is_high_priority(priority):
-                        if _task_counter.is_high_priority_full(config["cpu_liner_task"]):
-                            return False
-                        need_add_high = True
-                    return False
+                        return False
+
+                    if _task_counter.is_high_priority_full(config["cpu_liner_task"]):
+                        return False
+
+                    need_add_high = True
 
                 if task_name in running_task_names:
                     return False
 
             if need_add_high:
-                _task_counter.add_high_priority_task(task_id, self._running_tasks)
+                if not _task_counter.add_high_priority_task(task_id, self._running_tasks):
+                    return False
 
             # 2. Status updates (queue is thread-safe)
             shared_status_info_liner.task_status_queue.put(("waiting", task_id, None, None, None, None, None))
