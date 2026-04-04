@@ -14,6 +14,7 @@ from typing import Callable, List, Optional, Union
 
 from task_scheduling.common import logger
 from task_scheduling.manager import task_status_manager
+from task_scheduling.utils import is_valid_function_type
 
 
 class TaskScheduler:
@@ -79,6 +80,11 @@ class TaskScheduler:
             if function_type is None:
                 logger.warning(
                     f"Task name '{task_name}' has no function type, tasks cannot be added!")
+                return False
+
+            if not is_valid_function_type(function_type):
+                logger.warning(
+                    f"Task name '{task_name}' has unsupported function type '{function_type}', tasks cannot be added!")
                 return False
 
             self.core_task_queue.put((delay,

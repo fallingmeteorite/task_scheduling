@@ -17,7 +17,7 @@ import dill
 from task_scheduling.common import logger, config
 from task_scheduling.manager import task_scheduler
 from task_scheduling.server_webui import get_tasks_info, start_task_status_ui
-from task_scheduling.utils import is_async_function
+from task_scheduling.utils import is_async_function, is_valid_function_type
 
 
 class NetworkUtils:
@@ -318,7 +318,7 @@ class ServerHealthMonitor:
 
 def task_submit(task_id: str, delay: Union[int, None], daily_time: Union[str, None], function_type: str,
                 timeout_processing: bool, task_name: str, func: Callable, priority: str,
-                *args, **kwargs) -> None:
+                *args, **kwargs) -> bool:
     """
     Submit task to queue.
 
@@ -333,19 +333,28 @@ def task_submit(task_id: str, delay: Union[int, None], daily_time: Union[str, No
         priority: Task priority
         args: Positional arguments
         kwargs: Keyword arguments
+
+    Returns:
+        bool: Whether the task was accepted for scheduling
     """
+    if not is_valid_function_type(function_type):
+        logger.error("Unsupported function type. Please use 'io', 'cpu', or 'timer'.")
+        return False
+
     async_function = is_async_function(func)
     if async_function and not function_type == "timer":
-        task_scheduler.add_task(None, None, async_function, function_type, timeout_processing,
-                                task_name, task_id, func, priority, *args, **kwargs)
+        return task_scheduler.add_task(None, None, async_function, function_type, timeout_processing,
+                                       task_name, task_id, func, priority, *args, **kwargs)
 
     if not async_function and not function_type == "timer":
-        task_scheduler.add_task(None, None, async_function, function_type, timeout_processing,
-                                task_name, task_id, func, priority, *args, **kwargs)
+        return task_scheduler.add_task(None, None, async_function, function_type, timeout_processing,
+                                       task_name, task_id, func, priority, *args, **kwargs)
 
     if function_type == "timer":
-        task_scheduler.add_task(delay, daily_time, async_function, function_type, timeout_processing,
-                                task_name, task_id, func, priority, *args, **kwargs)
+        return task_scheduler.add_task(delay, daily_time, async_function, function_type, timeout_processing,
+                                       task_name, task_id, func, priority, *args, **kwargs)
+
+    return False
 
 
 class TaskServerCore:
@@ -379,9 +388,9 @@ class TaskServerCore:
             # Get task scheduling parameters
             delay = task_data.get('delay')
             daily_time = task_data.get('daily_time')
-            function_type = task_data.get('function_type', 'normal')
+            function_type = task_data.get('function_type')
             timeout_processing = task_data.get('timeout_processing', False)
-            priority = task_data.get('priority', 'normal')
+            priority = task_data.get('priority', 'low')
 
             # Validate required parameters
             if not function_code or not function_name:
@@ -400,12 +409,15 @@ class TaskServerCore:
                 return
 
             # Submit task to scheduler
-            task_submit(
+            submitted = task_submit(
                 task_id, delay, daily_time, function_type, timeout_processing,
                 task_name, func, priority, *args, **kwargs
             )
 
-            logger.info(f"Task '{task_name}' submitted successfully")
+            if submitted:
+                logger.info(f"Task '{task_name}' submitted successfully")
+            else:
+                logger.error(f"Task '{task_name}' was rejected by the scheduler")
 
         except Exception as e:
             logger.error(f"Task execution failed: {e}")
