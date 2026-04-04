@@ -126,7 +126,7 @@ def get_tasks_info():
     """
     Get task information as structured data.
     """
-    tasks_dict = task_status_manager._task_status_dict
+    tasks_dict = task_status_manager.get_all_task_statuses()
 
     # Calculate statistics
     tasks_queue_size = 0
@@ -356,7 +356,7 @@ class TaskControlHandler(BaseHTTPRequestHandler):
         self.end_headers()
         try:
             self.wfile.write(json.dumps(parsed_info).encode('utf-8'))
-        except ConnectionAbortedError:
+        except (ConnectionAbortedError, BrokenPipeError, ConnectionResetError):
             pass
 
     def _handle_task_addition_status(self):
@@ -367,7 +367,7 @@ class TaskControlHandler(BaseHTTPRequestHandler):
         try:
             status_info = get_task_addition_status()
             self.wfile.write(json.dumps(status_info).encode('utf-8'))
-        except ConnectionAbortedError:
+        except (ConnectionAbortedError, BrokenPipeError, ConnectionResetError):
             pass
 
     def _handle_toggle_task_addition(self):
