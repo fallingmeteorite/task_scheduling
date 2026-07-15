@@ -119,7 +119,7 @@
             background-clip: text;
             border-left: 5px solid var(--accent-sky);
             padding-left: 18px;
-            text-shadow: 0 2px 5px rgba(74,144,226,0.2);
+            text-shadow: 0 2px 5px rgba(74, 144, 226, 0.2);
         }
 
         .header-controls {
@@ -144,10 +144,10 @@
         .search-container:focus-within {
             box-shadow: 0 0 0 4px rgba(74, 144, 226, 0.3);
             border-color: var(--accent-sky);
-            background: rgba(255,255,255,0.8);
+            background: rgba(255, 255, 255, 0.8);
         }
         .dark-theme .search-container:focus-within {
-            background: rgba(40,45,65,0.8);
+            background: rgba(40, 45, 65, 0.8);
         }
         .search-input {
             border: none;
@@ -172,7 +172,7 @@
             font-weight: 500;
             font-size: 0.85rem;
             cursor: pointer;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
             transition: var(--transition-smooth);
             backdrop-filter: blur(4px);
             text-transform: capitalize;
@@ -205,13 +205,27 @@
             background: var(--gradient-success);
             box-shadow: 0 6px 14px rgba(43, 189, 126, 0.4);
         }
-        .addition-control-btn:hover { transform: translateY(-3px) scale(1.02); filter: brightness(1.08); }
-        .addition-control-btn.loading { color: transparent; pointer-events: none; position: relative; }
+        .addition-control-btn:hover {
+            transform: translateY(-3px) scale(1.02);
+            filter: brightness(1.08);
+        }
+        .addition-control-btn.loading {
+            color: transparent;
+            pointer-events: none;
+            position: relative;
+        }
         .addition-control-btn.loading::after {
-            content: ''; position: absolute; width: 18px; height: 18px;
-            border: 2px solid #fff; border-top-color: transparent; border-radius: 50%;
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            border: 2px solid #fff;
+            border-top-color: transparent;
+            border-radius: 50%;
             animation: spin 0.8s linear infinite;
-            left: 50%; top: 50%; transform: translate(-50%, -50%);
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
         }
 
         .theme-toggle {
@@ -236,7 +250,7 @@
         .active-theme {
             background: var(--gradient-primary);
             color: white !important;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
         }
 
         .dashboard {
@@ -246,7 +260,8 @@
             margin-bottom: 24px;
         }
 
-        .stats-panel, .tasks-panel {
+        .stats-panel,
+        .tasks-panel {
             background: var(--bg-card);
             border-radius: var(--radius-md);
             box-shadow: var(--shadow-card);
@@ -256,15 +271,19 @@
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
         }
-        .stats-panel:hover, .tasks-panel:hover {
+        .stats-panel:hover,
+        .tasks-panel:hover {
             box-shadow: var(--shadow-hover);
-            background: rgba(255,255,255,0.8);
+            background: rgba(255, 255, 255, 0.8);
         }
-        .dark-theme .stats-panel:hover, .dark-theme .tasks-panel:hover {
-            background: rgba(45,52,75,0.8);
+        .dark-theme .stats-panel:hover,
+        .dark-theme .tasks-panel:hover {
+            background: rgba(45, 52, 75, 0.8);
         }
 
-        .stats-panel { padding: 22px; }
+        .stats-panel {
+            padding: 22px;
+        }
 
         .stats-header .stats-title {
             font-weight: 600;
@@ -277,12 +296,14 @@
         }
         .stats-header .stats-title::before {
             content: '';
-            width: 6px; height: 22px;
+            width: 6px;
+            height: 22px;
             background: var(--accent-sky);
             border-radius: 6px;
             opacity: 0.8;
         }
 
+        /* ===== TOTAL TASKS – Now clickable ===== */
         .total-tasks {
             background: var(--gradient-primary);
             color: white;
@@ -292,15 +313,35 @@
             margin: 20px 0 18px;
             box-shadow: 0 12px 22px -10px var(--primary-soft);
             backdrop-filter: blur(4px);
-            border: 1px solid rgba(255,255,255,0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            position: relative;
+            user-select: none;
         }
+        .total-tasks:hover {
+            transform: translateY(-4px) scale(1.01);
+            box-shadow: 0 18px 32px -12px var(--primary-soft);
+            background: var(--gradient-primary);
+            filter: brightness(1.08);
+        }
+        .total-tasks:active {
+            transform: scale(0.97);
+            transition-duration: 0.08s;
+        }
+
         .total-label {
             font-size: 0.8rem;
             opacity: 0.85;
             letter-spacing: 0.4px;
             text-transform: capitalize;
         }
-        .total-value { font-size: 2.6rem; font-weight: 700; line-height: 1.2; text-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .total-value {
+            font-size: 2.6rem;
+            font-weight: 700;
+            line-height: 1.2;
+            text-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
 
         .status-grid {
             display: grid;
@@ -325,24 +366,48 @@
             border-color: var(--accent-sky);
             box-shadow: 0 15px 20px -12px var(--primary-soft);
         }
+        .status-item:active {
+            transform: scale(0.96);
+            transition-duration: 0.08s;
+        }
         .status-icon {
-            width: 42px; height: 42px;
+            width: 42px;
+            height: 42px;
             border-radius: 14px;
-            display: flex; align-items: center; justify-content: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             margin-right: 14px;
             font-size: 1.1rem;
             color: white;
-            box-shadow: 0 8px 14px -6px rgba(0,0,0,0.3);
+            box-shadow: 0 8px 14px -6px rgba(0, 0, 0, 0.3);
             backdrop-filter: blur(2px);
+            flex-shrink: 0;
         }
-        .running .status-icon { background: var(--gradient-success); }
-        .failed .status-icon { background: var(--gradient-error); }
-        .completed .status-icon { background: var(--gradient-info); }
-        .queuing .status-icon { background: var(--gradient-warning); }
-        .waiting .status-icon { background: var(--gradient-waiting); }
-        .paused .status-icon { background: var(--gradient-warning); }
-        .cancelled .status-icon { background: var(--gradient-cancelled); }
-        .timeout .status-icon { background: var(--gradient-timeout); }
+        .running .status-icon {
+            background: var(--gradient-success);
+        }
+        .failed .status-icon {
+            background: var(--gradient-error);
+        }
+        .completed .status-icon {
+            background: var(--gradient-info);
+        }
+        .queuing .status-icon {
+            background: var(--gradient-warning);
+        }
+        .waiting .status-icon {
+            background: var(--gradient-waiting);
+        }
+        .paused .status-icon {
+            background: var(--gradient-warning);
+        }
+        .cancelled .status-icon {
+            background: var(--gradient-cancelled);
+        }
+        .timeout .status-icon {
+            background: var(--gradient-timeout);
+        }
 
         .status-info .status-name {
             font-size: 0.7rem;
@@ -351,12 +416,17 @@
             text-transform: capitalize;
             letter-spacing: 0.3px;
         }
-        .status-count { font-size: 1.3rem; font-weight: 700; }
+        .status-count {
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
 
         .tasks-header {
             padding: 18px 22px;
             border-bottom: 1px solid var(--border-subtle);
-            display: flex; justify-content: space-between; align-items: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             flex-wrap: wrap;
             gap: 12px;
         }
@@ -369,7 +439,12 @@
             text-transform: capitalize;
         }
         .tasks-title::before {
-            content: ''; width: 6px; height: 22px; background: var(--accent-mint); border-radius: 6px; opacity: 0.8;
+            content: '';
+            width: 6px;
+            height: 22px;
+            background: var(--accent-mint);
+            border-radius: 6px;
+            opacity: 0.8;
         }
         .filter-group {
             display: flex;
@@ -423,7 +498,7 @@
             gap: 8px;
             backdrop-filter: blur(6px);
             text-transform: capitalize;
-            min-width: 95px; /* Fixed width to prevent layout shift */
+            min-width: 95px;
             position: relative;
         }
 
@@ -442,7 +517,7 @@
             border-radius: 50%;
             animation: spin 0.6s linear infinite;
             display: none;
-            margin: 0; /* No margin to keep exact position */
+            margin: 0;
         }
 
         .refresh-btn.loading i {
@@ -482,15 +557,20 @@
             text-transform: capitalize;
             letter-spacing: 0.5px;
             border-bottom: 1px solid var(--border-subtle);
-            position: sticky; top: 0; z-index: 2;
+            position: sticky;
+            top: 0;
+            z-index: 2;
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
-            background: rgba(255,255,255,0.4);
+            background: rgba(255, 255, 255, 0.4);
         }
         .dark-theme .task-table th {
-            background: rgba(20,24,36,0.5);
+            background: rgba(20, 24, 36, 0.5);
         }
-        .task-table td { padding: 14px 18px; border-bottom: 1px solid var(--border-faint); }
+        .task-table td {
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border-faint);
+        }
         .task-row {
             background: var(--bg-card);
             transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
@@ -504,7 +584,11 @@
             box-shadow: 0 8px 18px -10px var(--primary-soft);
         }
 
-        .task-info { display: flex; flex-direction: column; gap: 4px; }
+        .task-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
         .task-name {
             font-weight: 600;
             color: var(--text-primary);
@@ -513,12 +597,17 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            padding: 4px 8px; margin: -4px -8px;
+            padding: 4px 8px;
+            margin: -4px -8px;
             border-radius: 6px;
             transition: 0.1s;
             border: 1px solid transparent;
         }
-        .task-name.expanded { white-space: normal; overflow: visible; max-width: none; }
+        .task-name.expanded {
+            white-space: normal;
+            overflow: visible;
+            max-width: none;
+        }
         .task-name:hover {
             background: var(--border-faint);
             border-color: var(--border-subtle);
@@ -529,7 +618,8 @@
             word-break: break-all;
             white-space: normal;
             line-height: 1.5;
-            padding: 4px 8px; margin: -4px -8px;
+            padding: 4px 8px;
+            margin: -4px -8px;
             border-radius: 6px;
             border: 1px solid transparent;
         }
@@ -564,47 +654,92 @@
         }
 
         .task-status {
-            display: inline-flex; align-items: center;
+            display: inline-flex;
+            align-items: center;
             padding: 6px 12px;
             border-radius: 30px;
             font-size: 0.7rem;
             font-weight: 600;
-            border: 1px solid rgba(255,255,255,0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
             backdrop-filter: blur(4px);
             text-transform: capitalize;
         }
-        .status-running { background: var(--status-running-bg); color: var(--accent-mint); }
-        .status-failed { background: var(--status-failed-bg); color: var(--accent-coral); }
-        .status-completed { background: var(--status-completed-bg); color: var(--accent-sky); }
-        .status-queuing { background: var(--status-queuing-bg); color: var(--accent-amber); }
-        .status-waiting { background: var(--status-waiting-bg); color: var(--accent-lavender); }
-        .status-paused { background: var(--status-paused-bg); color: #d48d3b; }
-        .status-cancelled { background: var(--status-cancelled-bg); color: var(--text-secondary); }
-        .status-timeout { background: var(--status-timeout-bg); color: #e67649; }
+        .status-running {
+            background: var(--status-running-bg);
+            color: var(--accent-mint);
+        }
+        .status-failed {
+            background: var(--status-failed-bg);
+            color: var(--accent-coral);
+        }
+        .status-completed {
+            background: var(--status-completed-bg);
+            color: var(--accent-sky);
+        }
+        .status-queuing {
+            background: var(--status-queuing-bg);
+            color: var(--accent-amber);
+        }
+        .status-waiting {
+            background: var(--status-waiting-bg);
+            color: var(--accent-lavender);
+        }
+        .status-paused {
+            background: var(--status-paused-bg);
+            color: #d48d3b;
+        }
+        .status-cancelled {
+            background: var(--status-cancelled-bg);
+            color: var(--text-secondary);
+        }
+        .status-timeout {
+            background: var(--status-timeout-bg);
+            color: #e67649;
+        }
 
         .status-indicator {
-            width: 6px; height: 6px;
+            width: 6px;
+            height: 6px;
             border-radius: 50%;
             margin-right: 6px;
             background: currentColor;
         }
 
-        .empty-state { padding: 40px 16px; text-align: center; color: var(--text-secondary); }
-        .empty-state-icon { font-size: 2.5rem; opacity: 0.5; }
-        .empty-state-title { text-transform: capitalize; }
+        .empty-state {
+            padding: 40px 16px;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+        .empty-state-icon {
+            font-size: 2.5rem;
+            opacity: 0.5;
+        }
+        .empty-state-title {
+            text-transform: capitalize;
+        }
 
         /* ----- Detail Modal – Fixed Close Button + Scrollable Content (UI fix only) ----- */
         .detail-overlay {
-            position: fixed; top:0; left:0; width:100%; height:100%;
-            background: rgba(0,0,0,0.2);
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.2);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             z-index: 10000;
-            display: flex; align-items: center; justify-content: center;
-            visibility: hidden; opacity: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            visibility: hidden;
+            opacity: 0;
             transition: opacity 0.25s ease;
         }
-        .detail-overlay.active { visibility: visible; opacity: 1; }
+        .detail-overlay.active {
+            visibility: visible;
+            opacity: 1;
+        }
 
         .detail-panel {
             width: 520px;
@@ -613,8 +748,8 @@
             max-height: 85vh;
             background: var(--bg-card);
             border-radius: 32px;
-            box-shadow: 0 35px 70px -20px rgba(0,0,0,0.4);
-            border: 1px solid rgba(255,255,255,0.25);
+            box-shadow: 0 35px 70px -20px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.25);
             transform: scale(0.95);
             transition: transform 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.1), opacity 0.2s;
             opacity: 0;
@@ -622,7 +757,7 @@
             -webkit-backdrop-filter: blur(16px);
             display: flex;
             flex-direction: column;
-            overflow: hidden; /* Important: prevent overall scroll, content scrolls inside */
+            overflow: hidden;
         }
         .active .detail-panel {
             transform: scale(1);
@@ -635,7 +770,7 @@
             align-items: center;
             padding: 24px 28px 16px 28px;
             border-bottom: 1px solid var(--border-subtle);
-            flex-shrink: 0; /* Fixed header, never scrolls */
+            flex-shrink: 0;
             background: inherit;
         }
         .detail-header h2 {
@@ -662,9 +797,11 @@
             transition: 0.15s;
             backdrop-filter: blur(6px);
         }
-        .close-detail:hover { background: var(--primary-light); color: white; }
+        .close-detail:hover {
+            background: var(--primary-light);
+            color: white;
+        }
 
-        /* Scrollable content area */
         .detail-scroll-area {
             flex: 1;
             overflow-y: auto;
@@ -683,7 +820,9 @@
             border-radius: 10px;
         }
 
-        .detail-property { margin-bottom: 22px; }
+        .detail-property {
+            margin-bottom: 22px;
+        }
         .detail-label {
             font-size: 0.7rem;
             color: var(--text-secondary);
@@ -715,7 +854,13 @@
             text-transform: capitalize;
         }
 
-        .action-group { display: flex; gap: 12px; margin-top: 30px; flex-wrap: wrap; justify-content: center; }
+        .action-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
         .detail-action-btn {
             padding: 12px 28px;
             border: none;
@@ -724,22 +869,48 @@
             font-weight: 600;
             cursor: pointer;
             transition: 0.2s;
-            box-shadow: 0 10px 18px -8px rgba(0,0,0,0.3);
+            box-shadow: 0 10px 18px -8px rgba(0, 0, 0, 0.3);
             backdrop-filter: blur(4px);
-            border: 1px solid rgba(255,255,255,0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
             text-transform: capitalize;
         }
-        .terminate-button { background: var(--gradient-error); color: white; }
-        .pause-button { background: var(--gradient-warning); color: white; }
-        .resume-button { background: var(--gradient-success); color: white; }
-        .detail-action-btn:hover { transform: translateY(-4px) scale(1.02); filter: brightness(1.1); box-shadow: 0 16px 24px -10px black; }
-        .detail-action-btn:disabled { opacity: 0.4; transform: none; }
-        .detail-action-btn.loading { color: transparent; position: relative; }
+        .terminate-button {
+            background: var(--gradient-error);
+            color: white;
+        }
+        .pause-button {
+            background: var(--gradient-warning);
+            color: white;
+        }
+        .resume-button {
+            background: var(--gradient-success);
+            color: white;
+        }
+        .detail-action-btn:hover {
+            transform: translateY(-4px) scale(1.02);
+            filter: brightness(1.1);
+            box-shadow: 0 16px 24px -10px black;
+        }
+        .detail-action-btn:disabled {
+            opacity: 0.4;
+            transform: none;
+        }
+        .detail-action-btn.loading {
+            color: transparent;
+            position: relative;
+        }
         .detail-action-btn.loading::after {
-            content: ''; position: absolute; width: 18px; height: 18px;
-            border: 2px solid white; border-top-color: transparent; border-radius: 50%;
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            border: 2px solid white;
+            border-top-color: transparent;
+            border-radius: 50%;
             animation: spin 0.8s linear infinite;
-            left: 50%; top: 50%; transform: translate(-50%, -50%);
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
         }
 
         .timestamp {
@@ -752,721 +923,826 @@
             text-transform: capitalize;
         }
 
-        .notification-container { position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px; max-width: 340px; }
-        .notification {
-            background: var(--bg-card); border-radius: 24px; padding: 18px; box-shadow: 0 25px 40px -12px black; border-left: 4px solid var(--primary-base); display: flex; gap: 12px; transform: translateX(400px); opacity: 0; transition: all 0.35s cubic-bezier(0.2,0.9,0.3,1); backdrop-filter: blur(16px); border: 1px solid var(--border-subtle);
+        .notification-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 20000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 340px;
         }
-        .notification.show { transform: translateX(0); opacity: 1; }
-        .notification.hide { transform: translateX(400px); opacity: 0; }
-        .notification-title { text-transform: capitalize; }
-        .progress-bar { height: 2px; background: var(--border-subtle); margin-top: 8px; overflow: hidden; border-radius: 2px; }
-        .progress-fill { height: 100%; background: var(--accent-sky); width: 100%; transition: width 0.1s linear; }
+        .notification {
+            background: var(--bg-card);
+            border-radius: 24px;
+            padding: 18px;
+            box-shadow: 0 25px 40px -12px black;
+            border-left: 4px solid var(--primary-base);
+            display: flex;
+            gap: 12px;
+            transform: translateX(400px);
+            opacity: 0;
+            transition: all 0.35s cubic-bezier(0.2, 0.9, 0.3, 1);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border-subtle);
+        }
+        .notification.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        .notification.hide {
+            transform: translateX(400px);
+            opacity: 0;
+        }
+        .notification-title {
+            text-transform: capitalize;
+        }
+        .progress-bar {
+            height: 2px;
+            background: var(--border-subtle);
+            margin-top: 8px;
+            overflow: hidden;
+            border-radius: 2px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: var(--accent-sky);
+            width: 100%;
+            transition: width 0.1s linear;
+        }
 
-        .highlight { background: rgba(74, 144, 226, 0.3); padding: 2px 0; border-radius: 3px; }
+        .highlight {
+            background: rgba(74, 144, 226, 0.3);
+            padding: 2px 0;
+            border-radius: 3px;
+        }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
         }
 
         @media (max-width: 1000px) {
-            .dashboard { grid-template-columns: 1fr; }
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body class="light-theme">
-<!-- Notifications -->
-<div class="notification-container" id="notificationContainer"></div>
+    <!-- Notifications -->
+    <div class="notification-container" id="notificationContainer"></div>
 
-<!-- Detail Overlay – Smart Start Time Display (Fixed close button + scroll) -->
-<div class="detail-overlay" id="detailOverlay">
-    <div class="detail-panel">
-        <div class="detail-header">
-            <h2>Task Details</h2>
-            <button class="close-detail" id="closeDetailBtn">&times;</button>
-        </div>
-        <div class="detail-scroll-area">
-            <div id="detailContent">
-                <!-- Dynamic Content -->
+    <!-- Detail Overlay – Smart Start Time Display (Fixed close button + scroll) -->
+    <div class="detail-overlay" id="detailOverlay">
+        <div class="detail-panel">
+            <div class="detail-header">
+                <h2>Task Details</h2>
+                <button class="close-detail" id="closeDetailBtn">&times;</button>
             </div>
-        </div>
-    </div>
-</div>
-
-<div class="container">
-    <header>
-        <h1>Task Status Monitor</h1>
-        <div class="header-controls">
-            <div class="search-container">
-                <input type="text" class="search-input" id="searchInput" placeholder="Search by name or id...">
-                <button class="search-button" id="searchButton">Search</button>
-            </div>
-            <button class="addition-control-btn" id="additionControlBtn">
-                <i class="fas fa-plus-circle"></i>
-                <span>Stop Adding Tasks</span>
-            </button>
-            <div class="theme-toggle" id="themeToggle">
-                <span class="light active-theme">Light</span>
-                <span class="dark">Dark</span>
-            </div>
-        </div>
-    </header>
-
-    <div class="dashboard">
-        <!-- Left Panel: Statistics -->
-        <div class="stats-panel">
-            <div class="stats-header">
-                <div class="stats-title">Task Overview</div>
-            </div>
-            <div class="total-tasks">
-                <div class="total-label">Total Tasks</div>
-                <div class="total-value" id="total-count">0</div>
-            </div>
-            <div class="status-grid">
-                <div class="status-item running" data-status="running">
-                    <div class="status-icon"><i class="fas fa-play"></i></div>
-                    <div class="status-info">
-                        <div class="status-name">Running</div>
-                        <div class="status-count" id="running-count">0</div>
-                    </div>
+            <div class="detail-scroll-area">
+                <div id="detailContent">
+                    <!-- Dynamic Content -->
                 </div>
-                <div class="status-item failed" data-status="failed">
-                    <div class="status-icon"><i class="fas fa-times"></i></div>
-                    <div class="status-info">
-                        <div class="status-name">Failed</div>
-                        <div class="status-count" id="failed-count">0</div>
-                    </div>
-                </div>
-                <div class="status-item completed" data-status="completed">
-                    <div class="status-icon"><i class="fas fa-check"></i></div>
-                    <div class="status-info">
-                        <div class="status-name">Completed</div>
-                        <div class="status-count" id="completed-count">0</div>
-                    </div>
-                </div>
-                <div class="status-item queuing" data-status="queuing">
-                    <div class="status-icon"><i class="fas fa-list-ol"></i></div>
-                    <div class="status-info">
-                        <div class="status-name">Queuing</div>
-                        <div class="status-count" id="queuing-count">0</div>
-                    </div>
-                </div>
-                <div class="status-item waiting" data-status="waiting">
-                    <div class="status-icon"><i class="fas fa-hourglass-start"></i></div>
-                    <div class="status-info">
-                        <div class="status-name">Waiting</div>
-                        <div class="status-count" id="waiting-count">0</div>
-                    </div>
-                </div>
-                <div class="status-item paused" data-status="paused">
-                    <div class="status-icon"><i class="fas fa-pause"></i></div>
-                    <div class="status-info">
-                        <div class="status-name">Paused</div>
-                        <div class="status-count" id="paused-count">0</div>
-                    </div>
-                </div>
-                <div class="status-item cancelled" data-status="cancelled">
-                    <div class="status-icon"><i class="fas fa-stop"></i></div>
-                    <div class="status-info">
-                        <div class="status-name">Cancelled</div>
-                        <div class="status-count" id="cancelled-count">0</div>
-                    </div>
-                </div>
-                <div class="status-item timeout" data-status="timeout">
-                    <div class="status-icon"><i class="fas fa-hourglass-end"></i></div>
-                    <div class="status-info">
-                        <div class="status-name">Timeout</div>
-                        <div class="status-count" id="timeout-count">0</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Right Panel: Task List -->
-        <div class="tasks-panel">
-            <div class="tasks-header">
-                <div class="tasks-title">Task List</div>
-                <div class="filter-group">
-                    <select class="filter-select" id="statusFilter">
-                        <option value="all">All Status</option>
-                        <option value="running">Running</option>
-                        <option value="failed">Failed</option>
-                        <option value="completed">Completed</option>
-                        <option value="queuing">Queuing</option>
-                        <option value="waiting">Waiting</option>
-                        <option value="paused">Paused</option>
-                        <option value="cancelled">Cancelled</option>
-                        <option value="timeout">Timeout</option>
-                    </select>
-                    <button class="refresh-btn" id="refreshButton">
-                        <i class="fas fa-rotate-right"></i>
-                        <span class="loading-spinner"></span>
-                        Refresh
-                    </button>
-                </div>
-            </div>
-            <div class="task-table-container">
-                <table class="task-table">
-                    <thead>
-                        <tr>
-                            <th>Task</th>
-                            <th>Type</th>
-                            <th>Priority</th>
-                            <th>Status</th>
-                            <th>Duration</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tasks"></tbody>
-                </table>
             </div>
         </div>
     </div>
-    <div class="timestamp" id="timestamp"></div>
-</div>
 
-<script>
-    // ========== All Javascript Logic Preserved, Smart Start Time Display + Priority ==========
-    (function() {
-        // ---------- Notification System ----------
-        class NotificationSystem {
-            constructor() {
-                this.container = document.getElementById('notificationContainer');
-                this.notifications = new Set();
-            }
-            show({ title, message, type = 'info', duration = 5000 }) {
-                const id = Date.now() + Math.random();
-                const notification = document.createElement('div');
-                notification.className = `notification ${type}`;
-                notification.innerHTML = `
-                    <div class="notification-icon">${this.getIcon(type)}</div>
-                    <div class="notification-content">
-                        <div class="notification-title">${title}</div>
-                        <div class="notification-message">${message}</div>
-                        <div class="progress-bar"><div class="progress-fill" style="width: 100%"></div></div>
+    <div class="container">
+        <header>
+            <h1>Task Status Monitor</h1>
+            <div class="header-controls">
+                <div class="search-container">
+                    <input type="text" class="search-input" id="searchInput" placeholder="Search by name or id...">
+                    <button class="search-button" id="searchButton">Search</button>
+                </div>
+                <button class="addition-control-btn" id="additionControlBtn">
+                    <i class="fas fa-plus-circle"></i>
+                    <span>Stop Adding Tasks</span>
+                </button>
+                <div class="theme-toggle" id="themeToggle">
+                    <span class="light active-theme">Light</span>
+                    <span class="dark">Dark</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="dashboard">
+            <!-- Left Panel: Statistics -->
+            <div class="stats-panel">
+                <div class="stats-header">
+                    <div class="stats-title">Task Overview</div>
+                </div>
+                <!-- Total Tasks – now clickable: resets filter to "All Status" -->
+                <div class="total-tasks" id="totalTasksCard">
+                    <div class="total-label">Total Tasks</div>
+                    <div class="total-value" id="total-count">0</div>
+                </div>
+                <div class="status-grid">
+                    <div class="status-item running" data-status="running">
+                        <div class="status-icon"><i class="fas fa-play"></i></div>
+                        <div class="status-info">
+                            <div class="status-name">Running</div>
+                            <div class="status-count" id="running-count">0</div>
+                        </div>
                     </div>
-                `;
-                this.container.appendChild(notification);
-                this.notifications.add(id);
-                setTimeout(() => notification.classList.add('show'), 10);
-                const progressFill = notification.querySelector('.progress-fill');
-                let width = 100;
-                const interval = setInterval(() => { width -= (100 / (duration / 100)); progressFill.style.width = width + '%'; }, 100);
-                const timeout = setTimeout(() => { this.close(id); clearInterval(interval); }, duration);
-                notification._timeout = timeout; notification._interval = interval; notification._id = id;
-                return id;
-            }
-            close(id) {
-                const notification = Array.from(this.container.children).find(c => c._id === id);
-                if (notification) {
-                    notification.classList.remove('show'); notification.classList.add('hide');
-                    clearTimeout(notification._timeout); clearInterval(notification._interval);
-                    setTimeout(() => { if(notification.parentNode) notification.parentNode.removeChild(notification); this.notifications.delete(id); }, 400);
-                }
-            }
-            getIcon(type) {
-                const icons = { success: '✓', error: '✕', warning: '!', info: 'i' };
-                return icons[type] || 'i';
-            }
-        }
-        const notificationSystem = new NotificationSystem();
+                    <div class="status-item failed" data-status="failed">
+                        <div class="status-icon"><i class="fas fa-times"></i></div>
+                        <div class="status-info">
+                            <div class="status-name">Failed</div>
+                            <div class="status-count" id="failed-count">0</div>
+                        </div>
+                    </div>
+                    <div class="status-item completed" data-status="completed">
+                        <div class="status-icon"><i class="fas fa-check"></i></div>
+                        <div class="status-info">
+                            <div class="status-name">Completed</div>
+                            <div class="status-count" id="completed-count">0</div>
+                        </div>
+                    </div>
+                    <div class="status-item queuing" data-status="queuing">
+                        <div class="status-icon"><i class="fas fa-list-ol"></i></div>
+                        <div class="status-info">
+                            <div class="status-name">Queuing</div>
+                            <div class="status-count" id="queuing-count">0</div>
+                        </div>
+                    </div>
+                    <div class="status-item waiting" data-status="waiting">
+                        <div class="status-icon"><i class="fas fa-hourglass-start"></i></div>
+                        <div class="status-info">
+                            <div class="status-name">Waiting</div>
+                            <div class="status-count" id="waiting-count">0</div>
+                        </div>
+                    </div>
+                    <div class="status-item paused" data-status="paused">
+                        <div class="status-icon"><i class="fas fa-pause"></i></div>
+                        <div class="status-info">
+                            <div class="status-name">Paused</div>
+                            <div class="status-count" id="paused-count">0</div>
+                        </div>
+                    </div>
+                    <div class="status-item cancelled" data-status="cancelled">
+                        <div class="status-icon"><i class="fas fa-stop"></i></div>
+                        <div class="status-info">
+                            <div class="status-name">Cancelled</div>
+                            <div class="status-count" id="cancelled-count">0</div>
+                        </div>
+                    </div>
+                    <div class="status-item timeout" data-status="timeout">
+                        <div class="status-icon"><i class="fas fa-hourglass-end"></i></div>
+                        <div class="status-info">
+                            <div class="status-name">Timeout</div>
+                            <div class="status-count" id="timeout-count">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-        // ---------- Task Addition Control ----------
-        const additionControlBtn = document.getElementById('additionControlBtn');
-        let taskAdditionEnabled = true;
-        async function fetchTaskAdditionStatus() {
-            try {
-                const response = await fetch('/task-addition-status');
-                if (response.ok) {
-                    const data = await response.json();
-                    taskAdditionEnabled = data.enabled;
-                    updateAdditionControlButton();
+            <!-- Right Panel: Task List -->
+            <div class="tasks-panel">
+                <div class="tasks-header">
+                    <div class="tasks-title">Task List</div>
+                    <div class="filter-group">
+                        <select class="filter-select" id="statusFilter">
+                            <option value="all">All Status</option>
+                            <option value="running">Running</option>
+                            <option value="failed">Failed</option>
+                            <option value="completed">Completed</option>
+                            <option value="queuing">Queuing</option>
+                            <option value="waiting">Waiting</option>
+                            <option value="paused">Paused</option>
+                            <option value="cancelled">Cancelled</option>
+                            <option value="timeout">Timeout</option>
+                        </select>
+                        <button class="refresh-btn" id="refreshButton">
+                            <i class="fas fa-rotate-right"></i>
+                            <span class="loading-spinner"></span>
+                            Refresh
+                        </button>
+                    </div>
+                </div>
+                <div class="task-table-container">
+                    <table class="task-table">
+                        <thead>
+                            <tr>
+                                <th>Task</th>
+                                <th>Type</th>
+                                <th>Priority</th>
+                                <th>Status</th>
+                                <th>Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tasks"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="timestamp" id="timestamp"></div>
+    </div>
+
+    <script>
+        // ========== All Javascript Logic Preserved, Smart Start Time Display + Priority ==========
+        (function() {
+            // ---------- Notification System ----------
+            class NotificationSystem {
+                constructor() {
+                    this.container = document.getElementById('notificationContainer');
+                    this.notifications = new Set();
                 }
-            } catch (error) {
-                console.error('Failed to fetch task addition status:', error);
+                show({ title, message, type = 'info', duration = 5000 }) {
+                    const id = Date.now() + Math.random();
+                    const notification = document.createElement('div');
+                    notification.className = `notification ${type}`;
+                    notification.innerHTML = `
+                            <div class="notification-icon">${this.getIcon(type)}</div>
+                            <div class="notification-content">
+                                <div class="notification-title">${title}</div>
+                                <div class="notification-message">${message}</div>
+                                <div class="progress-bar"><div class="progress-fill" style="width: 100%"></div></div>
+                            </div>
+                        `;
+                    this.container.appendChild(notification);
+                    this.notifications.add(id);
+                    setTimeout(() => notification.classList.add('show'), 10);
+                    const progressFill = notification.querySelector('.progress-fill');
+                    let width = 100;
+                    const interval = setInterval(() => { width -= (100 / (duration / 100));
+                        progressFill.style.width = width + '%'; }, 100);
+                    const timeout = setTimeout(() => { this.close(id);
+                        clearInterval(interval); }, duration);
+                    notification._timeout = timeout;
+                    notification._interval = interval;
+                    notification._id = id;
+                    return id;
+                }
+                close(id) {
+                    const notification = Array.from(this.container.children).find(c => c._id === id);
+                    if (notification) {
+                        notification.classList.remove('show');
+                        notification.classList.add('hide');
+                        clearTimeout(notification._timeout);
+                        clearInterval(notification._interval);
+                        setTimeout(() => { if (notification.parentNode) notification.parentNode.removeChild(notification);
+                            this.notifications.delete(id); }, 400);
+                    }
+                }
+                getIcon(type) {
+                    const icons = { success: '✓', error: '✕', warning: '!', info: 'i' };
+                    return icons[type] || 'i';
+                }
             }
-        }
-        function updateAdditionControlButton() {
-            if (taskAdditionEnabled) {
-                additionControlBtn.innerHTML = '<i class="fas fa-plus-circle"></i><span>Stop Adding Tasks</span>';
-                additionControlBtn.classList.remove('disabled');
-            } else {
-                additionControlBtn.innerHTML = '<i class="fas fa-play-circle"></i><span>Resume Adding Tasks</span>';
-                additionControlBtn.classList.add('disabled');
+            const notificationSystem = new NotificationSystem();
+
+            // ---------- Task Addition Control ----------
+            const additionControlBtn = document.getElementById('additionControlBtn');
+            let taskAdditionEnabled = true;
+            async function fetchTaskAdditionStatus() {
+                try {
+                    const response = await fetch('/task-addition-status');
+                    if (response.ok) {
+                        const data = await response.json();
+                        taskAdditionEnabled = data.enabled;
+                        updateAdditionControlButton();
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch task addition status:', error);
+                }
             }
-        }
-        async function toggleTaskAddition() {
-            setAdditionButtonLoading(true);
-            try {
-                const response = await fetch('/toggle-task-addition', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    taskAdditionEnabled = data.enabled;
-                    notificationSystem.show({
-                        title: 'Success',
-                        message: data.message,
-                        type: 'success',
-                        duration: 3000
-                    });
-                    updateAdditionControlButton();
+
+            function updateAdditionControlButton() {
+                if (taskAdditionEnabled) {
+                    additionControlBtn.innerHTML = '<i class="fas fa-plus-circle"></i><span>Stop Adding Tasks</span>';
+                    additionControlBtn.classList.remove('disabled');
                 } else {
-                    throw new Error('Failed to toggle task addition');
+                    additionControlBtn.innerHTML = '<i class="fas fa-play-circle"></i><span>Resume Adding Tasks</span>';
+                    additionControlBtn.classList.add('disabled');
                 }
-            } catch (error) {
-                notificationSystem.show({
-                    title: 'Error',
-                    message: `Failed to toggle task addition: ${error.message}`,
-                    type: 'error',
-                    duration: 5000
-                });
-            } finally {
-                setAdditionButtonLoading(false);
-            }
-        }
-        function setAdditionButtonLoading(loading) {
-            if (loading) {
-                additionControlBtn.classList.add('loading');
-                additionControlBtn.disabled = true;
-            } else {
-                additionControlBtn.classList.remove('loading');
-                additionControlBtn.disabled = false;
-            }
-        }
-        additionControlBtn.addEventListener('click', toggleTaskAddition);
-        fetchTaskAdditionStatus();
-
-        // ---------- Theme Toggle ----------
-        const themeToggle = document.getElementById('themeToggle');
-        const lightThemeBtn = themeToggle.querySelector('.light');
-        const darkThemeBtn = themeToggle.querySelector('.dark');
-        const body = document.body;
-        const savedTheme = localStorage.getItem('theme');
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (savedTheme === 'dark' || (!savedTheme && prefersDark)) enableDarkTheme();
-        themeToggle.addEventListener('click', (e) => {
-            if (e.target.classList.contains('light')) enableLightTheme();
-            else if (e.target.classList.contains('dark')) enableDarkTheme();
-        });
-        function enableDarkTheme() {
-            body.classList.replace('light-theme', 'dark-theme');
-            lightThemeBtn.classList.remove('active-theme');
-            darkThemeBtn.classList.add('active-theme');
-            localStorage.setItem('theme', 'dark');
-        }
-        function enableLightTheme() {
-            body.classList.replace('dark-theme', 'light-theme');
-            darkThemeBtn.classList.remove('active-theme');
-            lightThemeBtn.classList.add('active-theme');
-            localStorage.setItem('theme', 'light');
-        }
-
-        // ---------- Utils ----------
-        function formatDuration(seconds) {
-            if (!seconds && seconds !== 0) return '-';
-            if (seconds === -1) return 'Timeout';
-            const h = Math.floor(seconds / 3600);
-            const m = Math.floor((seconds % 3600) / 60);
-            const s = Math.floor(seconds % 60);
-            return [h > 0 ? h : null, m, s].filter(x => x !== null).map(x => x.toString().padStart(2, '0')).join(':');
-        }
-
-        function formatStartTime(timestamp) {
-            if (!timestamp) return null;
-            const date = new Date(timestamp * 1000);
-            return date.toLocaleString(undefined, {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
-            });
-        }
-
-        function highlightText(text, searchTerm) {
-            if (!searchTerm || !text) return text;
-            try {
-                const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-                return text.replace(regex, '<span class="highlight">$1</span>');
-            } catch (e) {
-                return text;
-            }
-        }
-
-        function capitalizeFirst(str) {
-            if (!str) return str;
-            return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
-        }
-
-        function filterTasks(tasks, searchTerm, statusFilter) {
-            let filtered = tasks;
-
-            if (statusFilter && statusFilter !== 'all') {
-                filtered = filtered.filter(t => t.status.toLowerCase() === statusFilter.toLowerCase());
             }
 
-            if (searchTerm && searchTerm.trim() !== '') {
-                const lower = searchTerm.toLowerCase().trim();
-                filtered = filtered.filter(t =>
-                    (t.name && t.name.toLowerCase().includes(lower)) ||
-                    (t.id && t.id.toLowerCase().includes(lower))
-                );
+            async function toggleTaskAddition() {
+                setAdditionButtonLoading(true);
+                try {
+                    const response = await fetch('/toggle-task-addition', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        taskAdditionEnabled = data.enabled;
+                        notificationSystem.show({
+                            title: 'Success',
+                            message: data.message,
+                            type: 'success',
+                            duration: 3000
+                        });
+                        updateAdditionControlButton();
+                    } else {
+                        throw new Error('Failed to toggle task addition');
+                    }
+                } catch (error) {
+                    notificationSystem.show({
+                        title: 'Error',
+                        message: `Failed to toggle task addition: ${error.message}`,
+                        type: 'error',
+                        duration: 5000
+                    });
+                } finally {
+                    setAdditionButtonLoading(false);
+                }
             }
 
-            return filtered;
-        }
-
-        // ---------- Detail Panel With Smart Start Time Display and Priority ----------
-        const overlay = document.getElementById('detailOverlay');
-        const detailContent = document.getElementById('detailContent');
-        const closeBtn = document.getElementById('closeDetailBtn');
-        let currentTaskForDetail = null;
-
-        function openDetailPanel(task) {
-            currentTaskForDetail = task;
-            renderDetailPanel(task);
-            overlay.classList.add('active');
-        }
-
-        function closeDetailPanel() {
-            overlay.classList.remove('active');
-            currentTaskForDetail = null;
-        }
-
-        closeBtn.addEventListener('click', closeDetailPanel);
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDetailPanel(); });
-
-        function canPerformActions(status) {
-            return ['running', 'waiting', 'paused'].includes(status.toLowerCase());
-        }
-        function canPause(status) {
-            return ['running'].includes(status.toLowerCase());
-        }
-        function canResume(status) {
-            return ['paused'].includes(status.toLowerCase());
-        }
-        function canTerminate(status) {
-            return ['running', 'paused'].includes(status.toLowerCase());
-        }
-
-        function renderDetailPanel(task) {
-            const canPauseTask = canPause(task.status);
-            const canResumeTask = canResume(task.status);
-            const canTerminateTask = canTerminate(task.status);
-
-            let actionsHtml = '';
-            if (canPerformActions(task.status)) {
-                actionsHtml = '<div class="action-group">';
-                if (canTerminateTask) actionsHtml += `<button class="detail-action-btn terminate-button" id="detailTerminateBtn">Terminate</button>`;
-                if (canPauseTask) actionsHtml += `<button class="detail-action-btn pause-button" id="detailPauseBtn">Pause</button>`;
-                if (canResumeTask) actionsHtml += `<button class="detail-action-btn resume-button" id="detailResumeBtn">Resume</button>`;
-                actionsHtml += '</div>';
-            } else {
-                actionsHtml = '<p style="color: var(--secondary);">No actions available</p>';
+            function setAdditionButtonLoading(loading) {
+                if (loading) {
+                    additionControlBtn.classList.add('loading');
+                    additionControlBtn.disabled = true;
+                } else {
+                    additionControlBtn.classList.remove('loading');
+                    additionControlBtn.disabled = false;
+                }
             }
+            additionControlBtn.addEventListener('click', toggleTaskAddition);
+            fetchTaskAdditionStatus();
 
-            const errorBlock = task.error_info ? `<div class="detail-error"><strong>Error:</strong> ${task.error_info}</div>` : '';
-
-            // Smart start time display
-            let startTimeDisplay = 'N/A';
-            const statusLower = task.status.toLowerCase();
-            if (statusLower === 'queuing' || statusLower === 'waiting') {
-                startTimeDisplay = 'Not Started';
-            } else if (task.start_time) {
-                const formatted = formatStartTime(task.start_time);
-                if (formatted) startTimeDisplay = formatted;
-            }
-
-            const priorityValue = task.priority !== undefined && task.priority !== null ? task.priority : 'N/A';
-            const startTimeHtml = `<div class="detail-property">
-                <div class="detail-label">Started</div>
-                <div class="detail-value">${startTimeDisplay}</div>
-            </div>`;
-
-            detailContent.innerHTML = `
-                <div class="detail-property"><div class="detail-label">Task Id</div><div class="detail-value">${task.id}</div></div>
-                <div class="detail-property"><div class="detail-label">Name</div><div class="detail-value">${task.name || 'Unnamed'}</div></div>
-                <div class="detail-property"><div class="detail-label">Type</div><div class="detail-value">${capitalizeFirst(task.type) || 'N/A'}</div></div>
-                <div class="detail-property"><div class="detail-label">Priority</div><div class="detail-value">${priorityValue}</div></div>
-                <div class="detail-property"><div class="detail-label">Status</div><div class="detail-value"><span class="task-status status-${task.status.toLowerCase()}"><span class="status-indicator"></span>${capitalizeFirst(task.status)}</span></div></div>
-                ${startTimeHtml}
-                <div class="detail-property"><div class="detail-label">Duration</div><div class="detail-value">${formatDuration(task.duration)}</div></div>
-                ${errorBlock}
-                ${actionsHtml}
-            `;
-
-            if (canTerminateTask) {
-                document.getElementById('detailTerminateBtn')?.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    handleActionFromDetail('terminate');
-                });
-            }
-            if (canPauseTask) {
-                document.getElementById('detailPauseBtn')?.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    handleActionFromDetail('pause');
-                });
-            }
-            if (canResumeTask) {
-                document.getElementById('detailResumeBtn')?.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    handleActionFromDetail('resume');
-                });
-            }
-        }
-
-        async function handleActionFromDetail(action) {
-            if (!currentTaskForDetail) return;
-            const taskId = currentTaskForDetail.id;
-            const taskType = currentTaskForDetail.type || '';
-
-            const detailButtons = document.querySelectorAll('.detail-action-btn');
-            detailButtons.forEach(btn => {
-                btn.classList.add('loading');
-                btn.disabled = true;
+            // ---------- Theme Toggle ----------
+            const themeToggle = document.getElementById('themeToggle');
+            const lightThemeBtn = themeToggle.querySelector('.light');
+            const darkThemeBtn = themeToggle.querySelector('.dark');
+            const body = document.body;
+            const savedTheme = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (savedTheme === 'dark' || (!savedTheme && prefersDark)) enableDarkTheme();
+            themeToggle.addEventListener('click', (e) => {
+                if (e.target.classList.contains('light')) enableLightTheme();
+                else if (e.target.classList.contains('dark')) enableDarkTheme();
             });
 
-            const actionMessages = {
-                pause: { title: 'Pausing Task', message: `Pausing task ${taskId}...` },
-                resume: { title: 'Resuming Task', message: `Resuming task ${taskId}...` },
-                terminate: { title: 'Terminating Task', message: `Terminating task ${taskId}...` }
-            };
-            const notificationId = notificationSystem.show({
-                ...actionMessages[action],
-                type: 'info',
-                duration: 3000
-            });
+            function enableDarkTheme() {
+                body.classList.replace('light-theme', 'dark-theme');
+                lightThemeBtn.classList.remove('active-theme');
+                darkThemeBtn.classList.add('active-theme');
+                localStorage.setItem('theme', 'dark');
+            }
 
-            try {
-                const response = await fetch(`/tasks/${taskId}/${action}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ task_type: taskType })
+            function enableLightTheme() {
+                body.classList.replace('dark-theme', 'light-theme');
+                darkThemeBtn.classList.remove('active-theme');
+                lightThemeBtn.classList.add('active-theme');
+                localStorage.setItem('theme', 'light');
+            }
+
+            // ---------- Utils ----------
+            function formatDuration(seconds) {
+                if (!seconds && seconds !== 0) return '-';
+                if (seconds === -1) return 'Timeout';
+                const h = Math.floor(seconds / 3600);
+                const m = Math.floor((seconds % 3600) / 60);
+                const s = Math.floor(seconds % 60);
+                return [h > 0 ? h : null, m, s].filter(x => x !== null).map(x => x.toString().padStart(2, '0')).join(':');
+            }
+
+            function formatStartTime(timestamp) {
+                if (!timestamp) return null;
+                const date = new Date(timestamp * 1000);
+                return date.toLocaleString(undefined, {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+            }
+
+            function highlightText(text, searchTerm) {
+                if (!searchTerm || !text) return text;
+                try {
+                    const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+                    return text.replace(regex, '<span class="highlight">$1</span>');
+                } catch (e) {
+                    return text;
+                }
+            }
+
+            function capitalizeFirst(str) {
+                if (!str) return str;
+                return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+            }
+
+            function filterTasks(tasks, searchTerm, statusFilter) {
+                let filtered = tasks;
+
+                if (statusFilter && statusFilter !== 'all') {
+                    filtered = filtered.filter(t => t.status.toLowerCase() === statusFilter.toLowerCase());
+                }
+
+                if (searchTerm && searchTerm.trim() !== '') {
+                    const lower = searchTerm.toLowerCase().trim();
+                    filtered = filtered.filter(t =>
+                        (t.name && t.name.toLowerCase().includes(lower)) ||
+                        (t.id && t.id.toLowerCase().includes(lower))
+                    );
+                }
+
+                return filtered;
+            }
+
+            // ---------- Detail Panel With Smart Start Time Display and Priority ----------
+            const overlay = document.getElementById('detailOverlay');
+            const detailContent = document.getElementById('detailContent');
+            const closeBtn = document.getElementById('closeDetailBtn');
+            let currentTaskForDetail = null;
+
+            function openDetailPanel(task) {
+                currentTaskForDetail = task;
+                renderDetailPanel(task);
+                overlay.classList.add('active');
+            }
+
+            function closeDetailPanel() {
+                overlay.classList.remove('active');
+                currentTaskForDetail = null;
+            }
+
+            closeBtn.addEventListener('click', closeDetailPanel);
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDetailPanel(); });
+
+            function canPerformActions(status) {
+                return ['running', 'waiting', 'paused'].includes(status.toLowerCase());
+            }
+
+            function canPause(status) {
+                return ['running'].includes(status.toLowerCase());
+            }
+
+            function canResume(status) {
+                return ['paused'].includes(status.toLowerCase());
+            }
+
+            function canTerminate(status) {
+                return ['running', 'paused'].includes(status.toLowerCase());
+            }
+
+            function renderDetailPanel(task) {
+                const canPauseTask = canPause(task.status);
+                const canResumeTask = canResume(task.status);
+                const canTerminateTask = canTerminate(task.status);
+
+                let actionsHtml = '';
+                if (canPerformActions(task.status)) {
+                    actionsHtml = '<div class="action-group">';
+                    if (canTerminateTask) actionsHtml +=
+                        `<button class="detail-action-btn terminate-button" id="detailTerminateBtn">Terminate</button>`;
+                    if (canPauseTask) actionsHtml +=
+                        `<button class="detail-action-btn pause-button" id="detailPauseBtn">Pause</button>`;
+                    if (canResumeTask) actionsHtml +=
+                        `<button class="detail-action-btn resume-button" id="detailResumeBtn">Resume</button>`;
+                    actionsHtml += '</div>';
+                } else {
+                    actionsHtml = '<p style="color: var(--secondary);">No actions available</p>';
+                }
+
+                const errorBlock = task.error_info ? `<div class="detail-error"><strong>Error:</strong> ${task.error_info}</div>` :
+                '';
+
+                let startTimeDisplay = 'N/A';
+                const statusLower = task.status.toLowerCase();
+                if (statusLower === 'queuing' || statusLower === 'waiting') {
+                    startTimeDisplay = 'Not Started';
+                } else if (task.start_time) {
+                    const formatted = formatStartTime(task.start_time);
+                    if (formatted) startTimeDisplay = formatted;
+                }
+
+                const priorityValue = task.priority !== undefined && task.priority !== null ? task.priority : 'N/A';
+                const startTimeHtml = `<div class="detail-property">
+                        <div class="detail-label">Started</div>
+                        <div class="detail-value">${startTimeDisplay}</div>
+                    </div>`;
+
+                detailContent.innerHTML = `
+                        <div class="detail-property"><div class="detail-label">Task Id</div><div class="detail-value">${task.id}</div></div>
+                        <div class="detail-property"><div class="detail-label">Name</div><div class="detail-value">${task.name || 'Unnamed'}</div></div>
+                        <div class="detail-property"><div class="detail-label">Type</div><div class="detail-value">${capitalizeFirst(task.type) || 'N/A'}</div></div>
+                        <div class="detail-property"><div class="detail-label">Priority</div><div class="detail-value">${priorityValue}</div></div>
+                        <div class="detail-property"><div class="detail-label">Status</div><div class="detail-value"><span class="task-status status-${task.status.toLowerCase()}"><span class="status-indicator"></span>${capitalizeFirst(task.status)}</span></div></div>
+                        ${startTimeHtml}
+                        <div class="detail-property"><div class="detail-label">Duration</div><div class="detail-value">${formatDuration(task.duration)}</div></div>
+                        ${errorBlock}
+                        ${actionsHtml}
+                    `;
+
+                if (canTerminateTask) {
+                    document.getElementById('detailTerminateBtn')?.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        handleActionFromDetail('terminate');
+                    });
+                }
+                if (canPauseTask) {
+                    document.getElementById('detailPauseBtn')?.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        handleActionFromDetail('pause');
+                    });
+                }
+                if (canResumeTask) {
+                    document.getElementById('detailResumeBtn')?.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        handleActionFromDetail('resume');
+                    });
+                }
+            }
+
+            async function handleActionFromDetail(action) {
+                if (!currentTaskForDetail) return;
+                const taskId = currentTaskForDetail.id;
+                const taskType = currentTaskForDetail.type || '';
+
+                const detailButtons = document.querySelectorAll('.detail-action-btn');
+                detailButtons.forEach(btn => {
+                    btn.classList.add('loading');
+                    btn.disabled = true;
                 });
 
-                if (!response.ok) throw new Error(`Failed to ${action} task`);
-                const data = await response.json();
-
-                notificationSystem.close(notificationId);
-                notificationSystem.show({
-                    title: `${action.charAt(0).toUpperCase() + action.slice(1)} Successful`,
-                    message: `Task ${taskId} has been ${action}d`,
-                    type: 'success',
+                const actionMessages = {
+                    pause: { title: 'Pausing Task', message: `Pausing task ${taskId}...` },
+                    resume: { title: 'Resuming Task', message: `Resuming task ${taskId}...` },
+                    terminate: { title: 'Terminating Task', message: `Terminating task ${taskId}...` }
+                };
+                const notificationId = notificationSystem.show({
+                    ...actionMessages[action],
+                    type: 'info',
                     duration: 3000
                 });
 
-                await fetchData();
-
-                if (currentTaskForDetail && overlay.classList.contains('active')) {
-                    if (currentData && currentData.tasks) {
-                        const updatedTask = currentData.tasks.find(t => t.id === taskId);
-                        if (updatedTask) {
-                            currentTaskForDetail = updatedTask;
-                            renderDetailPanel(updatedTask);
-                        }
-                    }
-                }
-            } catch (error) {
-                notificationSystem.close(notificationId);
-                notificationSystem.show({
-                    title: `${action.charAt(0).toUpperCase() + action.slice(1)} Failed`,
-                    message: `Failed to ${action} task: ${error.message}`,
-                    type: 'error',
-                    duration: 5000
-                });
-                await fetchData();
-            } finally {
-                detailButtons.forEach(btn => {
-                    btn.classList.remove('loading');
-                    btn.disabled = false;
-                });
-            }
-        }
-
-        // ---------- Main Table Rendering with Priority Column ----------
-        function updatePage(data, searchTerm = '', statusFilter = 'all') {
-            if (data === "nan" || !data || typeof data !== 'object') {
-                showNoTasksState();
-                updateTimestamp();
-                return;
-            }
-
-            document.getElementById('total-count').textContent = data.tasks?.length || 0;
-            document.getElementById('running-count').textContent = data.running_count || 0;
-            document.getElementById('failed-count').textContent = data.failed_count || 0;
-            document.getElementById('completed-count').textContent = data.completed_count || 0;
-
-            const queuingCount = data.tasks ? data.tasks.filter(t => t.status.toLowerCase() === 'queuing').length : 0;
-            document.getElementById('queuing-count').textContent = queuingCount;
-
-            const waitingCount = data.tasks ? data.tasks.filter(t => t.status.toLowerCase() === 'waiting').length : 0;
-            document.getElementById('waiting-count').textContent = waitingCount;
-
-            const pausedCount = data.tasks ? data.tasks.filter(t => t.status.toLowerCase() === 'paused').length : 0;
-            document.getElementById('paused-count').textContent = pausedCount;
-
-            const cancelledCount = data.tasks ? data.tasks.filter(t => t.status.toLowerCase() === 'cancelled').length : 0;
-            document.getElementById('cancelled-count').textContent = cancelledCount;
-
-            const timeoutCount = data.tasks ? data.tasks.filter(t => t.status.toLowerCase() === 'timeout').length : 0;
-            document.getElementById('timeout-count').textContent = timeoutCount;
-
-            const tasksContainer = document.getElementById('tasks');
-            if (data.tasks?.length > 0) {
-                const filtered = filterTasks(data.tasks, searchTerm, statusFilter);
-                if (filtered.length > 0) {
-                    tasksContainer.innerHTML = filtered.map(task => {
-                        const priorityDisplay = (task.priority !== undefined && task.priority !== null) ? task.priority : 'N/A';
-                        return `
-                        <tr class="task-row" data-task-id="${task.id}">
-                            <td class="task-info">
-                                <div class="task-name" onclick="toggleExpand(this)">${highlightText(task.name || 'Unnamed task', searchTerm)}</div>
-                                <div class="task-id">Id: ${highlightText(task.id, searchTerm)}</div>
-                            </td>
-                            <td><span class="task-type">${capitalizeFirst(task.type) || 'N/A'}</span></td>
-                            <td><span class="task-priority">${priorityDisplay}</span></td>
-                            <td><span class="task-status status-${task.status.toLowerCase()}"><span class="status-indicator"></span>${capitalizeFirst(task.status)}</span></td>
-                            <td>${formatDuration(task.duration)}</td>
-                        </tr>
-                    `}).join('');
-
-                    document.querySelectorAll('.task-row').forEach(row => {
-                        row.addEventListener('click', (e) => {
-                            if (e.target.classList.contains('task-name')) return;
-                            const taskId = row.dataset.taskId;
-                            const task = filtered.find(t => t.id === taskId);
-                            if (task) openDetailPanel(task);
-                        });
-
-                        const nameDiv = row.querySelector('.task-name');
-                        if (nameDiv) {
-                            nameDiv.addEventListener('click', (e) => {
-                                e.stopPropagation();
-                                toggleExpand(nameDiv);
-                                const taskId = row.dataset.taskId;
-                                const task = filtered.find(t => t.id === taskId);
-                                if (task) openDetailPanel(task);
-                            });
-                        }
-
-                        const idDiv = row.querySelector('.task-id');
-                        if (idDiv) {
-                            idDiv.addEventListener('click', (e) => {
-                                e.stopPropagation();
-                                const taskId = row.dataset.taskId;
-                                const task = filtered.find(t => t.id === taskId);
-                                if (task) openDetailPanel(task);
-                            });
-                        }
+                try {
+                    const response = await fetch(`/tasks/${taskId}/${action}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ task_type: taskType })
                     });
 
+                    if (!response.ok) throw new Error(`Failed to ${action} task`);
+                    const data = await response.json();
+
+                    notificationSystem.close(notificationId);
+                    notificationSystem.show({
+                        title: `${action.charAt(0).toUpperCase() + action.slice(1)} Successful`,
+                        message: `Task ${taskId} has been ${action}d`,
+                        type: 'success',
+                        duration: 3000
+                    });
+
+                    await fetchData();
+
+                    if (currentTaskForDetail && overlay.classList.contains('active')) {
+                        if (currentData && currentData.tasks) {
+                            const updatedTask = currentData.tasks.find(t => t.id === taskId);
+                            if (updatedTask) {
+                                currentTaskForDetail = updatedTask;
+                                renderDetailPanel(updatedTask);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    notificationSystem.close(notificationId);
+                    notificationSystem.show({
+                        title: `${action.charAt(0).toUpperCase() + action.slice(1)} Failed`,
+                        message: `Failed to ${action} task: ${error.message}`,
+                        type: 'error',
+                        duration: 5000
+                    });
+                    await fetchData();
+                } finally {
+                    detailButtons.forEach(btn => {
+                        btn.classList.remove('loading');
+                        btn.disabled = false;
+                    });
+                }
+            }
+
+            // ---------- Main Table Rendering with Priority Column ----------
+            function updatePage(data, searchTerm = '', statusFilter = 'all') {
+                if (data === "nan" || !data || typeof data !== 'object') {
+                    showNoTasksState();
+                    updateTimestamp();
+                    return;
+                }
+
+                document.getElementById('total-count').textContent = data.tasks?.length || 0;
+                document.getElementById('running-count').textContent = data.running_count || 0;
+                document.getElementById('failed-count').textContent = data.failed_count || 0;
+                document.getElementById('completed-count').textContent = data.completed_count || 0;
+
+                const queuingCount = data.tasks ? data.tasks.filter(t => t.status.toLowerCase() === 'queuing').length : 0;
+                document.getElementById('queuing-count').textContent = queuingCount;
+
+                const waitingCount = data.tasks ? data.tasks.filter(t => t.status.toLowerCase() === 'waiting').length : 0;
+                document.getElementById('waiting-count').textContent = waitingCount;
+
+                const pausedCount = data.tasks ? data.tasks.filter(t => t.status.toLowerCase() === 'paused').length : 0;
+                document.getElementById('paused-count').textContent = pausedCount;
+
+                const cancelledCount = data.tasks ? data.tasks.filter(t => t.status.toLowerCase() === 'cancelled').length : 0;
+                document.getElementById('cancelled-count').textContent = cancelledCount;
+
+                const timeoutCount = data.tasks ? data.tasks.filter(t => t.status.toLowerCase() === 'timeout').length : 0;
+                document.getElementById('timeout-count').textContent = timeoutCount;
+
+                const tasksContainer = document.getElementById('tasks');
+                if (data.tasks?.length > 0) {
+                    const filtered = filterTasks(data.tasks, searchTerm, statusFilter);
+                    if (filtered.length > 0) {
+                        tasksContainer.innerHTML = filtered.map(task => {
+                            const priorityDisplay = (task.priority !== undefined && task.priority !== null) ? task
+                                .priority : 'N/A';
+                            return `
+                                <tr class="task-row" data-task-id="${task.id}">
+                                    <td class="task-info">
+                                        <div class="task-name" onclick="toggleExpand(this)">${highlightText(task.name || 'Unnamed task', searchTerm)}</div>
+                                        <div class="task-id">Id: ${highlightText(task.id, searchTerm)}</div>
+                                    </td>
+                                    <td><span class="task-type">${capitalizeFirst(task.type) || 'N/A'}</span></td>
+                                    <td><span class="task-priority">${priorityDisplay}</span></td>
+                                    <td><span class="task-status status-${task.status.toLowerCase()}"><span class="status-indicator"></span>${capitalizeFirst(task.status)}</span></td>
+                                    <td>${formatDuration(task.duration)}</td>
+                                </tr>
+                            `;
+                        }).join('');
+
+                        document.querySelectorAll('.task-row').forEach(row => {
+                            row.addEventListener('click', (e) => {
+                                if (e.target.classList.contains('task-name')) return;
+                                const taskId = row.dataset.taskId;
+                                const task = filtered.find(t => t.id === taskId);
+                                if (task) openDetailPanel(task);
+                            });
+
+                            const nameDiv = row.querySelector('.task-name');
+                            if (nameDiv) {
+                                nameDiv.addEventListener('click', (e) => {
+                                    e.stopPropagation();
+                                    toggleExpand(nameDiv);
+                                    const taskId = row.dataset.taskId;
+                                    const task = filtered.find(t => t.id === taskId);
+                                    if (task) openDetailPanel(task);
+                                });
+                            }
+
+                            const idDiv = row.querySelector('.task-id');
+                            if (idDiv) {
+                                idDiv.addEventListener('click', (e) => {
+                                    e.stopPropagation();
+                                    const taskId = row.dataset.taskId;
+                                    const task = filtered.find(t => t.id === taskId);
+                                    if (task) openDetailPanel(task);
+                                });
+                            }
+                        });
+
+                    } else {
+                        tasksContainer.innerHTML =
+                            `<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">🔍</div><div class="empty-state-title">No tasks found</div></div></td></tr>`;
+                    }
                 } else {
-                    tasksContainer.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">🔍</div><div class="empty-state-title">No tasks found</div></div></td></tr>`;
+                    showNoTasksState();
                 }
-            } else {
-                showNoTasksState();
+                updateTimestamp();
             }
-            updateTimestamp();
-        }
 
-        function showNoTasksState() {
-            document.getElementById('tasks').innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">☁️</div><div class="empty-state-title">No tasks available</div></div></td></tr>`;
-            ['total-count', 'running-count', 'failed-count', 'completed-count', 'queuing-count', 'waiting-count', 'paused-count', 'cancelled-count', 'timeout-count']
+            function showNoTasksState() {
+                document.getElementById('tasks').innerHTML =
+                    `<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">☁️</div><div class="empty-state-title">No tasks available</div></div></td></tr>`;
+                ['total-count', 'running-count', 'failed-count', 'completed-count', 'queuing-count', 'waiting-count',
+                    'paused-count', 'cancelled-count', 'timeout-count'
+                ]
                 .forEach(id => document.getElementById(id).textContent = '0');
-        }
-
-        function updateTimestamp() {
-            document.getElementById('timestamp').textContent = `Last updated: ${new Date().toLocaleString()}`;
-        }
-
-        window.toggleExpand = function(el) {
-            el.classList.toggle('expanded');
-        };
-
-        // ---------- Fetch Data ----------
-        let currentData = null;
-        let currentSearchTerm = '';
-        let currentStatusFilter = 'all';
-
-        async function fetchData() {
-            try {
-                const response = await fetch('/tasks');
-                if (!response.ok) throw new Error(`Http error! status: ${response.status}`);
-                const data = await response.json();
-                currentData = data;
-                updatePage(data, currentSearchTerm, currentStatusFilter);
-                return data;
-            } catch (error) {
-                console.log('Using mock data due to fetch error:', error);
-                const mockData = {
-                    running_count: 2,
-                    failed_count: 1,
-                    completed_count: 5,
-                    tasks: [
-                        { id: "task-001-very-long-id-example", name: "Process Data", type: "data", status: "Running", duration: 125, start_time: Math.floor(Date.now()/1000) - 125, priority: "High" },
-                        { id: "task-002", name: "Generate Report", type: "report", status: "Completed", duration: 45, start_time: Math.floor(Date.now()/1000) - 500, priority: "Medium" },
-                        { id: "task-003", name: "Backup Database", type: "database", status: "Failed", duration: 300, error_info: "Connection timeout", start_time: Math.floor(Date.now()/1000) - 600, priority: "Low" },
-                        { id: "task-004", name: "Send Notifications", type: "email", status: "Waiting", duration: null, start_time: null, priority: "High" },
-                        { id: "task-005", name: "Data Analysis", type: "analysis", status: "Paused", duration: 180, start_time: Math.floor(Date.now()/1000) - 200, priority: "Medium" },
-                        { id: "task-006", name: "Cleanup Job", type: "maintenance", status: "Cancelled", duration: null, start_time: Math.floor(Date.now()/1000) - 1000, priority: "Low" },
-                        { id: "task-007", name: "Data Sync", type: "sync", status: "Queuing", duration: null, start_time: null, priority: "High" },
-                        { id: "task-008", name: "Image Processing", type: "media", status: "Waiting", duration: null, start_time: null, priority: "Normal" },
-                        { id: "task-009", name: "Long Running Task", type: "batch", status: "Timeout", duration: -1, error_info: "Task execution exceeded time limit", start_time: Math.floor(Date.now()/1000) - 7200, priority: "High" }
-                    ]
-                };
-                currentData = mockData;
-                updatePage(mockData, currentSearchTerm, currentStatusFilter);
-                return mockData;
             }
-        }
 
-        // Event Listeners
-        const searchInput = document.getElementById('searchInput');
-        const searchButton = document.getElementById('searchButton');
-        const statusFilter = document.getElementById('statusFilter');
+            function updateTimestamp() {
+                document.getElementById('timestamp').textContent = `Last updated: ${new Date().toLocaleString()}`;
+            }
 
-        function applyFilters() {
-            currentSearchTerm = searchInput.value.trim();
-            currentStatusFilter = statusFilter.value;
-            if (currentData) updatePage(currentData, currentSearchTerm, currentStatusFilter);
-        }
+            window.toggleExpand = function(el) {
+                el.classList.toggle('expanded');
+            };
 
-        searchButton.addEventListener('click', applyFilters);
-        searchInput.addEventListener('keyup', (e) => {
-            if (e.key === 'Enter') applyFilters();
-        });
-        statusFilter.addEventListener('change', applyFilters);
+            // ---------- Fetch Data ----------
+            let currentData = null;
+            let currentSearchTerm = '';
+            let currentStatusFilter = 'all';
 
-        document.querySelectorAll('.status-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const status = item.dataset.status;
-                if (status) {
-                    statusFilter.value = status;
-                    applyFilters();
+            async function fetchData() {
+                try {
+                    const response = await fetch('/tasks');
+                    if (!response.ok) throw new Error(`Http error! status: ${response.status}`);
+                    const data = await response.json();
+                    currentData = data;
+                    updatePage(data, currentSearchTerm, currentStatusFilter);
+                    return data;
+                } catch (error) {
+                    console.log('Using mock data due to fetch error:', error);
+                    const mockData = {
+                        running_count: 2,
+                        failed_count: 1,
+                        completed_count: 5,
+                        tasks: [
+                            { id: "task-001-very-long-id-example", name: "Process Data", type: "data",
+                            status: "Running", duration: 125, start_time: Math.floor(Date.now() / 1000) - 125,
+                                priority: "High" },
+                            { id: "task-002", name: "Generate Report", type: "report", status: "Completed",
+                                duration: 45, start_time: Math.floor(Date.now() / 1000) - 500,
+                            priority: "Medium" },
+                            { id: "task-003", name: "Backup Database", type: "database", status: "Failed",
+                                duration: 300, error_info: "Connection timeout", start_time: Math.floor(Date
+                                    .now() / 1000) - 600, priority: "Low" },
+                            { id: "task-004", name: "Send Notifications", type: "email", status: "Waiting",
+                                duration: null, start_time: null, priority: "High" },
+                            { id: "task-005", name: "Data Analysis", type: "analysis", status: "Paused",
+                                duration: 180, start_time: Math.floor(Date.now() / 1000) - 200,
+                            priority: "Medium" },
+                            { id: "task-006", name: "Cleanup Job", type: "maintenance", status: "Cancelled",
+                                duration: null, start_time: Math.floor(Date.now() / 1000) - 1000,
+                            priority: "Low" },
+                            { id: "task-007", name: "Data Sync", type: "sync", status: "Queuing", duration: null,
+                                start_time: null, priority: "High" },
+                            { id: "task-008", name: "Image Processing", type: "media", status: "Waiting",
+                                duration: null, start_time: null, priority: "Normal" },
+                            { id: "task-009", name: "Long Running Task", type: "batch", status: "Timeout",
+                                duration: -1, error_info: "Task execution exceeded time limit",
+                                start_time: Math.floor(Date.now() / 1000) - 7200, priority: "High" }
+                        ]
+                    };
+                    currentData = mockData;
+                    updatePage(mockData, currentSearchTerm, currentStatusFilter);
+                    return mockData;
                 }
-            });
-        });
+            }
 
-        const refreshBtn = document.getElementById('refreshButton');
-        refreshBtn.addEventListener('click', () => {
-            refreshBtn.classList.add('loading');
-            refreshBtn.disabled = true;
-            fetchData().finally(() => {
+            // ---------- Event Listeners ----------
+            const searchInput = document.getElementById('searchInput');
+            const searchButton = document.getElementById('searchButton');
+            const statusFilter = document.getElementById('statusFilter');
+
+            function applyFilters() {
+                currentSearchTerm = searchInput.value.trim();
+                currentStatusFilter = statusFilter.value;
+                if (currentData) updatePage(currentData, currentSearchTerm, currentStatusFilter);
+            }
+
+            searchButton.addEventListener('click', applyFilters);
+            searchInput.addEventListener('keyup', (e) => {
+                if (e.key === 'Enter') applyFilters();
+            });
+            statusFilter.addEventListener('change', applyFilters);
+
+            // ---- Status item clicks: filter by status ----
+            document.querySelectorAll('.status-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const status = item.dataset.status;
+                    if (status) {
+                        statusFilter.value = status;
+                        applyFilters();
+                    }
+                });
+            });
+
+            // ---- NEW: Total Tasks card click: reset to "All Status" ----
+            document.getElementById('totalTasksCard').addEventListener('click', function(e) {
+                // Reset filter dropdown to "All Status"
+                statusFilter.value = 'all';
+                applyFilters();
+                // (Optional) subtle haptic feedback via a tiny scale pulse
+                this.style.transition = 'transform 0.08s cubic-bezier(0.2, 0.9, 0.3, 1.1)';
+                this.style.transform = 'scale(0.97)';
                 setTimeout(() => {
-                    refreshBtn.classList.remove('loading');
-                    refreshBtn.disabled = false;
-                }, 500);
+                    this.style.transform = 'scale(1)';
+                }, 100);
             });
-        });
 
-        fetchData();
-        setInterval(() => {
+            // ---- Refresh button ----
+            const refreshBtn = document.getElementById('refreshButton');
+            refreshBtn.addEventListener('click', () => {
+                refreshBtn.classList.add('loading');
+                refreshBtn.disabled = true;
+                fetchData().finally(() => {
+                    setTimeout(() => {
+                        refreshBtn.classList.remove('loading');
+                        refreshBtn.disabled = false;
+                    }, 500);
+                });
+            });
+
+            // ---- Initial load & auto-refresh ----
             fetchData();
-            fetchTaskAdditionStatus();
-        }, 4000);
-    })();
-</script>
+            setInterval(() => {
+                fetchData();
+                fetchTaskAdditionStatus();
+            }, 4000);
+        })();
+    </script>
 </body>
 </html>
