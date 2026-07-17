@@ -5,13 +5,13 @@ from task_scheduling.utils import interruptible_sleep
 
 
 def linear_task(input_info):
-    for i in range(10):
+    for i in range(20):
         interruptible_sleep(1)
         print(f"Linear task: {input_info} - {i}")
 
 
 async def async_task(input_info):
-    for i in range(10):
+    for i in range(20):
         await asyncio.sleep(1)
         print(f"Async task: {input_info} - {i}")
 
@@ -32,6 +32,7 @@ if __name__ == "__main__":
         None, None, FUNCTION_TYPE_IO, True, "async_task",
         async_task, priority_low, "Hello Async"
     )
+
     try:
         while True:
             time.sleep(0.1)
