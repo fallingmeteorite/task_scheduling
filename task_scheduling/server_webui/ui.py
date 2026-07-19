@@ -522,6 +522,8 @@ def start_task_status_ui(host='', port=7999, max_port_attempts=100):
         TaskStatusServer: The server instance with actual port information
     """
     server = TaskStatusServer()
+    if host:
+        server.host = host  # Host override configuration
     server.port = port  # Port in override configuration
     server.max_port_attempts = max_port_attempts
     server.start()

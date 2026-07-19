@@ -16,7 +16,7 @@ class RPCClient:
     Simple RPC Client for direct function calls with proper serialization.
 
     Usage:
-        with RPCClient('localhost', 8888) as client:
+        with RPCClient() as client:
             info = client.get_tasks_info()
             client.add_ban_task_name('bad_task')
             client.pause_api('video', 'task_123')
@@ -78,26 +78,26 @@ class RPCClient:
         """
         return self._rpc_call('get_tasks_info')
 
-    def get_task_status(self, task_name: str) -> Dict[str, Any]:
+    def get_task_status(self, task_id: str) -> Dict[str, Any]:
         """
         Get status of specific task.
 
         Args:
-            task_name: Name of task
+            task_id: Task ID
 
         Returns:
             Dict[str, Any]: Task status information
         """
-        return self._rpc_call('get_task_status', task_name)
+        return self._rpc_call('get_task_status', task_id)
 
-    def get_task_count(self) -> Dict[str, int]:
+    def get_task_count(self, task_name: str) -> int:
         """
-        Get task counts by status.
+        Get the count of tasks with the specified task name.
 
         Returns:
-            Dict[str, int]: Task counts
+            int: Task count
         """
-        return self._rpc_call('get_task_count')
+        return self._rpc_call('get_task_count', task_name)
 
     def get_all_task_count(self) -> Dict[str, Any]:
         """
