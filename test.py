@@ -34,8 +34,8 @@ if __name__ == "__main__":
     )
 
     try:
-
         while True:
             time.sleep(0.1)
+
     except KeyboardInterrupt:
         task_scheduler.shutdown_scheduler()
