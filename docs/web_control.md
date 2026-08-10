@@ -8,7 +8,7 @@
 from task_scheduling.server_webui import start_task_status_ui
 
 # 启动网页界面，访问: http://localhost:8000
-start_task_status_ui()
+start_task_status_ui(host="127.0.0.1", port=8000)
 ```
 
 - 功能说明
