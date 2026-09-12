@@ -93,7 +93,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict],
     """
     _, _, task_id, _, _, _ = task
     task_pid[task_id] = os.getpid()
-    task_manager = ProcessTaskManager(task_signal_transmission)
+    task_manager = ProcessTaskManager(task_signal_transmission, task_status_queue)
     try:
         result = asyncio.run(_execute_task_async(task, task_status_queue, task_manager))
     except StopException:

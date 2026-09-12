@@ -58,7 +58,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict],
     # Create a shared dictionary
     _sharedtaskdict = SharedTaskDict()
 
-    task_manager = ProcessTaskManager(task_signal_transmission)
+    task_manager = ProcessTaskManager(task_signal_transmission, task_status_queue)
     try:
         with ThreadTerminator().terminate_control() as terminate_ctx:
             with ThreadSuspender() as pause_ctx:

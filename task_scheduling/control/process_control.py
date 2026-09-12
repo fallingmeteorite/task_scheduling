@@ -20,7 +20,7 @@ import threading
 import time
 from typing import Dict, Any, Union
 
-from task_scheduling.common import config
+from task_scheduling.common import config, logger
 
 
 class ProcessTaskManager:
@@ -29,18 +29,20 @@ class ProcessTaskManager:
     Monitors a task queue for control commands and applies them to managed tasks.
     """
 
-    __slots__ = ['_tasks', '_lock', '_task_queue', '_running', '_main_task_id', '_fail_count_dict']
+    __slots__ = ['_tasks', '_lock', '_task_queue', '_task_status_queue', '_running', '_main_task_id', '_fail_count_dict']
 
-    def __init__(self, task_queue: Dict) -> None:
+    def __init__(self, task_queue: Dict, task_status_queue: Dict) -> None:
         """
         Initialize the ProcessTaskManager.
 
         Args:
             task_queue: Shared dictionary for receiving task control commands
+            task_status_queue: Queue to update task status.
         """
         self._tasks: Dict[str, Dict[str, Any]] = {}
         self._lock = threading.RLock()
         self._task_queue = task_queue
+        self._task_status_queue = task_status_queue
         self._running = True
         self._main_task_id: Union[str, None] = None
         self._fail_count_dict: dict = {}
@@ -125,6 +127,25 @@ class ProcessTaskManager:
                 if task_id != self._main_task_id:
                     self.terminate_task(task_id)
                     del self._tasks[task_id]
+                    logger.info(f"task | {task_id} | cancelled, forced termination")
+
+    def pause_branch_tasks(self) -> None:
+        """Pause all tasks except the main task."""
+        with self._lock:
+            for task_id in list(self._tasks.keys()):
+                if task_id != self._main_task_id:
+                    self.pause_task(task_id)
+                    self._task_status_queue.put(("paused", task_id, None, None, None, None, None))
+                    logger.info(f"task | {task_id} | paused")
+
+    def resume_branch_tasks(self) -> None:
+        """Resume all tasks except the main task."""
+        with self._lock:
+            for task_id in list(self._tasks.keys()):
+                if task_id != self._main_task_id:
+                    self.resume_task(task_id)
+                    self._task_status_queue.put(("running", task_id, None, None, None, None, None))
+                    logger.info(f"task | {task_id} | resumed")
 
     def terminate_task(self, task_id: str) -> None:
         """Terminate specific task."""
@@ -173,9 +194,15 @@ class ProcessTaskManager:
                         if action == "kill":
                             self.terminate_task(task_id)
                         elif action == "pause":
+                            # First check if it's the main thread, if it is, pause the branch thread first
+                            if task_id == self._main_task_id:
+                                self.pause_branch_tasks()
                             self.pause_task(task_id)
                         elif action == "resume":
-                            self.resume_task(task_id)
+                            # First check if it's the main thread, if it is, resume the branch thread first
+                            if task_id == self._main_task_id:
+                                self.resume_branch_tasks()
+                            self.pause_task(task_id)
 
                     # Remove from queue since we're processing it
                     del self._task_queue[task_id]
