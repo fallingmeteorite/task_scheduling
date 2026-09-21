@@ -13,8 +13,9 @@ try:
     from task_scheduling.scheduler.utils.parameter_check import get_param_count, retry_on_error_decorator_check
     from task_scheduling.scheduler.utils.dill_coverage import DillProcessPoolExecutor
     from task_scheduling.scheduler.utils.time_bucket import TimeBucketQueue
+    from task_scheduling.scheduler.utils.restrict import restrict_scope
 except KeyboardInterrupt:
     sys.exit(0)
 
 __all__ = ['exit_cleanup', 'SharedStatusInfo', 'TaskCounter', 'get_param_count', 'retry_on_error_decorator_check',
-           'DillProcessPoolExecutor', 'TimeBucketQueue']
+           'DillProcessPoolExecutor', 'TimeBucketQueue', 'restrict_scope']

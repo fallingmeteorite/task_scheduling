@@ -18,7 +18,7 @@ from task_scheduling.common import logger, config
 from task_scheduling.control import ThreadTaskManager
 from task_scheduling.handling import ThreadSuspender
 from task_scheduling.manager import task_status_manager
-from task_scheduling.scheduler.utils import retry_on_error_decorator_check
+from task_scheduling.scheduler.utils import retry_on_error_decorator_check, restrict_scope
 from task_scheduling.result_server import store_task_result
 
 # Create Manager instance
@@ -55,15 +55,19 @@ async def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> A
             # If the task needs timeout processing, set the timeout time
             if timeout_processing:
                 if retry_on_error_decorator_check(func):
-                    result = await asyncio.wait_for(func(task_id, *args, **kwargs),
+                    with restrict_scope("all"):
+                        result = await asyncio.wait_for(func(task_id, *args, **kwargs),
                                                     timeout=config["watch_dog_time"])
                 else:
-                    result = await asyncio.wait_for(func(*args, **kwargs), timeout=config["watch_dog_time"])
+                    with restrict_scope("all"):
+                        result = await asyncio.wait_for(func(*args, **kwargs), timeout=config["watch_dog_time"])
             else:
                 if retry_on_error_decorator_check(func):
-                    result = await func(task_id, *args, **kwargs)
+                    with restrict_scope("all"):
+                        result = await func(task_id, *args, **kwargs)
                 else:
-                    result = await func(*args, **kwargs)
+                    with restrict_scope("all"):
+                        result = await func(*args, **kwargs)
 
         _task_manager.remove(task_id)
 
@@ -320,7 +324,7 @@ class IoAsyncioTask:
                 self._task_counters.clear()
                 self._running_tasks.clear()
                 self._scheduler_stop_events.clear()
-                self._task_add_lock = True
+                self._task_add_lock = False
 
             logger.debug(
                 "Scheduler and event loop have stopped, all resources have been released and parameters reset")
@@ -373,7 +377,7 @@ class IoAsyncioTask:
             future.add_done_callback(partial(self._task_done, task_id, task_name))
 
             with self._lock:
-                self._task_add_lock = True
+                self._task_add_lock = False
 
     def _task_done(self,
                    task_id: str,

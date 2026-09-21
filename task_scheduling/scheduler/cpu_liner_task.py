@@ -21,7 +21,7 @@ from task_scheduling.handling import ThreadTerminator, StopException, ThreadSusp
 from task_scheduling.manager import task_status_manager, SharedTaskDict
 from task_scheduling.result_server import store_task_result
 from task_scheduling.scheduler.utils import exit_cleanup, TaskCounter, SharedStatusInfo, get_param_count, \
-    retry_on_error_decorator_check, DillProcessPoolExecutor
+    retry_on_error_decorator_check, DillProcessPoolExecutor, restrict_scope
 
 _task_counter = TaskCounter("cpu_liner_task")
 shared_status_info_liner = SharedStatusInfo()
@@ -74,16 +74,20 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict],
                             share_info = (task_name, task_manager, ThreadTerminator, StopException, ThreadingTimeout,
                                           TimeoutException, ThreadSuspender, task_status_queue)
                             if retry_on_error_decorator_check(func):
-                                result = func(task_id, share_info, _sharedtaskdict, task_signal_transmission, *args,
+                                with restrict_scope("process", "subprocess"):
+                                    result = func(task_id, share_info, _sharedtaskdict, task_signal_transmission, *args,
                                               **kwargs)
                             else:
-                                result = func(share_info, _sharedtaskdict, task_signal_transmission, *args,
+                                with restrict_scope("process", "subprocess"):
+                                    result = func(share_info, _sharedtaskdict, task_signal_transmission, *args,
                                               **kwargs)
                         else:
                             if retry_on_error_decorator_check(func):
-                                result = func(task_id, *args, **kwargs)
+                                with restrict_scope("process", "subprocess"):
+                                    result = func(task_id, *args, **kwargs)
                             else:
-                                result = func(*args, **kwargs)
+                                with restrict_scope("process", "subprocess"):
+                                    result = func(*args, **kwargs)
                 else:
                     # Whether to pass in the task manager to facilitate other thread management
                     # Check whether the function needs to use hyperthreading
@@ -91,16 +95,20 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict],
                         share_info = (task_name, task_manager, ThreadTerminator, StopException, ThreadingTimeout,
                                       TimeoutException, ThreadSuspender, task_status_queue)
                         if retry_on_error_decorator_check(func):
-                            result = func(task_id, share_info, _sharedtaskdict, task_signal_transmission, *args,
+                            with restrict_scope("process", "subprocess"):
+                                result = func(task_id, share_info, _sharedtaskdict, task_signal_transmission, *args,
                                           **kwargs)
                         else:
-                            result = func(share_info, _sharedtaskdict, task_signal_transmission, *args,
+                            with restrict_scope("process", "subprocess"):
+                                result = func(share_info, _sharedtaskdict, task_signal_transmission, *args,
                                           **kwargs)
                     else:
                         if retry_on_error_decorator_check(func):
-                            result = func(task_id, *args, **kwargs)
+                            with restrict_scope("process", "subprocess"):
+                                result = func(task_id, *args, **kwargs)
                         else:
-                            result = func(*args, **kwargs)
+                            with restrict_scope("process", "subprocess"):
+                                result = func(*args, **kwargs)
 
     except (StopException, KeyboardInterrupt):
         logger.warning(f"task | {task_id} | cancelled, forced termination")
@@ -123,6 +131,8 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict],
 
     finally:
         # Terminate all other threads under the main thread
+        # Prevent the main thread from ending while the branch threads are still running
+        # Used as insurance, rather than stopping the normal operation of the branch line
         task_manager.terminate_branch_tasks()
 
         # Remove main thread logging

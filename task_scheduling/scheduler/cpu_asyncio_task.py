@@ -21,7 +21,7 @@ from task_scheduling.control import ProcessTaskManager
 from task_scheduling.handling import ThreadTerminator, StopException, ThreadSuspender
 from task_scheduling.result_server import store_task_result
 from task_scheduling.scheduler.utils import exit_cleanup, SharedStatusInfo, retry_on_error_decorator_check, \
-    DillProcessPoolExecutor
+    DillProcessPoolExecutor, restrict_scope
 
 shared_status_info_asyncio = SharedStatusInfo()
 
@@ -55,16 +55,20 @@ async def _execute_task_async(task: Tuple[bool, str, str, Callable, Tuple, Dict]
 
             if timeout_processing:
                 if retry_on_error_decorator_check(func):
-                    result = await asyncio.wait_for(func(task_id, *args, **kwargs),
+                    with restrict_scope("process", "subprocess"):
+                        result = await asyncio.wait_for(func(task_id, *args, **kwargs),
                                                     timeout=config["watch_dog_time"])
                 else:
-                    result = await asyncio.wait_for(func(*args, **kwargs),
+                    with restrict_scope("process", "subprocess"):
+                        result = await asyncio.wait_for(func(*args, **kwargs),
                                                     timeout=config["watch_dog_time"])
             else:
                 if retry_on_error_decorator_check(func):
-                    result = await func(task_id, *args, **kwargs)
+                    with restrict_scope("process", "subprocess"):
+                        result = await func(task_id, *args, **kwargs)
                 else:
-                    result = await func(*args, **kwargs)
+                    with restrict_scope("process", "subprocess"):
+                        result = await func(*args, **kwargs)
 
     return result
 

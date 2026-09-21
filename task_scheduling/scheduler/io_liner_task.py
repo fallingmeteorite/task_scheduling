@@ -18,7 +18,7 @@ from task_scheduling.control import ThreadTaskManager
 from task_scheduling.handling import TimeoutException, ThreadSuspender, StopException, ThreadingTimeout, \
     ThreadTerminator
 from task_scheduling.manager import task_status_manager
-from task_scheduling.scheduler.utils import TaskCounter, retry_on_error_decorator_check
+from task_scheduling.scheduler.utils import TaskCounter, retry_on_error_decorator_check, restrict_scope
 from task_scheduling.result_server import store_task_result
 
 # Create Manager instance
@@ -47,6 +47,7 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict]) -> An
     timeout_processing, task_name, task_id, func, priority, args, kwargs = task
     logger.debug(f"Start running task, task ID: {task_id}")
     try:
+
         with ThreadTerminator().terminate_control() as terminate_ctx:
             with ThreadSuspender() as pause_ctx:
 
@@ -57,14 +58,18 @@ def _execute_task(task: Tuple[bool, str, str, Callable, str, Tuple, Dict]) -> An
                 if timeout_processing:
                     with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
                         if retry_on_error_decorator_check(func):
-                            result = func(task_id, *args, **kwargs)
+                            with restrict_scope("all"):
+                                result = func(task_id, *args, **kwargs)
                         else:
-                            result = func(*args, **kwargs)
+                            with restrict_scope("all"):
+                                result = func(*args, **kwargs)
                 else:
                     if retry_on_error_decorator_check(func):
-                        result = func(task_id, *args, **kwargs)
+                        with restrict_scope("all"):
+                            result = func(task_id, *args, **kwargs)
                     else:
-                        result = func(*args, **kwargs)
+                        with restrict_scope("all"):
+                            result = func(*args, **kwargs)
 
         _task_manager.remove(task_id)
 
@@ -253,7 +258,7 @@ class IoLinerTask:
                 self._running_tasks.clear()
                 self._running_task_names.clear()
                 self._task_results.clear()
-                self._task_add_lock = True
+                self._task_add_lock = False
 
             self._scheduler_thread = None
 
@@ -313,7 +318,7 @@ class IoLinerTask:
                 with self._lock:
                     self._running_tasks[task_id] = [future, task_name, priority]
                     self._running_task_names.add(task_name)
-                    self._task_add_lock = True
+                    self._task_add_lock = False
 
                 future.add_done_callback(partial(self._task_done, task_id))
 

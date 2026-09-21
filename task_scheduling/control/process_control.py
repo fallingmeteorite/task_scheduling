@@ -29,7 +29,8 @@ class ProcessTaskManager:
     Monitors a task queue for control commands and applies them to managed tasks.
     """
 
-    __slots__ = ['_tasks', '_lock', '_task_queue', '_task_status_queue', '_running', '_main_task_id', '_fail_count_dict']
+    __slots__ = ['_tasks', '_lock', '_task_queue', '_task_status_queue', '_running', '_main_task_id',
+                 '_fail_count_dict']
 
     def __init__(self, task_queue: Dict, task_status_queue: Dict) -> None:
         """
@@ -127,6 +128,7 @@ class ProcessTaskManager:
                 if task_id != self._main_task_id:
                     self.terminate_task(task_id)
                     del self._tasks[task_id]
+                    self._task_status_queue.put(("cancelled", task_id, None, None, None, None, None))
                     logger.info(f"task | {task_id} | cancelled, forced termination")
 
     def pause_branch_tasks(self) -> None:
@@ -192,6 +194,9 @@ class ProcessTaskManager:
                     for action in actions:
                         # Directly call the corresponding method
                         if action == "kill":
+                            # First check if it's the main thread, if it is, terminate the branch thread first
+                            if task_id == self._main_task_id:
+                                self.terminate_branch_tasks()
                             self.terminate_task(task_id)
                         elif action == "pause":
                             # First check if it's the main thread, if it is, pause the branch thread first

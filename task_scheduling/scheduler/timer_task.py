@@ -18,7 +18,7 @@ from task_scheduling.control import ThreadTaskManager
 from task_scheduling.handling import ThreadTerminator, StopException, ThreadingTimeout, TimeoutException, \
     ThreadSuspender
 from task_scheduling.manager import task_status_manager
-from task_scheduling.scheduler.utils import retry_on_error_decorator_check
+from task_scheduling.scheduler.utils import retry_on_error_decorator_check, restrict_scope
 from task_scheduling.result_server import store_task_result
 
 from task_scheduling.scheduler.utils import TimeBucketQueue
@@ -56,14 +56,18 @@ def _execute_task(task: Tuple[bool, str, str, Callable, Tuple, Dict]) -> Any:
             if timeout_processing:
                 with ThreadingTimeout(seconds=config["watch_dog_time"], swallow_exc=False):
                     if retry_on_error_decorator_check(func):
-                        result = func(task_id, *args, **kwargs)
+                        with restrict_scope("all"):
+                            result = func(task_id, *args, **kwargs)
                     else:
-                        result = func(*args, **kwargs)
+                        with restrict_scope("all"):
+                            result = func(*args, **kwargs)
             else:
                 if retry_on_error_decorator_check(func):
-                    result = func(task_id, *args, **kwargs)
+                    with restrict_scope("all"):
+                        result = func(task_id, *args, **kwargs)
                 else:
-                    result = func(*args, **kwargs)
+                    with restrict_scope("all"):
+                        result = func(*args, **kwargs)
 
             _task_manager.remove(task_id)
 
