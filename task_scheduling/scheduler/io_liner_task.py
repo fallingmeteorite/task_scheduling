@@ -344,6 +344,10 @@ class IoLinerTask:
             result = "cancelled action"
 
         except Exception as error:
+
+            if config["exception_thrown"]:
+                raise
+
             # Other exceptions have already been handled in _execute_task.
             task_status_manager.add_task_status(task_id, None, "failed", None, None, error, None, None)
             result = "failed action"
